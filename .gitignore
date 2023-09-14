@@ -1,0 +1,5 @@
+data/
+*.csv
+.vscode/
+__pycache__/
+*.png
