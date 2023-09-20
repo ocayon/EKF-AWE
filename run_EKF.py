@@ -11,17 +11,19 @@ import time
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Read and process data
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-n_tether_elements = 15
+n_tether_elements = 5
 flight_data = read_data()
 flight_data = flight_data.reset_index()
     
-
+window_size=30
+flight_data['ax']=np.convolve(flight_data['ax'], np.ones(window_size)/window_size, mode='same')
+flight_data['ay']=np.convolve(flight_data['ay'], np.ones(window_size)/window_size, mode='same')
+flight_data['az']=np.convolve(flight_data['az'], np.ones(window_size)/window_size, mode='same')
 
 dep_fd = flight_data[flight_data['kite_set_depower']>25]
 pow_fd = flight_data[flight_data['kite_set_depower']<25]
 u_p = flight_data['kite_set_depower']-min(flight_data['kite_set_depower'])
 u_p = u_p/max(u_p)
-
 phi_upwind_direction = np.array(-flight_data['est_upwind_direction']-np.pi/2.+2*np.pi)
 vw = [9*np.cos(0.2),9*np.sin(0.2),0]
 
@@ -30,6 +32,7 @@ CD= []
 CS = []
 L=[]
 D=[]
+tether_length =[]
 for i in range(2):
     row = flight_data.iloc[i]
     args = (row['ground_tether_force'], n_tether_elements, list(row[['rx', 'ry', 'rz']]), list(row[['vx','vy','vz']]),vw,
@@ -38,7 +41,7 @@ for i in range(2):
                             kwargs={'find_force': False}, verbose=0)
     res = get_tether_end_position(
         opt_res.x, *args, return_values=True, find_force=False)
-    tether_length = res[1]
+    tether_length.append(res[1])
     aero_force = res[6]         
     va = res[7]
     FD = np.dot(va/np.linalg.norm(va),aero_force)*va/np.linalg.norm(va)
@@ -77,10 +80,11 @@ u_sym = ca.vertcat(Ft)
 
 #%% Measurement vectors 
 
+
 Z = np.array([flight_data['rx'],flight_data['ry'],flight_data['rz'],flight_data['vx'],flight_data['vy'],flight_data['vz'],
-              flight_data['az']*0,flight_data['ground_wind_velocity'],phi_upwind_direction,flight_data['ax'],flight_data['ay'],flight_data['az']]).T
+              np.zeros(len(flight_data)),flight_data['ground_wind_velocity'],phi_upwind_direction,flight_data['ax'],flight_data['ay'],flight_data['az']]).T
 
-
+dep = (flight_data['ground_tether_reelout_speed'] < 0) & (flight_data['kite_set_depower'] > 23)
 #%%
 ########################################################################
 ## Set simulation parameters
@@ -88,29 +92,103 @@ Z = np.array([flight_data['rx'],flight_data['ry'],flight_data['rz'],flight_data[
 n           =  x0.shape[0]      # state dimension
 nm          =  Z.shape[1]       # number of measurements
 m           =  3                # number of inputs
-
+    
 stdv_us = 0.1   
-stdv_Ft = 200
+
 stdv_xGPS = 2.5
-stdv_vGPS = 0.1
-stdv_aGPS = 1
+stdv_vGPS = 1
+stdv_aGPS = 7
 stdv_vwz = 0.1
-stdv_vwg = 5
-stdv_dirw = 30/180*np.pi
-
-## IDEA: make FL and FD dependant on alpha
-
-Q = np.zeros((m, m))
-Q[:3,:3] = np.eye(m)*stdv_Ft**2
+stdv_vwg = 1
+stdv_va = 0.5
+stdv_dirw = 10/180*np.pi
 
 R = np.zeros((nm,nm))
 R[:3, :3] = np.eye(3) * stdv_xGPS**2
+
 R[3:6, 3:6] = np.eye(3) * stdv_vGPS**2
 R[6,6] = stdv_vwz**2
 R[7,7] = stdv_vwg**2
 R[8,8] = stdv_dirw**2
 R[9:12,9:12] =  np.eye(3) * stdv_aGPS**2
-R[11,11] = 5**2
+
+# R[3,3] = 1.6**2
+# R[4,4] = 3.3**2
+# R[5,5] = 1.7**2
+# R[9,9] = 5.8**2
+# R[10,10] = 7.8**2
+# R[11,11] =6.9**2
+
+#%% Define process noise matrix
+stdv_Ft = 200
+stdv_CL = 0.2
+stdv_CD = 0.1
+stdv_CS = 0.1
+stdv_vw = 0.0
+
+# Define process noise matrix
+Q = np.zeros((9, 9))
+Q[:3,:3] = np.eye(3)*stdv_Ft**2
+Q[3:5,3:5] = np.eye(2)*stdv_vw**2
+Q[5,5] = 0.00**2
+Q[6,6] = stdv_CL**2
+Q[7,7] = stdv_CD**2
+Q[8,8] = stdv_CS**2
+
+# Wind correlation Ft
+# x direction
+# Q[0,3] = Q[3,0] = np.sqrt(Q[3,3]*Q[0,0])*0      
+# Q[1,3] = Q[3,1] = np.sqrt(Q[3,3]*Q[1,1])*0 
+# Q[2,3] = Q[3,2] = np.sqrt(Q[3,3]*Q[2,2])*0
+# # y direction
+# Q[0,4] = Q[4,0] = np.sqrt(Q[4,4]*Q[0,0])*0     
+# Q[1,4] = Q[4,1] = np.sqrt(Q[4,4]*Q[1,1])*0 
+# Q[2,4] = Q[4,2] = np.sqrt(Q[4,4]*Q[2,2])*0
+# # z direction
+# Q[0,5] = Q[5,0] = np.sqrt(Q[5,5]*Q[0,0])*0     
+# Q[1,5] = Q[5,1] = np.sqrt(Q[5,5]*Q[1,1])*0
+# Q[2,5] = Q[5,2] = np.sqrt(Q[5,5]*Q[2,2])*0
+
+# Wind correlation CL
+# Q[3,6] = Q[6,3] = np.sqrt(Q[3,3]*Q[6,6])*0.01     
+# Q[4,6] = Q[6,4] = np.sqrt(Q[4,4]*Q[6,6])*0.01
+# Q[5,6] = Q[6,5] = np.sqrt(Q[5,5]*Q[6,6])*0.01
+# # Wind correlation CD
+# Q[3,7] = Q[7,3] = np.sqrt(Q[3,3]*Q[7,7])*0.2     
+# Q[4,7] = Q[7,4] = np.sqrt(Q[4,4]*Q[7,7])*0.2
+# Q[5,7] = Q[7,5] = np.sqrt(Q[5,5]*Q[7,7])*0.2
+# # Wind correlation CS
+# Q[3,8] = Q[8,3] = np.sqrt(Q[3,3]*Q[8,8])*0.01      
+# Q[4,8] = Q[8,4] = np.sqrt(Q[4,4]*Q[8,8])*0.01
+# Q[5,8] = Q[8,5] = np.sqrt(Q[5,5]*Q[8,8])*0.01
+
+# Ft relation
+# Q[0,1] = Q[1,0] = np.sqrt(Q[0,0]*Q[1,1])*0.1        
+# Q[0,2] = Q[2,0] = np.sqrt(Q[0,0]*Q[2,2])*0.01       
+# Q[1,2] = Q[2,1] = np.sqrt(Q[1,1]*Q[2,2])*0.01  
+
+# Wind relation
+# Q[3,4] = Q[4,3] = np.sqrt(Q[3,3]*Q[4,4])*0.1        
+# Q[3,5] = Q[5,3] = np.sqrt(Q[3,3]*Q[5,5])*0.01       
+# Q[4,5] = Q[5,4] = np.sqrt(Q[4,4]*Q[5,5])*0.01        
+
+# Aerodynamic coefficients correlation
+# Q[6,7] = Q[7,6] = np.sqrt(Q[6,6]*Q[7,7])*0.1        # CL,CD
+# Q[6,8] = Q[8,6] = np.sqrt(Q[6,6]*Q[8,8])*0.01       # CL,CS
+# Q[7,8] = Q[8,7] = np.sqrt(Q[7,7]*Q[8,8])*0.01        # CD,CS
+
+# Tether force correlation CL
+# Q[0,6] = Q[6,0] = np.sqrt(Q[0,0]*Q[6,6])*0.9      
+# Q[1,6] = Q[6,1] = np.sqrt(Q[1,1]*Q[6,6])*0.9
+# Q[2,6] = Q[6,2] = np.sqrt(Q[2,2]*Q[6,6])*0.9
+# # Tether force correlation CD
+# Q[0,7] = Q[7,0] = np.sqrt(Q[0,0]*Q[7,7])*0.1
+# Q[1,7] = Q[7,1] = np.sqrt(Q[1,1]*Q[7,7])*0.1
+# Q[2,7] = Q[7,2] = np.sqrt(Q[2,2]*Q[7,7])*0.1
+# # Tether force correlation CS
+# Q[0,8] = Q[8,0] = np.sqrt(Q[0,0]*Q[8,8])*0.1
+# Q[1,8] = Q[8,1] = np.sqrt(Q[1,1]*Q[8,8])*0.1
+# Q[2,8] = Q[8,2] = np.sqrt(Q[2,2]*Q[8,8])*0.1
 
 #%%
 ########################################################################
@@ -122,6 +200,7 @@ nx = x0.shape[0]
 
 # allocate space to store traces
 XX_k1_k1    = np.zeros([nx, N])
+err_meas    = np.zeros([nm, N])
 z_k1_k1    = np.zeros([nm, N-1])
 PP_k1_k1    = np.zeros([n, N])
 STD_x_cor   = np.zeros([n, N])
@@ -168,7 +247,7 @@ for k in range(n_intervals):
     row = flight_data.iloc[k]
     args = (row['ground_tether_force'], n_tether_elements, x_k1_k1[0:3], x_k1_k1[3:6],x_k1_k1[6:9],
             list(row[['ax','ay','az']]),True, False)
-    opt_res = least_squares(get_tether_end_position, list(opt_res.x), args=args,
+    opt_res = least_squares(get_tether_end_position, opt_res.x, args=args,
                             kwargs={'find_force': False}, verbose=0)
     res = get_tether_end_position(
         opt_res.x, *args, return_values=True, find_force=False)
@@ -189,20 +268,23 @@ for k in range(n_intervals):
     CL.append(res[-2])
     CD.append(res[-1])
     zi = Z[k]
-
+    # if dep[k]:
+    #     R[6,6] = stdv_va**2
+    # else:
+    #     R[6,6] = 5**2
     if k%600==0:
         elapsed_time = time.time() - start_time
         start_time = time.time()  # Record end time
         mins +=1
         print(f"Real time: {mins} minutes.  Elapsed time: {elapsed_time:.2f} seconds")
-        
+
     sol = intg(x0=x_k1_k1, p=u)
     x_k1_k = np.array(sol["xf"].T)
     Fx = np.array(calc_Fx(x_k1_k.T,u,ts))
     G = np.array(calc_G(x_k1_k.T,u,ts))
     
     # # Convert continuous-time state-space model to discrete-time model
-    sys_ct = control.ss(Fx, G, np.zeros(n), np.zeros(m))
+    sys_ct = control.ss(Fx, G, np.zeros(n), np.zeros(9))
     sys_dt = control.sample_system(sys_ct, ts, method='zoh')
     # Get discrete-time state transition and input-to-state matrices
     Phi = sys_dt.A
@@ -279,6 +361,7 @@ for k in range(n_intervals):
     STD_x_cor[:,k]  = std_x_cor
     STD_z[:,k]      = std_z
     ZZ_pred [:,k]    = z_k1_k
+    err_meas[:,k] = z_k1_k - zi
     
 #%% Save results
 ti = 100
