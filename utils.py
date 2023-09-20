@@ -345,10 +345,18 @@ def get_tether_end_position(x, set_parameter, n_tether_elements, r_kite, v_kite,
     wvel = np.linalg.norm(vw)
     wdir = vw/wvel
 
+    vtau_kite = project_onto_plane(v_kite,r_kite/np.linalg.norm(r_kite)) # Velocity projected onto the tangent plane
+    omega_tether = np.cross(r_kite,vtau_kite)/(np.linalg.norm(r_kite)**2) # Tether angular velocity, with respect to the tether attachment point
 
-    # This omega can be improved by finding turning center and correcting for that
-    omega = np.cross(r_kite, v_kite)/np.linalg.norm(r_kite)**2
-    
+
+    at = np.dot(a_kite,np.array(v_kite)/np.linalg.norm(v_kite))*np.array(v_kite)/np.linalg.norm(v_kite)
+    omega_kite = np.cross(a_kite-at,v_kite)/(np.linalg.norm(v_kite)**2)
+    ICR = np.cross(v_kite,omega_kite)/(np.linalg.norm(omega_kite)**2)      
+    alpha = np.cross(at,ICR)/np.linalg.norm(ICR)**2
+
+
+        
+
     tensions = np.zeros((n_elements, 3))
     tensions[0, 0] = np.cos(beta_n)*np.cos(phi_n)*tension_ground
     tensions[0, 1] = np.cos(beta_n)*np.sin(phi_n)*tension_ground
@@ -374,9 +382,9 @@ def get_tether_end_position(x, set_parameter, n_tether_elements, r_kite, v_kite,
         kcu_element = separate_kcu_mass and j == n_elements - 2
 
         # Determine kinematics at point mass j.
-        vj = np.cross(omega, positions[j+1, :])
+        vj = np.cross(omega_tether, positions[j+1, :])
         velocities[j+1, :] = vj
-        aj = np.cross(omega, vj)
+        aj = np.cross(omega_tether, vj)
         accelerations[j+1, :] = aj
         delta_p = positions[j+1, :] - positions[j, :]
         ej = delta_p/np.linalg.norm(delta_p)  # Axial direction of tether element
@@ -385,6 +393,13 @@ def get_tether_end_position(x, set_parameter, n_tether_elements, r_kite, v_kite,
         if last_element:
             vj = np.array(v_kite)
             aj = np.array(a_kite)
+        if kcu_element:       
+            vkcu = v_kite + np.cross(omega_kite,positions[j+1, :]-r_kite)
+            vj = vkcu
+            velocities[j+1, :] = vj
+            akcu = a_kite+ np.cross(alpha,positions[j+1, :]-r_kite) +np.cross(omega_kite,np.cross(omega_kite,positions[j+1, :]-r_kite))
+            aj = akcu
+            accelerations[j+1, :] = aj
         # Determine flow at point mass j.
         vaj = vj - vwj  # Apparent wind velocity
         
@@ -535,7 +550,8 @@ def state_noise_matrices(x,u,ts):
     Fx = ca.jacobian(fx, x)    
     calc_fx = ca.Function('calc_fx',[x,u,ts],[fx])
     calc_Fx = ca.Function('calc_Fx',[x,u,ts],[Fx])
-    G = ca.jacobian(fx,u)
+    noise_vector = ca.vertcat(u,vw,x[9],x[10],x[11])
+    G = ca.jacobian(fx,noise_vector)
     calc_G = ca.Function('calc_G',[x,u,ts],[G])
     
     return fx,calc_Fx,calc_G
@@ -565,8 +581,8 @@ def observation_matrices(x,u):
     h[4] = x[4]
     h[5] = x[5]
 
-    h[6] = x[8]
-    h[7] = 0#ca.sqrt(x[6]**2+x[7]**2)*ca.log(10/z0)/ca.log(x[2]/z0) # Wind
+    h[6] = vw[2]
+    h[7] = 0#va_mod#ca.sqrt(x[6]**2+x[7]**2)*ca.log(10/z0)/ca.log(x[2]/z0) # Wind
     h[8] = 0#ca.arctan(x[7]/x[6])
     
     Ft = u
