@@ -39,6 +39,7 @@ tether_len = results.Lt
 Ft = np.array([results.Ftx,results.Fty,results.Ftz])
 Ft_mod = np.linalg.norm(Ft,axis = 0)
 
+v = np.vstack((np.array(vx),np.array(vy),np.array(vz))).T
 va = np.vstack((np.array(vwx-vx),np.array(vwy-vy),np.array(vwz-vz))).T
 
 vwh = []
@@ -76,13 +77,17 @@ for i in range(len(CL)):
     acc.append((Li+Di+Si-Ft.T[i]+Fg)/m_kite)
     omega.append(np.cross(r, v)/np.linalg.norm(r)**2)
 
-CL = np.sqrt(CL**2+   CS**2)
+CLt = np.sqrt(CL**2+   CS**2)
 #%%
+turn = (flight_data['ground_tether_reelout_speed'] > 0) & (abs(flight_data['kite_set_steering']) > 10)
 measured_wdir = -flight_data['est_upwind_direction']*180/np.pi-90+360
 measured_wvel = flight_data['est_wind_velocity']
 measured_va = flight_data['airspeed_apparent_windspeed']
 measured_Ft = flight_data['ground_tether_force']
 measured_aoa = flight_data['airspeed_angle_of_attack']
+meas_v = np.vstack((np.array(flight_data['vx']),np.array(flight_data['ay']),np.array(flight_data['az']))).T
+meas_a = np.vstack((np.array(flight_data['ax']),np.array(flight_data['ay']),np.array(flight_data['az']))).T
+t = flight_data.time
 #%% Plot aero coeffs
 
 # pow_res = results[flight_data['ground_tether_reelout_speed']>0]
@@ -111,9 +116,9 @@ measured_aoa = flight_data['airspeed_angle_of_attack']
 # # plt.scatter(pow_turn.aoa,pow_turn.CDw)
 
 
-# plt.figure()
-# plt.plot(aoa)
-# plt.plot(measured_aoa)
+plt.figure()
+plt.plot(aoa)
+plt.plot(measured_aoa)
 
 
 
@@ -141,52 +146,62 @@ measured_aoa = flight_data['airspeed_angle_of_attack']
 # custom_labels = ['13', '14', '15','16']
 # x_ticks = [0, 36000, 72000,108000]
 
-# # Plot horizontal wind speed
-# plt.figure()
-# plt.plot(vwh)
-# plt.xlabel('Time')
-# plt.ylabel('Horizontal Wind Speed')
-# # plt.xticks(x_ticks, custom_labels)
-# plt.grid()
+# Plot horizontal wind speed
+plt.figure()
+plt.plot(vwh)
+plt.xlabel('Time')
+plt.ylabel('Horizontal Wind Speed')
+# plt.xticks(x_ticks, custom_labels)
+plt.grid()
 
-# # Plot wind direction
-# plt.figure()
-# plt.plot(angle)
-# plt.xlabel('Time')
-# plt.ylabel('Wind Direction')
-# # plt.xticks(x_ticks, custom_labels)
-# plt.grid()
+# Plot wind direction
+plt.figure()
+plt.plot(angle)
+plt.xlabel('Time')
+plt.ylabel('Wind Direction')
+# plt.xticks(x_ticks, custom_labels)
+plt.grid()
 
-# # Plot vertical wind speed
-# plt.figure()
-# plt.plot(vwz)
-# plt.xlabel('Time')
-# plt.ylabel('Vertical Wind Speed')
-# # plt.xticks(x_ticks, custom_labels)
-# plt.grid()
+# Plot vertical wind speed
+plt.figure()
+plt.plot(vwz)
+plt.xlabel('Time')
+plt.ylabel('Vertical Wind Speed')
+# plt.xticks(x_ticks, custom_labels)
+plt.grid()
 
-# # Plot lift coefficient
-# plt.figure()
-# plt.plot(CLw)
-# plt.plot(CL)
+# Plot lift coefficient
+plt.figure()
+plt.plot(CLw)
+plt.plot(CL)
+plt.plot(CLt)
 
-# plt.xlabel('Time')
-# plt.ylabel('Lift Coefficient')
-# # plt.xticks(x_ticks, custom_labels)
-# plt.grid()
+plt.xlabel('Time')
+plt.ylabel('Lift Coefficient')
+# plt.xticks(x_ticks, custom_labels)
+plt.grid()
 
-# # Plot drag coefficient
-# plt.figure()
-# plt.plot(CDw)
-# plt.plot(CD)
+# Plot drag coefficient
+plt.figure()
+plt.plot(CDw)
+plt.plot(CD)
 
-# plt.xlabel('Time')
-# plt.ylabel('Drag Coefficient')
-# # plt.xticks(x_ticks, custom_labels)
-# plt.grid()
+plt.xlabel('Time')
+plt.ylabel('Drag Coefficient')
+# plt.xticks(x_ticks, custom_labels)
+plt.grid()
+
+# Plot drag coefficient
+plt.figure()
+plt.plot(CS)
+
+plt.xlabel('Time')
+plt.ylabel('Side Coefficient')
+# plt.xticks(x_ticks, custom_labels)
+plt.grid()
 
 # # Plot side force coefficient
-# plt.figure()
+# plt.figure()x
 # plt.plot(CLw/CDw)
 # plt.xlabel('Time')
 # plt.ylabel('CL/CD')
@@ -209,14 +224,14 @@ measured_aoa = flight_data['airspeed_angle_of_attack']
 # # plt.xticks(x_ticks, custom_labels)
 # plt.grid()
 
-# # Plot apparent velocity
-# plt.figure()
-# plt.plot(va_mod)
-# plt.plot(measured_va)
-# plt.xlabel('Time')
-# plt.ylabel('Apparent Velocity')
-# # plt.xticks(x_ticks, custom_labels)
-# plt.grid()
+# Plot apparent velocity
+plt.figure()
+plt.plot(va_mod)
+plt.plot(measured_va)
+plt.xlabel('Time')
+plt.ylabel('Apparent Velocity')
+# plt.xticks(x_ticks, custom_labels)
+plt.grid()
 
 # Plot slack
 fig, ax1 = plt.subplots()
@@ -242,7 +257,7 @@ plt.show()
 
 # plt.grid()
 
-start = 2000
+start = 0
 end = -1
 # Plot apparent velocity
 plt.figure()
@@ -270,14 +285,24 @@ plt.grid()
 
 # Plot Tether length
 plt.figure()
-plt.plot(tether_len[start:end])
-plt.plot(flight_data['ground_tether_length'].iloc[start:end])
-plt.plot(vz[start:end])
+plt.plot(t[start:end],tether_len[start:end])
+
+plt.plot(t[start:end],flight_data['ground_tether_length'].iloc[start:end]-9)
+plt.fill_between(t[start:end], 400, where=turn[start:end], color='lightblue', alpha=0.2)
 plt.xlabel('Time')
 plt.ylabel('Tether_len')
 plt.grid()
 plt.show()
 
+plt.figure()
+plt.plot(t[start:end],flight_data['kite_set_depower'].iloc[start:end],label = 'Up')
+plt.plot(t[start:end],flight_data['kite_actual_depower'].iloc[start:end],label = 'Up')
+plt.plot(t[start:end],flight_data['kite_set_steering'].iloc[start:end],label = 'Us')
+plt.plot(t[start:end],flight_data['kite_actual_steering'].iloc[start:end],label = 'Us')
+plt.xlabel('Time')
+plt.ylabel('Control inputs')
+plt.legend()
+plt.grid()
 # # Plot apparent velocity
 # plt.figure()
 # plt.plot(vz[start:end])
@@ -287,7 +312,7 @@ plt.show()
 
 
 #%%
-start = 4000
+start = 8000
 end = start+36000
 hours = [13,14,15]
 
