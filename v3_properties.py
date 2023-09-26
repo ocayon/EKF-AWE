@@ -40,4 +40,5 @@ frontal_area_kcu = 0.3
 L_blines = 96
 d_bridle = 2.5e-3
 
-z0 =    0.01
+z0 =    0.1
+kappa = 0.4
