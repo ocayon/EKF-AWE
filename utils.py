@@ -519,10 +519,11 @@ def state_noise_matrices(x,u,ts):
     
     r = x[0:3]
     v = x[3:6]
-    vw = x[6:9]
+    uf = x[6]
+    wdir = x[7]
+    wvel = uf/kappa*ca.log(r[2]/z0)
     
-    # Fa,Ft = get_forces(x, u)
-    
+    vw = ca.vertcat(wvel*ca.cos(wdir),wvel*ca.sin(wdir),0)
     Ft = u
     va = vw - v 
     va_mod = ca.sqrt(ca.dot(va,va))
@@ -532,9 +533,9 @@ def state_noise_matrices(x,u,ts):
     dir_L = Ft/Ft_mod - ca.dot(Ft/Ft_mod,dir_D)*dir_D
     dir_S = ca.cross(dir_L,dir_D) 
 
-    L = x[9]*0.5*rho*A_kite*va_mod**2*dir_L
-    D = x[10]*0.5*rho*A_kite*va*va_mod
-    S = x[11]*0.5*rho*A_kite*va_mod**2*dir_S
+    L = x[8]*0.5*rho*A_kite*va_mod**2*dir_L
+    D = x[9]*0.5*rho*A_kite*va*va_mod
+    S = x[10]*0.5*rho*A_kite*va_mod**2*dir_S
 
     Fg = ca.vertcat(0, 0, -m_kite*g)
     rp = v
@@ -546,11 +547,11 @@ def state_noise_matrices(x,u,ts):
     # CDn = Dmod/(0.5*rho*A_kite*va_mod**2)
     # CSn = Smod/(0.5*rho*A_kite*va_mod**2)
 
-    fx = ca.vertcat(rp,vp,0,0,0,0,0,0)
+    fx = ca.vertcat(rp,vp,0,0,0,0,0)
     Fx = ca.jacobian(fx, x)    
     calc_fx = ca.Function('calc_fx',[x,u,ts],[fx])
     calc_Fx = ca.Function('calc_Fx',[x,u,ts],[Fx])
-    noise_vector = ca.vertcat(u,vw,x[9],x[10],x[11])
+    noise_vector = ca.vertcat(u,x[8],x[9],x[10])
     G = ca.jacobian(fx,noise_vector)
     calc_G = ca.Function('calc_G',[x,u,ts],[G])
     
@@ -560,7 +561,11 @@ def observation_matrices(x,u):
     
     r = x[0:3]
     v = x[3:6]
-    vw = x[6:9]
+    uf = x[6]
+    wdir = x[7]
+    wvel = uf/kappa*ca.log(r[2]/z0)
+    
+    vw = ca.vertcat(wvel*ca.cos(wdir),wvel*ca.sin(wdir),0)
 
     va = vw - v
     va_mod = ca.norm_2(va)
@@ -581,9 +586,9 @@ def observation_matrices(x,u):
     h[4] = x[4]
     h[5] = x[5]
 
-    h[6] = vw[2]
-    h[7] = 0#va_mod#ca.sqrt(x[6]**2+x[7]**2)*ca.log(10/z0)/ca.log(x[2]/z0) # Wind
-    h[8] = 0#ca.arctan(x[7]/x[6])
+    h[6] = x[6]
+    h[7] = va_mod#ca.sqrt(x[6]**2+x[7]**2)*ca.log(10/z0)/ca.log(x[2]/z0) # Wind
+    h[8] = 0#ca.norm_2(vw)/ca.log(x[2]/z0)
     
     Ft = u
     va = vw - v 
@@ -594,9 +599,9 @@ def observation_matrices(x,u):
     dir_L = r/r_mod - ca.dot(r/r_mod,dir_D)*dir_D
     dir_S = ca.cross(dir_L,dir_D) 
 
-    L = x[9]*0.5*rho*A_kite*va_mod**2*dir_L
-    D = x[10]*0.5*rho*A_kite*va*va_mod
-    S = x[11]*0.5*rho*A_kite*va_mod**2*dir_S
+    L = x[8]*0.5*rho*A_kite*va_mod**2*dir_L
+    D = x[9]*0.5*rho*A_kite*va*va_mod
+    S = x[10]*0.5*rho*A_kite*va_mod**2*dir_S
 
     Fg = ca.vertcat(0, 0, -m_kite*g)
     h[9:12] = (-Ft+L+D+S+Fg)/m_kite

@@ -15,7 +15,10 @@ n_tether_elements = 5
 flight_data = read_data()
 flight_data = flight_data.reset_index()
     
-window_size=30
+measured_wvel = flight_data['ground_wind_velocity']
+measured_uf = measured_wvel*kappa/np.log(10/z0)
+
+window_size=10
 flight_data['ax']=np.convolve(flight_data['ax'], np.ones(window_size)/window_size, mode='same')
 flight_data['ay']=np.convolve(flight_data['ay'], np.ones(window_size)/window_size, mode='same')
 flight_data['az']=np.convolve(flight_data['az'], np.ones(window_size)/window_size, mode='same')
@@ -52,8 +55,8 @@ for i in range(2):
     D.append(FD)
 
 #%% Initial state vector 
-x0 = np.vstack((flight_data[['rx', 'ry', 'rz']].values[0, :],flight_data[['vx', 'vy', 'vz']].values[0, :],vw))
-x0 = np.append(x0,[CL[0],CD[0],0])
+x0 = np.vstack((flight_data[['rx', 'ry', 'rz']].values[0, :],flight_data[['vx', 'vy', 'vz']].values[0, :]))
+x0 = np.append(x0,[0.3,12/180*np.pi,CL[0],CD[0],0])
 
 #%% Definition kalman filter matrices
 
@@ -66,14 +69,15 @@ Lt =  ca.SX.sym('Lt')
 r = ca.SX.sym('r', 3) # Position
 v = ca.SX.sym('v', 3) # Velocity
 a = ca.SX.sym('a', 3) # Acceleration
-vw = ca.SX.sym('vw', 3) # Acceleration
+uf = ca.SX.sym('uf')
+wdir = ca.SX.sym('wdir')
 CD = ca.SX.sym('CD')   
 CL = ca.SX.sym('CL')    
 CS = ca.SX.sym('CS')
 dFdup = ca.SX.sym('dFdup')
 
 
-x = ca.vertcat(r,v,vw,CL,CD,CS) # Solution vector
+x = ca.vertcat(r,v,uf,wdir,CL,CD,CS) # Solution vector
 
 u_sym = ca.vertcat(Ft)
 
@@ -82,7 +86,7 @@ u_sym = ca.vertcat(Ft)
 
 
 Z = np.array([flight_data['rx'],flight_data['ry'],flight_data['rz'],flight_data['vx'],flight_data['vy'],flight_data['vz'],
-              np.zeros(len(flight_data)),flight_data['ground_wind_velocity'],phi_upwind_direction,flight_data['ax'],flight_data['ay'],flight_data['az']]).T
+              measured_uf,flight_data['airspeed_apparent_windspeed'],np.zeros(len(flight_data)),flight_data['ax'],flight_data['ay'],flight_data['az']]).T
 
 dep = (flight_data['ground_tether_reelout_speed'] < 0) & (flight_data['kite_set_depower'] > 23)
 #%%
@@ -95,21 +99,20 @@ m           =  3                # number of inputs
     
 stdv_us = 0.1   
 
-stdv_xGPS = 2.5
-stdv_vGPS = 1
-stdv_aGPS = 7
-stdv_vwz = 0.1
-stdv_vwg = 1
-stdv_va = 0.5
+stdv_xGPS = 5
+stdv_vGPS = 1.8
+stdv_aGPS = 10
+stdv_uf = 0.001
+stdv_va = 0.1
 stdv_dirw = 10/180*np.pi
 
 R = np.zeros((nm,nm))
 R[:3, :3] = np.eye(3) * stdv_xGPS**2
 
 R[3:6, 3:6] = np.eye(3) * stdv_vGPS**2
-R[6,6] = stdv_vwz**2
-R[7,7] = stdv_vwg**2
-R[8,8] = stdv_dirw**2
+R[6,6] = stdv_uf**2
+R[7,7] = stdv_va**2
+R[8,8] = 0.1
 R[9:12,9:12] =  np.eye(3) * stdv_aGPS**2
 
 # R[3,3] = 1.6**2
@@ -119,21 +122,21 @@ R[9:12,9:12] =  np.eye(3) * stdv_aGPS**2
 # R[10,10] = 7.8**2
 # R[11,11] =6.9**2
 
+
 #%% Define process noise matrix
 stdv_Ft = 200
-stdv_CL = 0.2
+stdv_CL = 0.15
 stdv_CD = 0.1
-stdv_CS = 0.1
-stdv_vw = 0.0
+stdv_CS = 0.05
+stdv_vw = 0.
 
 # Define process noise matrix
-Q = np.zeros((9, 9))
+Q = np.zeros((6, 6))
 Q[:3,:3] = np.eye(3)*stdv_Ft**2
-Q[3:5,3:5] = np.eye(2)*stdv_vw**2
-Q[5,5] = 0.00**2
-Q[6,6] = stdv_CL**2
-Q[7,7] = stdv_CD**2
-Q[8,8] = stdv_CS**2
+# Q[3:6,3:6] = np.eye(3)*stdv_vw**2
+Q[3,3] = stdv_CL**2
+Q[4,4] = stdv_CD**2
+Q[5,5] = stdv_CS**2
 
 # Wind correlation Ft
 # x direction
@@ -243,9 +246,12 @@ vw = np.array([np.array(flight_data['ground_wind_velocity']),np.zeros(len(flight
 start_time = time.time()
 mins = -1
 for k in range(n_intervals):
+    wvel = x_k1_k1[6]/kappa*np.log(x_k1_k1[2]/z0)
+    wdir = x_k1_k1[7]
+    vw = np.array([wvel*np.cos(wdir),wvel*np.sin(wdir),0])
     ts = t[k+1]-t[k]
     row = flight_data.iloc[k]
-    args = (row['ground_tether_force'], n_tether_elements, x_k1_k1[0:3], x_k1_k1[3:6],x_k1_k1[6:9],
+    args = (row['ground_tether_force'], n_tether_elements, x_k1_k1[0:3], x_k1_k1[3:6],vw,
             list(row[['ax','ay','az']]),True, False)
     opt_res = least_squares(get_tether_end_position, opt_res.x, args=args,
                             kwargs={'find_force': False}, verbose=0)
@@ -268,10 +274,10 @@ for k in range(n_intervals):
     CL.append(res[-2])
     CD.append(res[-1])
     zi = Z[k]
-    # if dep[k]:
-    #     R[6,6] = stdv_va**2
-    # else:
-    #     R[6,6] = 5**2
+    if dep[k]:
+        R[7,7] = stdv_va**2
+    else:
+        R[7,7] = 5**2
     if k%600==0:
         elapsed_time = time.time() - start_time
         start_time = time.time()  # Record end time
@@ -284,7 +290,7 @@ for k in range(n_intervals):
     G = np.array(calc_G(x_k1_k.T,u,ts))
     
     # # Convert continuous-time state-space model to discrete-time model
-    sys_ct = control.ss(Fx, G, np.zeros(n), np.zeros(9))
+    sys_ct = control.ss(Fx, G, np.zeros(n), np.zeros(6))
     sys_dt = control.sample_system(sys_ct, ts, method='zoh')
     # Get discrete-time state transition and input-to-state matrices
     Phi = sys_dt.A
@@ -368,7 +374,7 @@ ti = 100
 results = XX_k1_k1[:,ti:k]
 results = np.vstack((results,np.array(Ft)[ti:k,:].T,np.array(tether_len[ti:k]),np.array(CL[ti:k]),np.array(CD[ti:k]),np.array(aoa[ti:k])
                      ,np.array(pitch[ti:k]),np.array(yaw[ti:k]),np.array(roll[ti:k])))
-column_names = ['x','y','z','vx','vy','vz','vwx','vwy','vwz','CL','CD','CS','Ftx','Fty','Ftz','Lt',
+column_names = ['x','y','z','vx','vy','vz','uf','wdir','CL','CD','CS','Ftx','Fty','Ftz','Lt',
                 'CLw','CDw','aoa','pitch','yaw','roll']
 df = pd.DataFrame(data=results.T, columns=column_names)
 
