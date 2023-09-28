@@ -26,9 +26,10 @@ z = results.z
 vx = results.vx
 vy = results.vy
 vz = results.vz
-vwx = results.vwx
-vwy = results.vwy
-vwz = results.vwz
+uf = results.uf
+wdir = results.wdir
+pitch = results.pitch
+
 CL = results.CL
 CD = results.CD
 CS = results.CS
@@ -39,9 +40,10 @@ tether_len = results.Lt
 Ft = np.array([results.Ftx,results.Fty,results.Ftz])
 Ft_mod = np.linalg.norm(Ft,axis = 0)
 
+wvel = uf/kappa*np.log(z/z0)
+vw = np.vstack((wvel*np.cos(wdir),wvel*np.sin(wdir),np.zeros(len(wvel)))).T
 v = np.vstack((np.array(vx),np.array(vy),np.array(vz))).T
-va = np.vstack((np.array(vwx-vx),np.array(vwy-vy),np.array(vwz-vz))).T
-
+va = vw-v
 vwh = []
 angle = []
 L = []
@@ -52,8 +54,7 @@ acc = []
 Fa = []
 omega = []
 for i in range(len(CL)):
-    vwh.append(np.sqrt(vwx[i]**2+vwy[i]**2))
-    angle.append(np.arctan(vwy[i]/vwx[i])*180/np.pi)
+
     va_mod.append(np.linalg.norm(va[i]))
     q = 0.5*1.225*A_kite*va_mod[i]**2
     L.append(CL[i]*q)
@@ -81,10 +82,13 @@ CLt = np.sqrt(CL**2+   CS**2)
 #%%
 turn = (flight_data['ground_tether_reelout_speed'] > 0) & (abs(flight_data['kite_set_steering']) > 10)
 measured_wdir = -flight_data['est_upwind_direction']*180/np.pi-90+360
-measured_wvel = flight_data['est_wind_velocity']
+measured_wvel = flight_data['ground_wind_velocity']
+measured_uf = measured_wvel*kappa/np.log(10/z0)
 measured_va = flight_data['airspeed_apparent_windspeed']
 measured_Ft = flight_data['ground_tether_force']
 measured_aoa = flight_data['airspeed_angle_of_attack']
+meas_pitch = flight_data['kite_0_pitch']-5
+meas_pitch1 = flight_data['kite_1_pitch']-5
 meas_v = np.vstack((np.array(flight_data['vx']),np.array(flight_data['ay']),np.array(flight_data['az']))).T
 meas_a = np.vstack((np.array(flight_data['ax']),np.array(flight_data['ay']),np.array(flight_data['az']))).T
 t = flight_data.time
@@ -148,7 +152,23 @@ plt.plot(measured_aoa)
 
 # Plot horizontal wind speed
 plt.figure()
-plt.plot(vwh)
+plt.plot(uf)
+plt.plot(measured_uf)
+plt.xlabel('Time')
+plt.ylabel('Friction velocity')
+# plt.xticks(x_ticks, custom_labels)
+plt.grid()
+
+# Plot horizontal wind speed
+plt.figure()
+plt.plot(wvel)
+plt.xlabel('Time')
+plt.ylabel('Horizontal Wind Speed')
+# plt.xticks(x_ticks, custom_labels)
+plt.grid()
+
+plt.figure()
+plt.plot(wdir*180/np.pi)
 plt.xlabel('Time')
 plt.ylabel('Horizontal Wind Speed')
 # plt.xticks(x_ticks, custom_labels)
@@ -162,13 +182,7 @@ plt.ylabel('Wind Direction')
 # plt.xticks(x_ticks, custom_labels)
 plt.grid()
 
-# Plot vertical wind speed
-plt.figure()
-plt.plot(vwz)
-plt.xlabel('Time')
-plt.ylabel('Vertical Wind Speed')
-# plt.xticks(x_ticks, custom_labels)
-plt.grid()
+
 
 # Plot lift coefficient
 plt.figure()
@@ -311,8 +325,13 @@ plt.grid()
 # plt.grid()
 
 
+plt.figure()
+plt.plot(pitch-90)
+plt.plot(meas_pitch)
+plt.plot(meas_pitch1)
+
 #%%
-start = 8000
+start = 4000
 end = start+36000
 hours = [13,14,15]
 
@@ -333,7 +352,7 @@ for i in range(len(hours)):
     minERA5 = ERA5vel[0:-1:2,0]
     maxERA5 = ERA5vel[1::2,0]
     ax_vel[i].fill_betweenx(hERA5, minERA5, maxERA5, color='lightgrey', alpha=0.5)
-    ax_vel[i].scatter(vwh[start:end],z[start:end],color = 'lightblue',alpha = 0.5)
+    ax_vel[i].scatter(wvel[start:end],z[start:end],color = 'lightblue',alpha = 0.5)
     ax_vel[i].boxplot([measured_wvel[start:end]],positions = [10],vert = False,widths=(20))
     ax_vel[i].set_title(str(hours[i])+'h')
     ax_vel[i].set_xlabel('Wind velocity')
@@ -347,7 +366,7 @@ for i in range(len(hours)):
     minERA5 = ERA5dir[0:-1:2,0]
     maxERA5 = ERA5dir[1::2,0]
     ax_dir[i].fill_betweenx(hERA5, minERA5, maxERA5, color='lightgrey', alpha=0.5)
-    ax_dir[i].scatter(angle[start:end],z[start:end],color = 'lightblue',alpha = 0.5)
+    ax_dir[i].scatter(wdir[start:end]*180/np.pi,z[start:end],color = 'lightblue',alpha = 0.5)
     ax_dir[i].boxplot([measured_wdir[start:end]],positions = [10],vert = False,widths=(20))
     ax_dir[i].set_title(str(hours[i])+'h')
     ax_dir[i].set_xlabel('Wind direction')

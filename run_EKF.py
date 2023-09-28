@@ -102,7 +102,7 @@ stdv_us = 0.1
 stdv_xGPS = 5
 stdv_vGPS = 1.8
 stdv_aGPS = 10
-stdv_uf = 0.001
+stdv_uf = 0.01
 stdv_va = 0.1
 stdv_dirw = 10/180*np.pi
 
@@ -360,6 +360,8 @@ for k in range(n_intervals):
     # # Next step
     
     if k ==0:
+        rank_O = rank_observability_matrix(Fx,Hx)
+        print(rank_O)
         rank_O = rank_observability_matrix(Phi,Hx)
         print(rank_O)
     # store results

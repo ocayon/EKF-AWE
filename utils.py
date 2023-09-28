@@ -587,7 +587,7 @@ def observation_matrices(x,u):
     h[5] = x[5]
 
     h[6] = x[6]
-    h[7] = va_mod#ca.sqrt(x[6]**2+x[7]**2)*ca.log(10/z0)/ca.log(x[2]/z0) # Wind
+    h[7] = 0#va_mod#ca.sqrt(x[6]**2+x[7]**2)*ca.log(10/z0)/ca.log(x[2]/z0) # Wind
     h[8] = 0#ca.norm_2(vw)/ca.log(x[2]/z0)
     
     Ft = u
