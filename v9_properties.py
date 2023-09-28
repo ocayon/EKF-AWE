@@ -22,20 +22,20 @@ from numpy import pi
 
 rho = 1.2
 g = 9.81
-d_t = .05
+d_t = .014
 rho_t = 724.
 cd_t = 0.2
 tether_modulus = 614600/(pi*.002**2)  # From Uwe's thesis
 tether_stiffness = tether_modulus*pi*(d_t/2)**2
 
-m_kite = 30
+m_kite = 62
 m_kcu = 25
-l_bridle = 20
+l_bridle = 15.45
 
-A_kite = 40
+A_kite = 46.854
 
-cd_kcu = 0.82
-frontal_area_kcu = 0.5
+cd_kcu = 0.6
+frontal_area_kcu = 0.3
 
 L_blines = 130
 d_bridle = 5e-3
