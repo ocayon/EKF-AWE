@@ -1,7 +1,7 @@
 import casadi as ca
 import numpy as np
 import pandas as pd
-from v3_properties import *
+
 from scipy.optimize import least_squares
 from utils import get_tether_end_position, state_noise_matrices, observation_matrices, calculate_angle,project_onto_plane ,read_data, rank_observability_matrix,read_data_new
 import control
@@ -12,7 +12,23 @@ import time
 # Read and process data
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 n_tether_elements = 5
-flight_data = read_data()
+
+model = 'v3'
+year = '2019'
+month = '10'
+day = '08'
+
+
+if model == 'v3':
+    from v3_properties import *
+elif model == 'v9':
+    from v9_properties import *
+
+file_name = model+'_'+year+'-'+month+'-'+day
+file_path = './data/'+ file_name+'.csv'
+
+
+flight_data = pd.read_csv(file_path)
 flight_data = flight_data.reset_index()
     
 measured_wvel = flight_data['ground_wind_velocity']
@@ -27,8 +43,9 @@ dep_fd = flight_data[flight_data['kite_set_depower']>25]
 pow_fd = flight_data[flight_data['kite_set_depower']<25]
 u_p = flight_data['kite_set_depower']-min(flight_data['kite_set_depower'])
 u_p = u_p/max(u_p)
-phi_upwind_direction = np.array(-flight_data['est_upwind_direction']-np.pi/2.+2*np.pi)
-vw = [9*np.cos(0.2),9*np.sin(0.2),0]
+ground_wind_dir = np.array(-flight_data['est_upwind_direction']-np.pi/2.+2*np.pi)
+
+vw = [9*np.cos(np.mean(ground_wind_dir)),9*np.sin(np.mean(ground_wind_dir)),0]
 
 CL = []
 CD= []
@@ -56,7 +73,7 @@ for i in range(2):
 
 #%% Initial state vector 
 x0 = np.vstack((flight_data[['rx', 'ry', 'rz']].values[0, :],flight_data[['vx', 'vy', 'vz']].values[0, :]))
-x0 = np.append(x0,[0.3,12/180*np.pi,CL[0],CD[0],0])
+x0 = np.append(x0,[0.6,np.mean(ground_wind_dir),CL[0],CD[0],0])
 
 #%% Definition kalman filter matrices
 
@@ -99,7 +116,7 @@ m           =  3                # number of inputs
     
 stdv_us = 0.1   
 
-stdv_xGPS = 5
+stdv_xGPS = 2.5
 stdv_vGPS = 1.8
 stdv_aGPS = 10
 stdv_uf = 0.01
@@ -226,7 +243,7 @@ x_sol = x0
 x_k1_k1 = x0
 us = np.array(flight_data['kite_set_steering'])
 t = np.array(flight_data['time'])
-u = np.zeros(3)
+u = res[8]
 Ft = []
 tether_len = []
 CL = []
@@ -235,8 +252,9 @@ aoa = []
 yaw = []
 pitch = []
 roll = []
+cd_kcu = []
 sideslip = []
-flight_data['ground_tether_length'] = flight_data['ground_tether_length']+32.87
+flight_data['ground_tether_length'] = flight_data['ground_tether_length']+22.
 meas_lt = np.array(flight_data['ground_tether_length'])
 fx,calc_Fx,calc_G = state_noise_matrices(x,u_sym,Ts)
 dae = {'x': x, 'p': u_sym, 'ode': fx}
@@ -245,34 +263,14 @@ calc_hx,calc_Hx = observation_matrices(x,u_sym)
 vw = np.array([np.array(flight_data['ground_wind_velocity']),np.zeros(len(flight_data)),np.zeros(len(flight_data))]).T
 start_time = time.time()
 mins = -1
+tether_pos = []
 for k in range(n_intervals):
     wvel = x_k1_k1[6]/kappa*np.log(x_k1_k1[2]/z0)
     wdir = x_k1_k1[7]
     vw = np.array([wvel*np.cos(wdir),wvel*np.sin(wdir),0])
     ts = t[k+1]-t[k]
     row = flight_data.iloc[k]
-    args = (row['ground_tether_force'], n_tether_elements, x_k1_k1[0:3], x_k1_k1[3:6],vw,
-            list(row[['ax','ay','az']]),True, False)
-    opt_res = least_squares(get_tether_end_position, opt_res.x, args=args,
-                            kwargs={'find_force': False}, verbose=0)
-    res = get_tether_end_position(
-        opt_res.x, *args, return_values=True, find_force=False)
-    
-    u = np.array(res[8])
-    
-
-    dcm_b2w = res[2]
-    ey_kite = dcm_b2w[:,1]
-    ez_kite = dcm_b2w[:,2]
-    ex_kite = dcm_b2w[:,0]
-    
-    
-    
-    
-    Ft.append(res[8])
-    tether_len.append(res[1])
-    CL.append(res[-2])
-    CD.append(res[-1])
+   
     zi = Z[k]
     if dep[k]:
         R[7,7] = stdv_va**2
@@ -347,6 +345,31 @@ for k in range(n_intervals):
     P_k1_k1 = (np.eye(n) - K @ Hx) @ P_k1_k
     std_x_cor   = np.sqrt(np.diag(P_k1_k1))        # standard deviation of state estimation error (for validation)
     
+    
+    # Find tether shape and force
+    args = (row['ground_tether_force'], n_tether_elements, x_k1_k1[0:3], x_k1_k1[3:6],vw,
+            list(row[['ax','ay','az']]),True, False)
+    opt_res = least_squares(get_tether_end_position, opt_res.x, args=args,
+                            kwargs={'find_force': False}, verbose=0)
+    res = get_tether_end_position(
+        opt_res.x, *args, return_values=True, find_force=False)
+    
+    u = np.array(res[8])
+    
+    tether_pos.append(res[0])
+
+    dcm_b2w = res[2]
+    ey_kite = dcm_b2w[:,1]
+    ez_kite = dcm_b2w[:,2]
+    ex_kite = dcm_b2w[:,0]
+    
+    Ft.append(res[8])
+    tether_len.append(res[1])
+    CL.append(res[-2])
+    CD.append(res[-1])
+    cd_kcu.append(res[-3])
+    
+    
     va = x_k1_k1[6:9]-x_k1_k1[3:6] 
     va_proj = project_onto_plane(va, ey_kite)
     aoa.append(calculate_angle(ex_kite,va_proj))
@@ -359,7 +382,7 @@ for k in range(n_intervals):
     # print(x_k1_k1[12:15]-x_k1_k[12:15])
     # # Next step
     
-    if k ==0:
+    if k ==300:
         rank_O = rank_observability_matrix(Fx,Hx)
         print(rank_O)
         rank_O = rank_observability_matrix(Phi,Hx)
@@ -372,20 +395,21 @@ for k in range(n_intervals):
     err_meas[:,k] = z_k1_k - zi
     
 #%% Save results
-ti = 100
+ti = 0
 results = XX_k1_k1[:,ti:k]
 results = np.vstack((results,np.array(Ft)[ti:k,:].T,np.array(tether_len[ti:k]),np.array(CL[ti:k]),np.array(CD[ti:k]),np.array(aoa[ti:k])
-                     ,np.array(pitch[ti:k]),np.array(yaw[ti:k]),np.array(roll[ti:k])))
+                     ,np.array(pitch[ti:k]),np.array(yaw[ti:k]),np.array(roll[ti:k]),np.array(cd_kcu[ti:k])))
 column_names = ['x','y','z','vx','vy','vz','uf','wdir','CL','CD','CS','Ftx','Fty','Ftz','Lt',
-                'CLw','CDw','aoa','pitch','yaw','roll']
+                'CLw','CDw','aoa','pitch','yaw','roll','cd_kcu']
 df = pd.DataFrame(data=results.T, columns=column_names)
 
 flight_data = flight_data.iloc[ti:k]
 
+path = './results/'+model+'/'
 # Save the DataFrame to a CSV file
-csv_filename = 'EKFresults_temp.csv'
-df.to_csv(csv_filename, index=False)
+csv_filename = file_name+'_res_va.csv'
+df.to_csv(path+csv_filename, index=False)
 # Save the DataFrame to a CSV file
-csv_filename = 'flightdata_temp.csv'
-flight_data.to_csv(csv_filename, index=False)
+csv_filename = file_name+'_fd_va.csv'
+flight_data.to_csv(path+csv_filename, index=False)
 
