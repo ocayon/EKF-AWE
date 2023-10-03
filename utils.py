@@ -131,10 +131,14 @@ def get_az_el(x, set_parameter, n_tether_elements, r_kite, v_kite, vw, separate_
                 dj = 0  # TODO: add bridle drag
             elif n_tether_elements == 1:
                 dj = -.125*tether_drag_basis
-                dj += -.5*rho*vaj_sq*cd_kcu*frontal_area_kcu  # Adding kcu drag
+                dj += -.5*rho*np.linalg.norm(vajp)*vajp*cdp*Ap  # Adding kcu drag perpendicular to kcu
+                dj += -.5*rho*np.linalg.norm(vajn)*vajn*cdt*At  # Adding kcu drag parallel to kcu
             elif kcu_element:
                 dj = -.25*tether_drag_basis
-                dj += -.5*rho*vaj_sq*cd_kcu*frontal_area_kcu  # Adding kcu drag
+                dp= -.5*rho*np.linalg.norm(vajp)*vajp*cdp*Ap  # Adding kcu drag perpendicular to kcu
+                dt= -.5*rho*np.linalg.norm(vajn)*vajn*cdt*At  # Adding kcu drag parallel to kcu
+                dj += dp+dt
+                cd_kcu = (np.linalg.norm(dp+dt))/(0.5*rho*A_kite*np.linalg.norm(vaj)**2)
             else:
                 dj = -.5*tether_drag_basis
 
@@ -210,7 +214,7 @@ def get_az_el(x, set_parameter, n_tether_elements, r_kite, v_kite, vw, separate_
         CD = np.linalg.norm(D)/(0.5*rho*A_kite*np.linalg.norm(va)**2)
         CL = np.linalg.norm(L)/(0.5*rho*A_kite*np.linalg.norm(va)**2)
         return positions, stretched_tether_length, dcm_b2w, dcm_t2w, dcm_fa2w, \
-               dcm_tau2w, aerodynamic_force, va,tensions[-1,:], dcm_t2w[:,1], CL,CD
+               dcm_tau2w, aerodynamic_force, va,tensions[-1,:], dcm_t2w[:,1],cd_kcu, CL,CD
     else:
         return positions[-1, :] - r_kite[:]
 
@@ -400,6 +404,8 @@ def get_tether_end_position(x, set_parameter, n_tether_elements, r_kite, v_kite,
             akcu = a_kite+ np.cross(alpha,positions[j+1, :]-r_kite) +np.cross(omega_kite,np.cross(omega_kite,positions[j+1, :]-r_kite))
             aj = akcu
             accelerations[j+1, :] = aj
+
+            ej = (r_kite-np.array(positions[j+1, :]))/np.linalg.norm(r_kite-np.array(positions[j+1, :]))
         # Determine flow at point mass j.
         vaj = vj - vwj  # Apparent wind velocity
         
@@ -410,7 +416,6 @@ def get_tether_end_position(x, set_parameter, n_tether_elements, r_kite, v_kite,
         vaj_sq = np.linalg.norm(vaj)*vaj
         # vaj_sq = np.linalg.norm(vajn)*vajn
         tether_drag_basis = rho*l_unstrained*d_t*cd_t*vaj_sq
-
         # Determine drag at point mass j.
         if not separate_kcu_mass:
             if n_tether_elements == 1:
@@ -423,13 +428,17 @@ def get_tether_end_position(x, set_parameter, n_tether_elements, r_kite, v_kite,
             if last_element:
                 # dj = -0.25*rho*L_blines*d_bridle*vaj_sq*cd_t # Bridle lines drag
                 dj = 0
+                
             elif n_tether_elements == 1:
                 dj = -.125*tether_drag_basis
-                dj += -.5*rho*vaj_sq*cd_kcu*frontal_area_kcu  # Adding kcu drag
+                dj += -.5*rho*np.linalg.norm(vajp)*vajp*cdp*Ap  # Adding kcu drag perpendicular to kcu
+                dj += -.5*rho*np.linalg.norm(vajn)*vajn*cdt*At  # Adding kcu drag parallel to kcu
             elif kcu_element:
                 dj = -.25*tether_drag_basis
-                dj += -.5*rho*vaj_sq*cd_kcu*frontal_area_kcu  # Adding kcu drag
-                # dj += -0.25*rho*L_blines*d_bridle*vaj_sq*cd_t
+                dp= -.5*rho*np.linalg.norm(vajp)*vajp*cdp*Ap  # Adding kcu drag perpendicular to kcu
+                dt= -.5*rho*np.linalg.norm(vajn)*vajn*cdt*At  # Adding kcu drag parallel to kcu
+                dj += dp+dt
+                cd_kcu = (np.linalg.norm(dp+dt))/(0.5*rho*A_kite*np.linalg.norm(vaj)**2)
             else:
                 dj = -.5*tether_drag_basis
 
@@ -509,7 +518,7 @@ def get_tether_end_position(x, set_parameter, n_tether_elements, r_kite, v_kite,
         CD = np.linalg.norm(D)/(0.5*rho*A_kite*np.linalg.norm(va)**2)
         CL = np.linalg.norm(L)/(0.5*rho*A_kite*np.linalg.norm(va)**2)
         return positions, stretched_tether_length, dcm_b2w, dcm_t2w, dcm_fa2w, \
-               dcm_tau2w, aerodynamic_force, va,tensions[-1,:], dcm_t2w[:,1], CL,CD
+               dcm_tau2w, aerodynamic_force, va,tensions[-1,:], dcm_t2w[:,1],cd_kcu, CL,CD
     else:
         return (positions[-1, :] - r_kite)
     
