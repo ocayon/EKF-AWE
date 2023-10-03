@@ -1,24 +1,31 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from v3_properties import *
+
 
 
 
 
 #%%
 plt.close('all')
-# results = pd.read_csv('EKF_resultsnowind1.csv')
-# flight_data = pd.read_csv('flight_data.csv')
-# results = pd.read_csv('EKFresults_cont.csv')
-results = pd.read_csv('EKFresults_temp.csv')
-flight_data = pd.read_csv('flightdata_temp.csv')
-# ti = 36000+8000
-# te = 42000+8000
-# results = results.iloc[ti:te]
-# flight_data = flight_data.iloc[ti:te]
-# results = results.reset_index()
-# flight_data = flight_data.reset_index()
+
+model = 'v3'
+year = '2019'
+month = '10'
+day = '08'
+
+if model == 'v3':
+    from v3_properties import *
+elif model == 'v9':
+    from v9_properties import *
+
+path = './results/'+model+'/'
+file_name = model+'_'+year+'-'+month+'-'+day
+
+results = pd.read_csv(path+file_name+'_res_GPS.csv')
+flight_data = pd.read_csv(path+file_name+'_fd_GPS.csv')
+
+resultsnova = pd.read_csv(path+file_name+'_res_va.csv')
 #%%
 x = results.x
 y = results.y
@@ -30,8 +37,18 @@ uf = results.uf
 wdir = results.wdir
 pitch = results.pitch
 
+xnova = resultsnova.x
+ynova = resultsnova.y
+znova = resultsnova.z
+vxnova = resultsnova.vx
+vynova = resultsnova.vy
+vznova = resultsnova.vz
+ufnova = resultsnova.uf
+wdirnova = resultsnova.wdir
+
 CL = results.CL
 CD = results.CD
+cd_kcu = results.cd_kcu
 CS = results.CS
 CLw = results.CLw
 CDw = results.CDw
@@ -41,6 +58,7 @@ Ft = np.array([results.Ftx,results.Fty,results.Ftz])
 Ft_mod = np.linalg.norm(Ft,axis = 0)
 
 wvel = uf/kappa*np.log(z/z0)
+wvelnova = ufnova/kappa*np.log(znova/z0)
 vw = np.vstack((wvel*np.cos(wdir),wvel*np.sin(wdir),np.zeros(len(wvel)))).T
 v = np.vstack((np.array(vx),np.array(vy),np.array(vz))).T
 va = vw-v
@@ -80,7 +98,13 @@ for i in range(len(CL)):
 
 CLt = np.sqrt(CL**2+   CS**2)
 #%%
-turn = (flight_data['ground_tether_reelout_speed'] > 0) & (abs(flight_data['kite_set_steering']) > 10)
+pow = (flight_data['ground_tether_reelout_speed'] > 0) & (flight_data['kite_set_depower'] < 23)
+turn = (pow) & (abs(flight_data['kite_set_steering']) > 20)
+straight = (pow) & (abs(flight_data['kite_set_steering']) < 20)
+
+str_left = (straight) & (np.gradient(flight_data['kite_course'])>0 )
+str_right = (straight) & (np.gradient(flight_data['kite_course'])<0 )
+
 measured_wdir = -flight_data['est_upwind_direction']*180/np.pi-90+360
 measured_wvel = flight_data['ground_wind_velocity']
 measured_uf = measured_wvel*kappa/np.log(10/z0)
@@ -113,18 +137,43 @@ t = flight_data.time
 # # plt.scatter(pow_turn.aoa,pow_turn.CLw)
 # plt.plot(alpha_fit, Cl_fit, label=f'Trendline (Degree {degree})', color='r')
 
+plt.figure()
+plt.scatter(aoa[str_left],CDw[str_left],alpha = 0.5)
+plt.scatter(aoa[str_right],CDw[str_right],alpha = 0.5)
+
+# Add a color map to represent point density
+# plt.hist2d(aoa[str_left], CDw[str_left], bins=(50, 50), cmap=plt.cm.jet)
+
+# Add a color bar to the plot
+plt.colorbar()
+
 # plt.figure()
-# plt.scatter(pow_res.aoa,pow_res.CDw)
-# plt.scatter(dep_res.aoa,dep_res.CDw)
-# plt.scatter(pow_straight.aoa,pow_straight.CDw)
-# # plt.scatter(pow_turn.aoa,pow_turn.CDw)
+# # plt.scatter(aoa[turn],CLw[turn],alpha = 0.5)
+
+# # Add a color map to represent point density
+# # plt.hist2d(aoa[str_right], CDw[str_right], bins=(50, 50), cmap=plt.cm.jet)
+
+# # Add a color bar to the plot
+# plt.colorbar()
+
+
+
+# plt.scatter(pow_turn.aoa,pow_turn.CDw)
+plt.figure()
+plt.plot(aoa,cd_kcu)
+
+plt.figure()
+plt.plot(cd_kcu/CDw*100)
+plt.plot(resultsnova.cd_kcu/resultsnova.CDw*100)
+plt.xlabel('Time')
+plt.ylabel('Cd kcu/Cd wing [%]')
 
 
 plt.figure()
 plt.plot(aoa)
 plt.plot(measured_aoa)
 
-
+#%%
 
 # # fig = plt.figure()
 # # ax = fig.add_subplot(111, projection='3d')
@@ -153,6 +202,7 @@ plt.plot(measured_aoa)
 # Plot horizontal wind speed
 plt.figure()
 plt.plot(uf)
+plt.plot(resultsnova.uf)
 plt.plot(measured_uf)
 plt.xlabel('Time')
 plt.ylabel('Friction velocity')
@@ -169,8 +219,9 @@ plt.grid()
 
 plt.figure()
 plt.plot(wdir*180/np.pi)
+plt.plot(wdirnova*180/np.pi)
 plt.xlabel('Time')
-plt.ylabel('Horizontal Wind Speed')
+plt.ylabel('Horizontal Wind Direction')
 # plt.xticks(x_ticks, custom_labels)
 plt.grid()
 
@@ -197,8 +248,9 @@ plt.grid()
 
 # Plot drag coefficient
 plt.figure()
-plt.plot(CDw)
-plt.plot(CD)
+plt.plot(t,CDw,label = 'Cd wing')
+plt.plot(t,cd_kcu,label = 'Cd kcu')
+# plt.plot(CD)
 
 plt.xlabel('Time')
 plt.ylabel('Drag Coefficient')
@@ -272,25 +324,28 @@ plt.show()
 # plt.grid()
 
 start = 0
-end = -1
+end = 40000
 # Plot apparent velocity
 plt.figure()
 plt.plot(z[start:end])
-plt.plot(flight_data['rz'].iloc[start:end])
+plt.plot(znova[start:end])
+# plt.plot(flight_data['rz'].iloc[start:end])
 plt.xlabel('Time')
 plt.ylabel('Height')
 plt.grid()
 
 plt.figure()
 plt.plot(x[start:end])
-plt.plot(flight_data['rx'].iloc[start:end])
+plt.plot(xnova[start:end])
+# plt.plot(flight_data['rx'].iloc[start:end])
 plt.xlabel('Time')
 plt.ylabel('Pos east')
 plt.grid()
 
 plt.figure()
 plt.plot(y[start:end])
-plt.plot(flight_data['ry'].iloc[start:end])
+plt.plot(ynova[start:end])
+# plt.plot(flight_data['ry'].iloc[start:end])
 plt.xlabel('Time')
 plt.ylabel('Pos north')
 plt.grid()
@@ -299,8 +354,7 @@ plt.grid()
 
 # Plot Tether length
 plt.figure()
-plt.plot(t[start:end],tether_len[start:end])
-
+plt.plot(t[start:end],tether_len[start:end])    
 plt.plot(t[start:end],flight_data['ground_tether_length'].iloc[start:end]-9)
 plt.fill_between(t[start:end], 400, where=turn[start:end], color='lightblue', alpha=0.2)
 plt.xlabel('Time')
@@ -331,7 +385,7 @@ plt.plot(meas_pitch)
 plt.plot(meas_pitch1)
 
 #%%
-start = 4000
+start = 8000
 end = start+36000
 hours = [13,14,15]
 
@@ -353,6 +407,7 @@ for i in range(len(hours)):
     maxERA5 = ERA5vel[1::2,0]
     ax_vel[i].fill_betweenx(hERA5, minERA5, maxERA5, color='lightgrey', alpha=0.5)
     ax_vel[i].scatter(wvel[start:end],z[start:end],color = 'lightblue',alpha = 0.5)
+    ax_vel[i].scatter(wvelnova[start:end],znova[start:end],color = 'lightgreen',alpha = 0.5)
     ax_vel[i].boxplot([measured_wvel[start:end]],positions = [10],vert = False,widths=(20))
     ax_vel[i].set_title(str(hours[i])+'h')
     ax_vel[i].set_xlabel('Wind velocity')
@@ -367,6 +422,7 @@ for i in range(len(hours)):
     maxERA5 = ERA5dir[1::2,0]
     ax_dir[i].fill_betweenx(hERA5, minERA5, maxERA5, color='lightgrey', alpha=0.5)
     ax_dir[i].scatter(wdir[start:end]*180/np.pi,z[start:end],color = 'lightblue',alpha = 0.5)
+    ax_dir[i].scatter(wdirnova[start:end]*180/np.pi,znova[start:end],color = 'lightgreen',alpha = 0.5)
     ax_dir[i].boxplot([measured_wdir[start:end]],positions = [10],vert = False,widths=(20))
     ax_dir[i].set_title(str(hours[i])+'h')
     ax_dir[i].set_xlabel('Wind direction')
@@ -381,5 +437,7 @@ for i in range(len(hours)):
     start = end
     end = start+36000
     
+fig_vel.legend(['ERA5','EKF (GPS&groundwvel)','EKF with va','Ground measurement'])
+fig_dir.legend(['ERA5','EKF (GPS&groundwvel)','EKF with va','Ground measurement'])
 # fig_dir.savefig('wind_direction.png',dpi = 300)
 # fig_vel.savefig('wind_velocity.png',dpi = 300)
