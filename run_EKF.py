@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 
 from scipy.optimize import least_squares
-from utils import get_tether_end_position, state_noise_matrices, observation_matrices, calculate_angle,project_onto_plane ,read_data, rank_observability_matrix,read_data_new
+from utils import get_tether_end_position, state_noise_matrices, observation_matrices, calculate_angle,project_onto_plane ,read_data, rank_observability_matrix,read_data_new,get_measurements
 import control
 import time
 
@@ -34,10 +34,10 @@ flight_data = flight_data.reset_index()
 measured_wvel = flight_data['ground_wind_velocity']
 measured_uf = measured_wvel*kappa/np.log(10/z0)
 
-window_size=10
-flight_data['ax']=np.convolve(flight_data['ax'], np.ones(window_size)/window_size, mode='same')
-flight_data['ay']=np.convolve(flight_data['ay'], np.ones(window_size)/window_size, mode='same')
-flight_data['az']=np.convolve(flight_data['az'], np.ones(window_size)/window_size, mode='same')
+# window_size=10
+# flight_data['ax']=np.convolve(flight_data['ax'], np.ones(window_size)/window_size, mode='same')
+# flight_data['ay']=np.convolve(flight_data['ay'], np.ones(window_size)/window_size, mode='same')
+# flight_data['az']=np.convolve(flight_data['az'], np.ones(window_size)/window_size, mode='same')
 
 dep_fd = flight_data[flight_data['kite_set_depower']>25]
 pow_fd = flight_data[flight_data['kite_set_depower']<25]
@@ -55,7 +55,7 @@ D=[]
 tether_length =[]
 for i in range(2):
     row = flight_data.iloc[i]
-    args = (row['ground_tether_force'], n_tether_elements, list(row[['rx', 'ry', 'rz']]), list(row[['vx','vy','vz']]),vw,
+    args = (row['ground_tether_force'], n_tether_elements, list(row[['rx', 'ry', 'rz']]), list(row[['vx0','vy0','vz0']]),vw,
             list(row[['ax', 'ay', 'az']]),True, False)
     opt_res = least_squares(get_tether_end_position, list(row[['kite_elevation', 'kite_azimuth', 'kite_distance']]), args=args,
                             kwargs={'find_force': False}, verbose=0)
@@ -72,38 +72,31 @@ for i in range(2):
     D.append(FD)
 
 #%% Initial state vector 
-x0 = np.vstack((flight_data[['rx', 'ry', 'rz']].values[0, :],flight_data[['vx', 'vy', 'vz']].values[0, :]))
+x0 = np.vstack((flight_data[['rx', 'ry', 'rz']].values[0, :],flight_data[['vx1', 'vy1', 'vz1']].values[0, :]))
 x0 = np.append(x0,[0.6,np.mean(ground_wind_dir),CL[0],CD[0],0])
 
 #%% Definition kalman filter matrices
 
-Ts = ca.SX.sym('ts')  # timestep
-up = ca.SX.sym('up')  # steering input
-Ft = ca.SX.sym('Ft',3) # Tether force
-el =  ca.SX.sym('el')
-az =  ca.SX.sym('az')
-Lt =  ca.SX.sym('Lt')
-r = ca.SX.sym('r', 3) # Position
-v = ca.SX.sym('v', 3) # Velocity
-a = ca.SX.sym('a', 3) # Acceleration
-uf = ca.SX.sym('uf')
-wdir = ca.SX.sym('wdir')
-CD = ca.SX.sym('CD')   
-CL = ca.SX.sym('CL')    
-CS = ca.SX.sym('CS')
-dFdup = ca.SX.sym('dFdup')
+Ts = ca.SX.sym('ts')    # timestep
+Ft = ca.SX.sym('Ft',3)  # Tether force
+r = ca.SX.sym('r', 3)   # Position
+v = ca.SX.sym('v', 3)   # Velocity
+a = ca.SX.sym('a', 3)   # Acceleration
+uf = ca.SX.sym('uf')    # Fricton velocity
+wdir = ca.SX.sym('wdir')# Wind direction
+CD = ca.SX.sym('CD')    # Drag coefficient
+CL = ca.SX.sym('CL')    # Lift coefficient
+CS = ca.SX.sym('CS')    # Side force coefficient
 
-
-x = ca.vertcat(r,v,uf,wdir,CL,CD,CS) # Solution vector
-
-u_sym = ca.vertcat(Ft)
+x = ca.vertcat(r,v,uf,wdir,CL,CD,CS) # State vector symbolic
+u_sym = ca.vertcat(Ft) # Input vector symbolic
 
 
 #%% Measurement vectors 
-
-
-Z = np.array([flight_data['rx'],flight_data['ry'],flight_data['rz'],flight_data['vx'],flight_data['vy'],flight_data['vz'],
-              measured_uf,flight_data['airspeed_apparent_windspeed'],np.zeros(len(flight_data)),flight_data['ax'],flight_data['ay'],flight_data['az']]).T
+measurements = ['GPS_pos', 'GPS_vel', 'GPS_acc','ground_wvel']
+meas_dict,Z = get_measurements(flight_data,measurements)
+# Z = np.array([flight_data['rx'],flight_data['ry'],flight_data['rz'],flight_data['vx'],flight_data['vy'],flight_data['vz'],
+#               measured_uf,flight_data['airspeed_apparent_windspeed'],np.zeros(len(flight_data)),flight_data['ax'],flight_data['ay'],flight_data['az']]).T
 
 dep = (flight_data['ground_tether_reelout_speed'] < 0) & (flight_data['kite_set_depower'] > 23)
 #%%
@@ -114,8 +107,6 @@ n           =  x0.shape[0]      # state dimension
 nm          =  Z.shape[1]       # number of measurements
 m           =  3                # number of inputs
     
-stdv_us = 0.1   
-
 stdv_xGPS = 2.5
 stdv_vGPS = 1.8
 stdv_aGPS = 10
@@ -124,33 +115,37 @@ stdv_va = 0.1
 stdv_dirw = 10/180*np.pi
 
 R = np.zeros((nm,nm))
-R[:3, :3] = np.eye(3) * stdv_xGPS**2
-
-R[3:6, 3:6] = np.eye(3) * stdv_vGPS**2
-R[6,6] = stdv_uf**2
-R[7,7] = stdv_va**2
-R[8,8] = 0.1
-R[9:12,9:12] =  np.eye(3) * stdv_aGPS**2
-
-# R[3,3] = 1.6**2
-# R[4,4] = 3.3**2
-# R[5,5] = 1.7**2
-# R[9,9] = 5.8**2
-# R[10,10] = 7.8**2
-# R[11,11] =6.9**2
-
+j = 0
+for key, value in meas_dict.items():
+    if key == 'GPS_pos':
+        for i in range(value):
+            R[:3, :3] = np.eye(3) * stdv_xGPS**2
+            j +=3
+    elif key == 'GPS_vel':
+        for i in range(value):
+            R[j:j+3, j:j+3] = np.eye(3) * stdv_vGPS**2
+            j += 3
+    elif key == 'GPS_acc':
+        for i in range(value):
+            R[j:j+3, j:j+3] = np.eye(3) * stdv_aGPS**2
+            j += 3
+    elif key == 'ground_wvel':
+        for i in range(value):
+            R[j,j] = stdv_uf**2
+    elif key == 'apparent_wvel':
+        for i in range(value):
+            R[j,j] = stdv_va**2
 
 #%% Define process noise matrix
 stdv_Ft = 200
 stdv_CL = 0.15
 stdv_CD = 0.1
 stdv_CS = 0.05
-stdv_vw = 0.
+stdv_vw = 0.1
 
 # Define process noise matrix
 Q = np.zeros((6, 6))
 Q[:3,:3] = np.eye(3)*stdv_Ft**2
-# Q[3:6,3:6] = np.eye(3)*stdv_vw**2
 Q[3,3] = stdv_CL**2
 Q[4,4] = stdv_CD**2
 Q[5,5] = stdv_CS**2
@@ -241,29 +236,27 @@ P_k1_k1 = np.eye(n)*1**2
 
 x_sol = x0
 x_k1_k1 = x0
-us = np.array(flight_data['kite_set_steering'])
 t = np.array(flight_data['time'])
-u = res[8]
-Ft = []
-tether_len = []
-CL = []
-CD = []
-aoa = []
-yaw = []
-pitch = []
-roll = []
-cd_kcu = []
-sideslip = []
+u = res[8]      # Initial input
+Ft = []         # Tether force
+tether_len = [] # Tether length
+CL = []         # Lift coefficient
+CD = []         # Drag coefficient
+aoa = []        # Angle of attack
+yaw = []        # Yaw angle
+pitch = []      # Pitch angle
+roll = []       # Roll angle
+cd_kcu = []     # Kite control unit drag coefficient
+sideslip = []   # Sideslip angle
+tether_pos = [] # Tether positions
 flight_data['ground_tether_length'] = flight_data['ground_tether_length']+22.
-meas_lt = np.array(flight_data['ground_tether_length'])
-fx,calc_Fx,calc_G = state_noise_matrices(x,u_sym,Ts)
-dae = {'x': x, 'p': u_sym, 'ode': fx}
-intg = ca.integrator('intg', 'cvodes', dae, {'tf': 0.1})
-calc_hx,calc_Hx = observation_matrices(x,u_sym)
-vw = np.array([np.array(flight_data['ground_wind_velocity']),np.zeros(len(flight_data)),np.zeros(len(flight_data))]).T
+
+fx,calc_Fx,calc_G = state_noise_matrices(x,u_sym,Ts)        # Nonlinear state transition function (fx), state transition matrix (Fx), system noise input matrix(G)
+calc_hx,calc_Hx = observation_matrices(x,u_sym,meas_dict)   # Nonlinear observation function (hx), observation matrix (Hx)
+dae = {'x': x, 'p': u_sym, 'ode': fx}                       # Define ODE system
+intg = ca.integrator('intg', 'cvodes', dae, {'tf': 0.1})    # Define integrator
 start_time = time.time()
 mins = -1
-tether_pos = []
 for k in range(n_intervals):
     wvel = x_k1_k1[6]/kappa*np.log(x_k1_k1[2]/z0)
     wdir = x_k1_k1[7]
@@ -272,10 +265,10 @@ for k in range(n_intervals):
     row = flight_data.iloc[k]
    
     zi = Z[k]
-    if dep[k]:
-        R[7,7] = stdv_va**2
-    else:
-        R[7,7] = 5**2
+    # if dep[k]:
+    #     R[7,7] = stdv_va**2
+    # else:
+    #     R[7,7] = 5**2
     if k%600==0:
         elapsed_time = time.time() - start_time
         start_time = time.time()  # Record end time
@@ -288,7 +281,7 @@ for k in range(n_intervals):
     G = np.array(calc_G(x_k1_k.T,u,ts))
     
     # # Convert continuous-time state-space model to discrete-time model
-    sys_ct = control.ss(Fx, G, np.zeros(n), np.zeros(6))
+    sys_ct = control.ss(Fx, G, np.zeros(n), np.zeros(len(Q)))
     sys_dt = control.sample_system(sys_ct, ts, method='zoh')
     # Get discrete-time state transition and input-to-state matrices
     Phi = sys_dt.A
@@ -349,44 +342,43 @@ for k in range(n_intervals):
     # Find tether shape and force
     args = (row['ground_tether_force'], n_tether_elements, x_k1_k1[0:3], x_k1_k1[3:6],vw,
             list(row[['ax','ay','az']]),True, False)
+    # Find tether shape
     opt_res = least_squares(get_tether_end_position, opt_res.x, args=args,
                             kwargs={'find_force': False}, verbose=0)
+    # Calculate tether force
     res = get_tether_end_position(
         opt_res.x, *args, return_values=True, find_force=False)
     
-    u = np.array(res[8])
-    
-    tether_pos.append(res[0])
+    u = np.array(res[8])        # Input next step
 
-    dcm_b2w = res[2]
-    ey_kite = dcm_b2w[:,1]
-    ez_kite = dcm_b2w[:,2]
-    ex_kite = dcm_b2w[:,0]
-    
-    Ft.append(res[8])
-    tether_len.append(res[1])
-    CL.append(res[-2])
-    CD.append(res[-1])
-    cd_kcu.append(res[-3])
-    
-    
-    va = x_k1_k1[6:9]-x_k1_k1[3:6] 
-    va_proj = project_onto_plane(va, ey_kite)
-    aoa.append(calculate_angle(ex_kite,va_proj))
-    va_proj = project_onto_plane(va, ez_kite)
-    sideslip.append(calculate_angle(ey_kite,va_proj))
-    # pitch.append(np.arctan2(x_k1_k1[5],np.sqrt(x_k1_k1[3]**2+x_k1_k1[4]**2))*180/np.pi)
-    pitch.append(calculate_angle(ex_kite, [0,0,1]))
-    yaw.append(calculate_angle(ex_kite, [0,1,0]))
-    roll.append(calculate_angle(ey_kite, [0,0,1]))
-    # print(x_k1_k1[12:15]-x_k1_k[12:15])
-    # # Next step
-    
+
+    tether_pos.append(res[0])   # Tether positions
+    dcm_b2w = res[2]            # DCM bridle to earth
+    ey_kite = dcm_b2w[:,1]      # Kite y axis
+    ez_kite = dcm_b2w[:,2]      # Kite z axis
+    ex_kite = dcm_b2w[:,0]      # Kite x axis
+    Ft.append(res[8])           # Tether force
+    tether_len.append(res[1])   # Tether length
+    CL.append(res[-2])          # Lift coefficient
+    CD.append(res[-1])          # Drag coefficient
+    cd_kcu.append(res[-3])      # Kite control unit drag coefficient
+    va = x_k1_k1[6:9]-x_k1_k1[3:6]                      # Apparent wind velocity
+    va_proj = project_onto_plane(va, ey_kite)           # Projected apparent wind velocity onto kite y axis
+    aoa.append(calculate_angle(ex_kite,va_proj))        # Angle of attack
+    va_proj = project_onto_plane(va, ez_kite)           # Projected apparent wind velocity onto kite z axis
+    sideslip.append(calculate_angle(ey_kite,va_proj))   # Sideslip angle
+    pitch.append(calculate_angle(ex_kite, [0,0,1]))     # Pitch angle
+    yaw.append(calculate_angle(ex_kite, [0,1,0]))       # Yaw angle       
+    roll.append(calculate_angle(ey_kite, [0,0,1]))      # Roll angle
+
+    # Calculate rank observability matrix
     if k ==300:
         rank_O = rank_observability_matrix(Fx,Hx)
         print(rank_O)
         rank_O = rank_observability_matrix(Phi,Hx)
         print(rank_O)
+
+    # # Next step
     # store results
     XX_k1_k1[:,k]   = np.array(x_k1_k1).reshape(-1)
     STD_x_cor[:,k]  = std_x_cor
@@ -407,9 +399,9 @@ flight_data = flight_data.iloc[ti:k]
 
 path = './results/'+model+'/'
 # Save the DataFrame to a CSV file
-csv_filename = file_name+'_res_va.csv'
+csv_filename = file_name+'_rest.csv'
 df.to_csv(path+csv_filename, index=False)
 # Save the DataFrame to a CSV file
-csv_filename = file_name+'_fd_va.csv'
+csv_filename = file_name+'_fdt.csv'
 flight_data.to_csv(path+csv_filename, index=False)
 

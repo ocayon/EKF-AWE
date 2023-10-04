@@ -55,6 +55,64 @@ def read_data_new():
     
     return df
 
+def get_measurements(df, measurements):
+    meas_dict = {}
+    Z = []
+    for meas in measurements:
+        if meas == 'GPS_pos':
+            col_rx = [col for col in df.columns if 'rx' in col]
+            col_ry = [col for col in df.columns if 'ry' in col]
+            col_rz = [col for col in df.columns if 'rz' in col]
+            for i in range(len(col_rx)):
+                Z.append(df[col_rx[i]].values)
+                Z.append(df[col_ry[i]].values)
+                Z.append(df[col_rz[i]].values)
+            meas_dict[meas] = len(col_rx)
+
+        elif meas == 'GPS_vel':
+            col_vx = [col for col in df.columns if 'vx' in col]
+            col_vy = [col for col in df.columns if 'vy' in col]
+            col_vz = [col for col in df.columns if 'vz' in col]
+            for i in range(len(col_vx)):
+                Z.append(df[col_vx[i]].values)
+                Z.append(df[col_vy[i]].values)
+                Z.append(df[col_vz[i]].values)
+            meas_dict[meas] = len(col_vx)
+        
+        elif meas == 'GPS_acc':
+            col_ax = [col for col in df.columns if 'ax' in col]
+            col_ay = [col for col in df.columns if 'ay' in col]
+            col_az = [col for col in df.columns if 'az' in col]
+            for i in range(len(col_ax)):
+                Z.append(df[col_ax[i]].values)
+                Z.append(df[col_ay[i]].values)
+                Z.append(df[col_az[i]].values)
+            meas_dict[meas] = len(col_ax)
+        
+        elif meas == 'ground_wvel':
+            uf = df['ground_wind_velocity']*kappa/np.log(10/z0)
+            Z.append(uf.values)
+            meas_dict[meas] = 1
+
+        elif meas == 'apparent_wvel':
+            col_va = [col for col in df.columns if 'apparent' in col]
+            for i in range(len(col_va)):
+                Z.append(df[col_va[i]].values)
+                meas_dict[meas] = len(col_va)
+
+    Z = np.array(Z)
+    Z = Z.T
+
+    return meas_dict, Z
+
+
+
+
+
+
+
+
+
 def plot_vector(p0, v, ax, scale_vector=.03, color='g', label=None):
     p1 = p0 + v * scale_vector
     vector = np.vstack(([p0], [p1])).T
@@ -562,7 +620,9 @@ def state_noise_matrices(x,u,ts):
     
     return fx,calc_Fx,calc_G
     
-def observation_matrices(x,u):
+def observation_matrices(x,u,meas_dict):
+    
+    
     
     r = x[0:3]
     v = x[3:6]
@@ -574,27 +634,6 @@ def observation_matrices(x,u):
 
     va = vw - v
     va_mod = ca.norm_2(va)
-    
-    # Fa,Ft = get_forces(x, u)
-    # ez_bridle = Ft/ca.norm_2(Ft)
-    # ey_bridle = ca.cross(ez_bridle, va)/ca.norm_2(ca.cross(ez_bridle, va))
-    # ex_bridle = ca.cross(ey_bridle, ez_bridle)
-    # va_proj = project_onto_plane_sym(va, ey_bridle)
-    # aoa = calculate_angle_sym(ex_bridle,va_proj)
-    # vax = ca.dot(va,ex_bridle)
-
-    h = ca.SX.sym('h', 12) # Observation vector
-    h[0] = x[0] # Position
-    h[1] = x[1]
-    h[2] = x[2]
-    h[3] = x[3] # Velocity
-    h[4] = x[4]
-    h[5] = x[5]
-
-    h[6] = x[6]
-    h[7] = 0#va_mod#ca.sqrt(x[6]**2+x[7]**2)*ca.log(10/z0)/ca.log(x[2]/z0) # Wind
-    h[8] = 0#ca.norm_2(vw)/ca.log(x[2]/z0)
-    
     Ft = u
     va = vw - v 
     va_mod = ca.sqrt(ca.dot(va,va))
@@ -609,7 +648,33 @@ def observation_matrices(x,u):
     S = x[10]*0.5*rho*A_kite*va_mod**2*dir_S
 
     Fg = ca.vertcat(0, 0, -m_kite*g)
-    h[9:12] = (-Ft+L+D+S+Fg)/m_kite
+    
+    # Fa,Ft = get_forces(x, u)
+    # ez_bridle = Ft/ca.norm_2(Ft)
+    # ey_bridle = ca.cross(ez_bridle, va)/ca.norm_2(ca.cross(ez_bridle, va))
+    # ex_bridle = ca.cross(ey_bridle, ez_bridle)
+    # va_proj = project_onto_plane_sym(va, ey_bridle)
+    # aoa = calculate_angle_sym(ex_bridle,va_proj)
+    # vax = ca.dot(va,ex_bridle)
+    h = ca.SX()
+
+    for key, value in meas_dict.items():
+        if key == 'GPS_pos':
+            for i in range(value):
+                h = ca.vertcat(x[0:3])
+        elif key == 'GPS_vel':
+            for i in range(value):
+                h = ca.vertcat(h,x[3:6])
+        elif key == 'GPS_acc':
+            for i in range(value):
+                a = (-Ft+L+D+S+Fg)/m_kite
+                h = ca.vertcat(h,a)
+        elif key == 'ground_wvel':
+            for i in range(value):
+                h = ca.vertcat(h,x[6])
+        elif key == 'apparent_wvel':
+            for i in range(value):
+                h = ca.vertcat(h,va_mod)
 
     
     calc_hx = ca.Function('calc_h',[x,u],[h])
