@@ -13,10 +13,10 @@ import time
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 n_tether_elements = 5
 
-model = 'v3'
-year = '2019'
-month = '10'
-day = '08'
+model = 'v9'
+year = '2021'
+month = '09'
+day = '23'
 
 
 if model == 'v3':
@@ -45,6 +45,8 @@ u_p = flight_data['kite_set_depower']-min(flight_data['kite_set_depower'])
 u_p = u_p/max(u_p)
 ground_wind_dir = np.array(-flight_data['est_upwind_direction']-np.pi/2.+2*np.pi)
 
+up = (flight_data['kite_set_depower']-min(flight_data['kite_set_depower']))/(max(flight_data['kite_set_depower'])-min(flight_data['kite_set_depower']))
+
 vw = [9*np.cos(np.mean(ground_wind_dir)),9*np.sin(np.mean(ground_wind_dir)),0]
 
 CL = []
@@ -56,7 +58,7 @@ tether_length =[]
 for i in range(2):
     row = flight_data.iloc[i]
     args = (row['ground_tether_force'], n_tether_elements, list(row[['rx', 'ry', 'rz']]), list(row[['vx0','vy0','vz0']]),vw,
-            list(row[['ax', 'ay', 'az']]),True, False)
+            list(row[['ax1', 'ay1', 'az1']]),True, False)
     opt_res = least_squares(get_tether_end_position, list(row[['kite_elevation', 'kite_azimuth', 'kite_distance']]), args=args,
                             kwargs={'find_force': False}, verbose=0)
     res = get_tether_end_position(
@@ -93,12 +95,12 @@ u_sym = ca.vertcat(Ft) # Input vector symbolic
 
 
 #%% Measurement vectors 
-measurements = ['GPS_pos', 'GPS_vel', 'GPS_acc','ground_wvel']
+measurements = ['GPS_pos', 'GPS_vel', 'GPS_acc','apparent_wvel']
 meas_dict,Z = get_measurements(flight_data,measurements)
 # Z = np.array([flight_data['rx'],flight_data['ry'],flight_data['rz'],flight_data['vx'],flight_data['vy'],flight_data['vz'],
 #               measured_uf,flight_data['airspeed_apparent_windspeed'],np.zeros(len(flight_data)),flight_data['ax'],flight_data['ay'],flight_data['az']]).T
 
-dep = (flight_data['ground_tether_reelout_speed'] < 0) & (flight_data['kite_set_depower'] > 23)
+dep = (flight_data['ground_tether_reelout_speed'] < 0) & (up > 0.1)
 #%%
 ########################################################################
 ## Set simulation parameters
@@ -108,7 +110,7 @@ nm          =  Z.shape[1]       # number of measurements
 m           =  3                # number of inputs
     
 stdv_xGPS = 2.5
-stdv_vGPS = 1.8
+stdv_vGPS = 1
 stdv_aGPS = 10
 stdv_uf = 0.01
 stdv_va = 0.1
@@ -116,6 +118,7 @@ stdv_dirw = 10/180*np.pi
 
 R = np.zeros((nm,nm))
 j = 0
+jva = None
 for key, value in meas_dict.items():
     if key == 'GPS_pos':
         for i in range(value):
@@ -132,9 +135,12 @@ for key, value in meas_dict.items():
     elif key == 'ground_wvel':
         for i in range(value):
             R[j,j] = stdv_uf**2
+            j+=1
     elif key == 'apparent_wvel':
         for i in range(value):
             R[j,j] = stdv_va**2
+            jva = j
+            j+=1
 
 #%% Define process noise matrix
 stdv_Ft = 200
@@ -265,10 +271,11 @@ for k in range(n_intervals):
     row = flight_data.iloc[k]
    
     zi = Z[k]
-    # if dep[k]:
-    #     R[7,7] = stdv_va**2
-    # else:
-    #     R[7,7] = 5**2
+    if jva:
+        if dep[k]:
+            R[jva,jva] = stdv_va**2
+        else:
+            R[jva,jva] = 4**2
     if k%600==0:
         elapsed_time = time.time() - start_time
         start_time = time.time()  # Record end time
@@ -341,7 +348,7 @@ for k in range(n_intervals):
     
     # Find tether shape and force
     args = (row['ground_tether_force'], n_tether_elements, x_k1_k1[0:3], x_k1_k1[3:6],vw,
-            list(row[['ax','ay','az']]),True, False)
+            list(row[['ax1','ay1','az1']]),True, False)
     # Find tether shape
     opt_res = least_squares(get_tether_end_position, opt_res.x, args=args,
                             kwargs={'find_force': False}, verbose=0)
@@ -399,9 +406,9 @@ flight_data = flight_data.iloc[ti:k]
 
 path = './results/'+model+'/'
 # Save the DataFrame to a CSV file
-csv_filename = file_name+'_rest.csv'
+csv_filename = file_name+'_res.csv'
 df.to_csv(path+csv_filename, index=False)
 # Save the DataFrame to a CSV file
-csv_filename = file_name+'_fdt.csv'
+csv_filename = file_name+'_fd.csv'
 flight_data.to_csv(path+csv_filename, index=False)
 
