@@ -9,10 +9,10 @@ import matplotlib.pyplot as plt
 #%%
 plt.close('all')
 
-model = 'v3'
-year = '2019'
-month = '10'
-day = '08'
+model = 'v9'
+year = '2021'
+month = '09'
+day = '23'
 
 if model == 'v3':
     from v3_properties import *
@@ -22,10 +22,10 @@ elif model == 'v9':
 path = './results/'+model+'/'
 file_name = model+'_'+year+'-'+month+'-'+day
 
-results = pd.read_csv(path+file_name+'_res_GPS.csv')
-flight_data = pd.read_csv(path+file_name+'_fd_GPS.csv')
+results = pd.read_csv(path+file_name+'_res.csv')
+flight_data = pd.read_csv(path+file_name+'_fd.csv')
 
-resultsnova = pd.read_csv(path+file_name+'_res_va.csv')
+resultsnova = pd.read_csv(path+file_name+'_res.csv')
 #%%
 x = results.x
 y = results.y
@@ -111,10 +111,10 @@ measured_uf = measured_wvel*kappa/np.log(10/z0)
 measured_va = flight_data['airspeed_apparent_windspeed']
 measured_Ft = flight_data['ground_tether_force']
 measured_aoa = flight_data['airspeed_angle_of_attack']
-meas_pitch = flight_data['kite_0_pitch']-5
-meas_pitch1 = flight_data['kite_1_pitch']-5
-meas_v = np.vstack((np.array(flight_data['vx']),np.array(flight_data['ay']),np.array(flight_data['az']))).T
-meas_a = np.vstack((np.array(flight_data['ax']),np.array(flight_data['ay']),np.array(flight_data['az']))).T
+meas_pitch = flight_data['pitch0']
+meas_pitch1 = flight_data['pitch1']
+meas_v = np.vstack((np.array(flight_data['vx1']),np.array(flight_data['vy1']),np.array(flight_data['vz1']))).T
+# meas_a = np.vstack((np.array(flight_data['ax']),np.array(flight_data['ay']),np.array(flight_data['az']))).T
 t = flight_data.time
 #%% Plot aero coeffs
 
@@ -212,6 +212,7 @@ plt.grid()
 # Plot horizontal wind speed
 plt.figure()
 plt.plot(wvel)
+plt.plot(wvelnova)
 plt.xlabel('Time')
 plt.ylabel('Horizontal Wind Speed')
 # plt.xticks(x_ticks, custom_labels)
@@ -364,9 +365,9 @@ plt.show()
 
 plt.figure()
 plt.plot(t[start:end],flight_data['kite_set_depower'].iloc[start:end],label = 'Up')
-plt.plot(t[start:end],flight_data['kite_actual_depower'].iloc[start:end],label = 'Up')
+# plt.plot(t[start:end],flight_data['kite_actual_depower'].iloc[start:end],label = 'Up')
 plt.plot(t[start:end],flight_data['kite_set_steering'].iloc[start:end],label = 'Us')
-plt.plot(t[start:end],flight_data['kite_actual_steering'].iloc[start:end],label = 'Us')
+# plt.plot(t[start:end],flight_data['kite_actual_steering'].iloc[start:end],label = 'Us')
 plt.xlabel('Time')
 plt.ylabel('Control inputs')
 plt.legend()
