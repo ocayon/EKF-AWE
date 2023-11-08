@@ -759,3 +759,11 @@ def R_EG_Body(Roll,Pitch,Yaw):#!!In radians!!
     
     #Total Rotational Matrix
     return R_Roll.dot(R_Pitch.dot(R_Yaw))
+
+
+def calculate_polar_coordinates(r):
+    # Calculate azimuth and elevation angles from a vector.
+    r_mod = np.linalg.norm(r)
+    az = np.arctan2(r[1], r[0])
+    el = np.arcsin(r[2]/r_mod)
+    return el, az, r_mod
