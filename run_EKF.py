@@ -13,10 +13,10 @@ import time
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 n_tether_elements = 5
 
-model = 'v9'
-year = '2021'
-month = '09'
-day = '23'
+model = 'v3'
+year = '2019'
+month = '10'
+day = '08'
 
 
 if model == 'v3':
@@ -43,7 +43,7 @@ dep_fd = flight_data[flight_data['kite_set_depower']>25]
 pow_fd = flight_data[flight_data['kite_set_depower']<25]
 u_p = flight_data['kite_set_depower']-min(flight_data['kite_set_depower'])
 u_p = u_p/max(u_p)
-ground_wind_dir = np.array(-flight_data['est_upwind_direction']-np.pi/2.+2*np.pi)
+ground_wind_dir = np.array(-flight_data['ground_upwind_direction']/180*np.pi-np.pi/2.+2*np.pi)
 
 up = (flight_data['kite_set_depower']-min(flight_data['kite_set_depower']))/(max(flight_data['kite_set_depower'])-min(flight_data['kite_set_depower']))
 
@@ -57,7 +57,7 @@ D=[]
 tether_length =[]
 for i in range(2):
     row = flight_data.iloc[i]
-    args = (row['ground_tether_force'], n_tether_elements, list(row[['rx', 'ry', 'rz']]), list(row[['vx0','vy0','vz0']]),vw,
+    args = (row['ground_tether_force'], n_tether_elements, list(row[['rx', 'ry', 'rz']]), list(row[['vx1','vy1','vz1']]),vw,
             list(row[['ax1', 'ay1', 'az1']]),True, False)
     opt_res = least_squares(get_tether_end_position, list(row[['kite_elevation', 'kite_azimuth', 'kite_distance']]), args=args,
                             kwargs={'find_force': False}, verbose=0)
@@ -75,7 +75,7 @@ for i in range(2):
 
 #%% Initial state vector 
 x0 = np.vstack((flight_data[['rx', 'ry', 'rz']].values[0, :],flight_data[['vx1', 'vy1', 'vz1']].values[0, :]))
-x0 = np.append(x0,[0.6,np.mean(ground_wind_dir),CL[0],CD[0],0])
+x0 = np.append(x0,[0.6,np.mean(ground_wind_dir),0.6,0.1,0])
 
 #%% Definition kalman filter matrices
 
@@ -95,12 +95,12 @@ u_sym = ca.vertcat(Ft) # Input vector symbolic
 
 
 #%% Measurement vectors 
-measurements = ['GPS_pos', 'GPS_vel', 'GPS_acc','apparent_wvel']
+measurements = ['GPS_pos', 'GPS_vel','GPS_acc']
 meas_dict,Z = get_measurements(flight_data,measurements)
 # Z = np.array([flight_data['rx'],flight_data['ry'],flight_data['rz'],flight_data['vx'],flight_data['vy'],flight_data['vz'],
 #               measured_uf,flight_data['airspeed_apparent_windspeed'],np.zeros(len(flight_data)),flight_data['ax'],flight_data['ay'],flight_data['az']]).T
 
-dep = (flight_data['ground_tether_reelout_speed'] < 0) & (up > 0.1)
+dep = (flight_data['ground_tether_reelout_speed'] < 0) #& (up > 0.1)
 #%%
 ########################################################################
 ## Set simulation parameters
@@ -122,7 +122,8 @@ jva = None
 for key, value in meas_dict.items():
     if key == 'GPS_pos':
         for i in range(value):
-            R[:3, :3] = np.eye(3) * stdv_xGPS**2
+            R[j:j+3, j:j+3] = np.eye(3) * stdv_xGPS**2
+            R[j+3,j+3] = 10**2
             j +=3
     elif key == 'GPS_vel':
         for i in range(value):
@@ -143,18 +144,21 @@ for key, value in meas_dict.items():
             j+=1
 
 #%% Define process noise matrix
-stdv_Ft = 200
-stdv_CL = 0.15
-stdv_CD = 0.1
-stdv_CS = 0.05
-stdv_vw = 0.1
+stdv_Ft =200
+stdv_CL = 0.1
+stdv_CD = 0.01
+stdv_CS = 0.01
+stdv_uf = 0.1
+stdv_wdir = 2/180*np.pi
 
 # Define process noise matrix
-Q = np.zeros((6, 6))
+Q = np.zeros((8, 8))
 Q[:3,:3] = np.eye(3)*stdv_Ft**2
 Q[3,3] = stdv_CL**2
 Q[4,4] = stdv_CD**2
 Q[5,5] = stdv_CS**2
+Q[6,6] = stdv_uf**2
+Q[7,7] = stdv_wdir**2
 
 # Wind correlation Ft
 # x direction
@@ -271,11 +275,12 @@ for k in range(n_intervals):
     row = flight_data.iloc[k]
    
     zi = Z[k]
+    
     if jva:
         if dep[k]:
             R[jva,jva] = stdv_va**2
         else:
-            R[jva,jva] = 4**2
+            R[jva,jva] = 2**2
     if k%600==0:
         elapsed_time = time.time() - start_time
         start_time = time.time()  # Record end time
@@ -370,6 +375,7 @@ for k in range(n_intervals):
     CD.append(res[-1])          # Drag coefficient
     cd_kcu.append(res[-3])      # Kite control unit drag coefficient
     va = x_k1_k1[6:9]-x_k1_k1[3:6]                      # Apparent wind velocity
+    
     va_proj = project_onto_plane(va, ey_kite)           # Projected apparent wind velocity onto kite y axis
     aoa.append(calculate_angle(ex_kite,va_proj))        # Angle of attack
     va_proj = project_onto_plane(va, ez_kite)           # Projected apparent wind velocity onto kite z axis
@@ -406,9 +412,9 @@ flight_data = flight_data.iloc[ti:k]
 
 path = './results/'+model+'/'
 # Save the DataFrame to a CSV file
-csv_filename = file_name+'_res.csv'
+csv_filename = file_name+'_res_GPS.csv'
 df.to_csv(path+csv_filename, index=False)
 # Save the DataFrame to a CSV file
-csv_filename = file_name+'_fd.csv'
+csv_filename = file_name+'_fd_GPS.csv'
 flight_data.to_csv(path+csv_filename, index=False)
 
