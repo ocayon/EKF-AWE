@@ -484,9 +484,11 @@ def get_tether_end_position(x, set_parameter, n_tether_elements, r_kite, v_kite,
                 dj = 0
                 
             elif n_tether_elements == 1:
-                dj = -.125*tether_drag_basis
-                dj += -.5*rho*np.linalg.norm(vajp)*vajp*cdp*Ap  # Adding kcu drag perpendicular to kcu
-                dj += -.5*rho*np.linalg.norm(vajn)*vajn*cdt*At  # Adding kcu drag parallel to kcu
+                dj = -.25*tether_drag_basis
+                dp= -.5*rho*np.linalg.norm(vajp)*vajp*cdp*Ap  # Adding kcu drag perpendicular to kcu
+                dt= -.5*rho*np.linalg.norm(vajn)*vajn*cdt*At  # Adding kcu drag parallel to kcu
+                dj += dp+dt
+                cd_kcu = (np.linalg.norm(dp+dt))/(0.5*rho*A_kite*np.linalg.norm(vaj)**2)
             elif kcu_element:
                 dj = -.25*tether_drag_basis
                 dp= -.5*rho*np.linalg.norm(vajp)*vajp*cdp*Ap  # Adding kcu drag perpendicular to kcu
@@ -575,7 +577,19 @@ def get_tether_end_position(x, set_parameter, n_tether_elements, r_kite, v_kite,
                dcm_tau2w, aerodynamic_force, va,tensions[-1,:], dcm_t2w[:,1],cd_kcu, CL,CD
     else:
         return (positions[-1, :] - r_kite)
-    
+
+def get_vw_from_aoa(vw,ex_kite,ey_kite,ez_kite, aoa,ss,v_kite):
+    va = vw - v_kite
+
+    va_proj = project_onto_plane(va, -ey_kite)           # Projected apparent wind velocity onto kite y axis
+    aoacalc=calculate_angle(-ex_kite,va_proj)        #Angle of attack
+
+    if ss:
+        va_proj = project_onto_plane(va, ez_kite)           # Projected apparent wind velocity onto kite z axis
+        sscalc= (calculate_angle(ey_kite,va_proj)-90)   # Sideslip angle
+        return (aoacalc-aoa)**2+ (sscalc-ss)**2
+    else:
+        return aoacalc-aoa
 
 
 def state_noise_matrices(x,u,ts): 
@@ -597,7 +611,7 @@ def state_noise_matrices(x,u,ts):
     dir_S = ca.cross(dir_L,dir_D) 
 
     L = x[8]*0.5*rho*A_kite*va_mod**2*dir_L
-    D = x[9]*0.5*rho*A_kite*va*va_mod
+    D = x[9]*0.5*rho*A_kite*va_mod**2*dir_D
     S = x[10]*0.5*rho*A_kite*va_mod**2*dir_S
 
     Fg = ca.vertcat(0, 0, -m_kite*g)
@@ -614,7 +628,7 @@ def state_noise_matrices(x,u,ts):
     Fx = ca.jacobian(fx, x)    
     calc_fx = ca.Function('calc_fx',[x,u,ts],[fx])
     calc_Fx = ca.Function('calc_Fx',[x,u,ts],[Fx])
-    noise_vector = ca.vertcat(u,x[8],x[9],x[10])
+    noise_vector = ca.vertcat(u,x[8],x[9],x[10],uf,wdir)
     G = ca.jacobian(fx,noise_vector)
     calc_G = ca.Function('calc_G',[x,u,ts],[G])
     
