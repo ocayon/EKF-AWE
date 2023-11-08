@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 
 from scipy.optimize import least_squares
-from utils import get_tether_end_position, state_noise_matrices, observation_matrices, calculate_angle,project_onto_plane ,read_data, rank_observability_matrix,read_data_new,get_measurements
+from utils import *
 import control
 import time
 
@@ -39,13 +39,13 @@ measured_uf = measured_wvel*kappa/np.log(10/z0)
 # flight_data['ay']=np.convolve(flight_data['ay'], np.ones(window_size)/window_size, mode='same')
 # flight_data['az']=np.convolve(flight_data['az'], np.ones(window_size)/window_size, mode='same')
 
-dep_fd = flight_data[flight_data['kite_set_depower']>25]
-pow_fd = flight_data[flight_data['kite_set_depower']<25]
-u_p = flight_data['kite_set_depower']-min(flight_data['kite_set_depower'])
+dep_fd = flight_data[flight_data['kcu_set_depower']>25]
+pow_fd = flight_data[flight_data['kcu_set_depower']<25]
+u_p = flight_data['kcu_set_depower']-min(flight_data['kcu_set_depower'])
 u_p = u_p/max(u_p)
-ground_wind_dir = np.array(-flight_data['ground_upwind_direction']/180*np.pi-np.pi/2.+2*np.pi)
+ground_wind_dir = np.array(-flight_data['ground_wind_direction']/180*np.pi-np.pi/2.+2*np.pi)
 
-up = (flight_data['kite_set_depower']-min(flight_data['kite_set_depower']))/(max(flight_data['kite_set_depower'])-min(flight_data['kite_set_depower']))
+up = (flight_data['kcu_set_depower']-min(flight_data['kcu_set_depower']))/(max(flight_data['kcu_set_depower'])-min(flight_data['kcu_set_depower']))
 
 vw = [9*np.cos(np.mean(ground_wind_dir)),9*np.sin(np.mean(ground_wind_dir)),0]
 
@@ -57,9 +57,12 @@ D=[]
 tether_length =[]
 for i in range(2):
     row = flight_data.iloc[i]
-    args = (row['ground_tether_force'], n_tether_elements, list(row[['rx', 'ry', 'rz']]), list(row[['vx1','vy1','vz1']]),vw,
-            list(row[['ax1', 'ay1', 'az1']]),True, False)
-    opt_res = least_squares(get_tether_end_position, list(row[['kite_elevation', 'kite_azimuth', 'kite_distance']]), args=args,
+    kite_pos = np.array([row['kite_0_rx'],row['kite_0_ry'],row['kite_0_rz']])
+    kite_vel = np.array([row['kite_0_vx'],row['kite_0_vy'],row['kite_0_vz']])
+    kite_acc = np.array([row['kite_1_ax'],row['kite_1_ay'],row['kite_1_az']])
+    args = (row['ground_tether_force'], n_tether_elements, kite_pos, kite_vel,vw,
+            kite_acc,True, False)
+    opt_res = least_squares(get_tether_end_position, list(calculate_polar_coordinates(np.array(kite_pos))), args=args,
                             kwargs={'find_force': False}, verbose=0)
     res = get_tether_end_position(
         opt_res.x, *args, return_values=True, find_force=False)
@@ -74,7 +77,7 @@ for i in range(2):
     D.append(FD)
 
 #%% Initial state vector 
-x0 = np.vstack((flight_data[['rx', 'ry', 'rz']].values[0, :],flight_data[['vx1', 'vy1', 'vz1']].values[0, :]))
+x0 = np.vstack((flight_data[['kite_0_rx','kite_0_ry','kite_0_rz']].values[0, :],flight_data[['kite_0_vx','kite_0_vy','kite_0_vz']].values[0, :]))
 x0 = np.append(x0,[0.6,np.mean(ground_wind_dir),0.6,0.1,0])
 
 #%% Definition kalman filter matrices
@@ -95,7 +98,7 @@ u_sym = ca.vertcat(Ft) # Input vector symbolic
 
 
 #%% Measurement vectors 
-measurements = ['GPS_pos', 'GPS_vel','GPS_acc']
+measurements = ['GPS_pos', 'GPS_vel','GPS_acc','']
 meas_dict,Z = get_measurements(flight_data,measurements)
 # Z = np.array([flight_data['rx'],flight_data['ry'],flight_data['rz'],flight_data['vx'],flight_data['vy'],flight_data['vz'],
 #               measured_uf,flight_data['airspeed_apparent_windspeed'],np.zeros(len(flight_data)),flight_data['ax'],flight_data['ay'],flight_data['az']]).T
@@ -123,7 +126,7 @@ for key, value in meas_dict.items():
     if key == 'GPS_pos':
         for i in range(value):
             R[j:j+3, j:j+3] = np.eye(3) * stdv_xGPS**2
-            R[j+3,j+3] = 10**2
+            # R[j+3,j+3] = 10**2
             j +=3
     elif key == 'GPS_vel':
         for i in range(value):
@@ -146,10 +149,10 @@ for key, value in meas_dict.items():
 #%% Define process noise matrix
 stdv_Ft =200
 stdv_CL = 0.1
-stdv_CD = 0.01
+stdv_CD = 0.1
 stdv_CS = 0.01
-stdv_uf = 0.1
-stdv_wdir = 2/180*np.pi
+stdv_uf = 0
+stdv_wdir = 0/180*np.pi
 
 # Define process noise matrix
 Q = np.zeros((8, 8))
@@ -353,7 +356,7 @@ for k in range(n_intervals):
     
     # Find tether shape and force
     args = (row['ground_tether_force'], n_tether_elements, x_k1_k1[0:3], x_k1_k1[3:6],vw,
-            list(row[['ax1','ay1','az1']]),True, False)
+            list(row[['kite_1_ax','kite_1_ay','kite_1_az']]),True, False)
     # Find tether shape
     opt_res = least_squares(get_tether_end_position, opt_res.x, args=args,
                             kwargs={'find_force': False}, verbose=0)
