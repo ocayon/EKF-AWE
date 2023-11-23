@@ -8,9 +8,9 @@ from utils import get_tether_end_position, state_noise_matrices, observation_mat
 plt.close('all')
 
 model = 'v9'
-year = '2021'
-month = '10'
-day = '07'
+year = '2023'
+month = '11'
+day = '16'
 
 if model == 'v3':
     from v3_properties import *
@@ -20,45 +20,45 @@ elif model == 'v9':
 path = './results/'+model+'/'
 file_name = model+'_'+year+'-'+month+'-'+day
 
-results = pd.read_csv(path+file_name+'_res.csv')
+results = pd.read_csv(path+file_name+'_res_GPS.csv')
 flight_data = pd.read_csv(path+file_name+'_fd.csv')
 
 # results = results.iloc[8000:50000].reset_index()
 # flight_data = flight_data.iloc[8000:50000].reset_index()
 
 
-windpath = './data/'
-windfile = 'era5_data_'+year+'_'+month+'_'+day+'.npy'
+# windpath = './data/'
+# windfile = 'era5_data_'+year+'_'+month+'_'+day+'.npy'
 
-data_dict = np.load(windpath+windfile, allow_pickle=True)
+# data_dict = np.load(windpath+windfile, allow_pickle=True)
 
-# Extract arrays and information
-era5_hours = data_dict.item()['hours']
-era5_heights = data_dict.item()['heights']
-era5_wvel = data_dict.item()['wvel']
-era5_wdir = data_dict.item()['wdir']
+# # Extract arrays and information
+# era5_hours = data_dict.item()['hours']
+# era5_heights = data_dict.item()['heights']
+# era5_wvel = data_dict.item()['wvel']
+# era5_wdir = data_dict.item()['wdir']
 
 #%%
-pow = (flight_data['ground_tether_reelout_speed'] > 0) & (flight_data['kite_set_depower'] < 23)
-turn = (pow) & (abs(flight_data['kite_set_steering']) > 20)
-straight = (pow) & (abs(flight_data['kite_set_steering']) < 20)
+pow = (flight_data['ground_tether_reelout_speed'] > 0) & (flight_data['kcu_set_depower'] < 23)
+turn = (pow) & (abs(flight_data['kcu_set_steering']) > 20)
+straight = (pow) & (abs(flight_data['kcu_set_steering']) < 20)
 
-str_left = (straight) & (np.gradient(flight_data['kite_course'])>0 )
-str_right = (straight) & (np.gradient(flight_data['kite_course'])<0 )
+# str_left = (straight) & (np.gradient(flight_data['kite_course'])>0 )
+# str_right = (straight) & (np.gradient(flight_data['kite_course'])<0 )
 
-measured_wdir = -flight_data['ground_upwind_direction']-90+360
+measured_wdir = -flight_data['ground_wind_direction']-90+360
 measured_wvel = flight_data['ground_wind_velocity']
 measured_uf = measured_wvel*kappa/np.log(10/z0)
-measured_va = flight_data['airspeed_apparent_windspeed']
+measured_va = flight_data['kite_apparent_windspeed']
 measured_Ft = flight_data['ground_tether_force']
-measured_aoa = flight_data['airspeed_angle_of_attack']
-measured_ss = flight_data['airspeed_sideslip_angle']
+measured_aoa = flight_data['kite_angle_of_attack']
+# measured_ss = flight_data['kite_sideslip_angle']
 measured_aoa = np.array(measured_aoa)
-measured_aoa = np.convolve(measured_aoa, np.ones(10)/10, mode='same')
+# measured_aoa = np.convolve(measured_aoa, np.ones(10)/10, mode='same')
 meas_pitch = flight_data['kite_0_pitch']
 meas_pitch1 = flight_data['kite_1_pitch']
-meas_roll = flight_data['kite_0_roll']
-meas_roll1 = flight_data['kite_1_roll']
+meas_roll = flight_data['kite_0_roll']+4
+meas_roll1 = flight_data['kite_1_roll']+4
 meas_yaw = flight_data['kite_0_yaw']-90
 meas_yaw1 = flight_data['kite_1_yaw']-90
 # meas_v = np.vstack((np.array(flight_data['vx1']),np.array(flight_data['vy1']),np.array(flight_data['vz1']))).T
@@ -80,10 +80,10 @@ wdir = results.wdir
 pitch = results.pitch
 
 
-CL = results.CL
-CD = results.CD
+CL_EKF = results.CL
+CD_EKF = results.CD
 # cd_kcu = results.cd_kcu
-CS = results.CS
+CS_EKF = results.CS
 CLw = results.CLw
 CDw = results.CDw
 aoa = results.aoa
@@ -96,9 +96,9 @@ wvel = uf/kappa*np.log(z/z0)
 r_kite = np.vstack((x,y,z)).T
 vw = np.vstack((wvel*np.cos(wdir),wvel*np.sin(wdir),np.zeros(len(wvel)))).T
 v_kite = np.vstack((np.array(vx),np.array(vy),np.array(vz))).T
-meas_ax = flight_data.ax
-meas_ay = flight_data.ay
-meas_az = flight_data.az
+meas_ax = flight_data.kite_1_ax
+meas_ay = flight_data.kite_1_ay
+meas_az = flight_data.kite_1_az
 acc = np.vstack((np.array(meas_ax),np.array(meas_ay),np.array(meas_az))).T
 
 va = vw-v_kite
@@ -129,16 +129,8 @@ for i in range(len(CL)):
 
     r_mod = np.linalg.norm(r_kite[i])
 
-    # Lmod = ca.dot(Fa,dir_L)
-    # Dmod = ca.dot(Fa,dir_D)
-    # Smod = ca.dot(Fa,dir_S)
-    # Li = CL[i]*0.5*rho*A_kite*va_mod[i]**2*dir_L
-    # Di = CD[i]*0.5*rho*A_kite*dir_D*va_mod[i]**2
-    # Si = CS[i]*0.5*rho*A_kite*va_mod[i]**2*dir_S
-    # Fg = np.array([0,0,-m_kite*9.8])
-    # acc.append((Li+Di+Si-Ft[i]+Fg)/m_kite)
     omega.append(np.cross(r_kite[i], v_kite[i])/r_mod**2)
-    Fa = -Ft[i,:]+m_kite*acc[i,:]
+    Fa = -Ft[i,:]+m_kite*acc[i,:]+m_kite*np.array([0,0,-9.81])
 
     D = np.dot(Fa,dir_D)
     dir_L = Ft[i]/Ft_mod[i] - np.dot(Ft[i]/Ft_mod[i],dir_D)*dir_D
@@ -149,9 +141,9 @@ for i in range(len(CL)):
     CD[i] = np.linalg.norm(D)/(0.5*rho*A_kite*va_mod[i]**2)
     CL[i] = np.linalg.norm(L)/(0.5*rho*A_kite*va_mod[i]**2)
     CS[i] = np.linalg.norm(S)/(0.5*rho*A_kite*va_mod[i]**2)
-# Calculate angle of attack based on orientation angles and estimated wind speed
-    Transform_Matrix=R_EG_Body(meas_roll[i]/180*np.pi,meas_pitch[i]/180*np.pi,(meas_yaw[i])/180*np.pi)
-#    Transform_Matrix=R_EG_Body(kite_roll[i]/180*np.pi,kite_pitch[i]/180*np.pi,kite_yaw_modified[i])
+    # Calculate angle of attack based on orientation angles and estimated wind speed
+    Transform_Matrix=R_EG_Body(meas_roll1[i]/180*np.pi,meas_pitch1[i]/180*np.pi,(meas_yaw1[i])/180*np.pi)
+    #    Transform_Matrix=R_EG_Body(kite_roll[i]/180*np.pi,kite_pitch[i]/180*np.pi,kite_yaw_modified[i])
     Transform_Matrix=Transform_Matrix.T
     
     #X_vector
@@ -170,21 +162,21 @@ for i in range(len(CL)):
 
 
 
-CLt = np.sqrt(CL**2+   CS**2)
+CLt = np.sqrt(CL_EKF**2+   CS_EKF**2)
 
 
 #%%
 
-up = (flight_data['kite_set_depower']-min(flight_data['kite_set_depower']))/(max(flight_data['kite_set_depower'])-min(flight_data['kite_set_depower']))
-us = (flight_data['kite_set_steering'])/max(abs(flight_data['kite_set_steering']))
+up = (flight_data['kcu_actual_depower']-min(flight_data['kcu_actual_depower']))/(max(flight_data['kcu_actual_depower'])-min(flight_data['kcu_actual_depower']))
+us = (flight_data['kcu_actual_steering'])/max(abs(flight_data['kcu_actual_steering']))
 print(min(us))
 turn = (flight_data['ground_tether_reelout_speed'] > 0) & (abs(us) > 0.5)
 straight = (flight_data['ground_tether_reelout_speed'] > 0) & (abs(us) < 0.5)
 dep = (flight_data['ground_tether_reelout_speed'] < 0) & (up>0.1)
 trans = (flight_data['ground_tether_reelout_speed'] < 0) & (up<0.1)
 pow = (flight_data['ground_tether_reelout_speed'] > 0) & (up<0.1)
-turn_right = (flight_data['ground_tether_reelout_speed'] > 0) & (abs(flight_data['kite_set_steering']) > 10) & (np.gradient(flight_data['kite_course'])<0 )
-turn_left = (flight_data['ground_tether_reelout_speed'] > 0) & (abs(flight_data['kite_set_steering']) > 10) & (np.gradient(flight_data['kite_course'])>0 )
+# turn_right = (flight_data['ground_tether_reelout_speed'] > 0) & (abs(flight_data['kcu_set_steering']) > 10) & (np.gradient(flight_data['kite_course'])<0 )
+# turn_left = (flight_data['ground_tether_reelout_speed'] > 0) & (abs(flight_data['kcu_set_steering']) > 10) & (np.gradient(flight_data['kite_course'])>0 )
 
 plt.figure()
 plt.plot(aoacalc)
@@ -194,16 +186,16 @@ plt.grid()
 
 plt.figure()
 plt.plot(sideslipcalc)
-plt.plot(measured_ss)
+# plt.plot(measured_ss)
 plt.grid()
 
 
 #%% Plot aero coeffs
 
 # pow_res = results[flight_data['ground_tether_reelout_speed']>0]
-# pow_straight = pow_res[abs(flight_data['kite_set_steering'])<10]
-# pow_turn = pow_res[abs(flight_data['kite_set_steering'])>10]
-# dep_res = results[(flight_data['ground_tether_reelout_speed'] < 0) & (flight_data['kite_set_depower'] > 25)]
+# pow_straight = pow_res[abs(flight_data['kcu_set_steering'])<10]
+# pow_turn = pow_res[abs(flight_data['kcu_set_steering'])>10]
+# dep_res = results[(flight_data['ground_tether_reelout_speed'] < 0) & (flight_data['kcu_set_depower'] > 25)]
 
 # degree = 2  # Choose the degree of the polynomial (you can adjust this)
 # coefficients = np.polyfit(pow_res.aoa, pow_res.CLw, degree)
@@ -282,48 +274,40 @@ plt.grid()
 
 
 sideslipcalc = np.array(sideslipcalc)
-aoacalc = np.array(aoacalc)
+aoacalc = np.array(aoa)
+
 mask = (sideslipcalc<0)& (sideslipcalc>-25)&(pow)#&(aoacalc>3)&(aoacalc<5)
-coefficients = np.polyfit(sideslipcalc[mask&pow], CL[mask&pow], 1)
+mask = (up<0.1)&(aoacalc<10)&(z>180)
+coefficients = np.polyfit(sideslipcalc[mask], CL_EKF[mask], 3)
 polynomial = np.poly1d(coefficients)
-alpha_fit = np.linspace(min(sideslipcalc[mask&pow]), max(sideslipcalc[mask&pow]), 100)  # Create a range of alpha values for the trendline
+alpha_fit = np.linspace(min(sideslipcalc[mask]), max(sideslipcalc[mask]), 100)  # Create a range of alpha values for the trendline
 plt.figure()
-plt.scatter(sideslipcalc[mask&pow],CL[mask&pow],alpha = 0.5)   
+plt.scatter(sideslipcalc[mask],CL_EKF[mask],alpha = 0.5)   
 plt.plot(alpha_fit, polynomial(alpha_fit), label=f'Trendline (Degree 2)', color='r') 
 
-coefficients = np.polyfit(sideslipcalc[mask&pow], CD[mask&pow], 1)
+coefficients = np.polyfit(sideslipcalc[mask], CD_EKF[mask], 2)
 polynomial = np.poly1d(coefficients)
-alpha_fit = np.linspace(min(sideslipcalc[mask&pow]), max(sideslipcalc[mask&pow]), 100)  # Create a range of alpha values for the trendline
+alpha_fit = np.linspace(min(sideslipcalc[mask]), max(sideslipcalc[mask]), 100)  # Create a range of alpha values for the trendline
 plt.figure()
-plt.scatter(sideslipcalc[mask&pow],CD[mask&pow],alpha = 0.5)   
+plt.scatter(sideslipcalc[mask],CD_EKF[mask],alpha = 0.5)   
 plt.plot(alpha_fit, polynomial(alpha_fit), label=f'Trendline (Degree 2)', color='r') 
 
 
 
-coefficients = np.polyfit(aoacalc[mask&pow], CL[mask&pow], 1)
+coefficients = np.polyfit(aoacalc[mask], CL[mask], 2)
 polynomial = np.poly1d(coefficients)
-alpha_fit = np.linspace(min(aoacalc[mask&pow]), max(aoacalc[mask&pow]), 100)  # Create a range of alpha values for the trendline
+alpha_fit = np.linspace(min(aoacalc[mask]), max(aoacalc[mask]), 100)  # Create a range of alpha values for the trendline
 plt.figure()
-plt.scatter(aoacalc[mask&pow],CL[mask&pow],alpha = 0.5)   
+plt.scatter(aoacalc[mask],CL[mask],alpha = 0.5)   
 plt.plot(alpha_fit, polynomial(alpha_fit), label=f'Trendline (Degree 1)', color='r') 
 
 
-mask = (aoacalc<25)& (aoacalc>-25)
-coefficients = np.polyfit(aoacalc[mask&pow], CD[mask&pow], 1)
-polynomial = np.poly1d(coefficients)
-alpha_fit = np.linspace(min(aoacalc[mask&pow]), max(aoacalc[mask&pow]), 100)  # Create a range of alpha values for the trendline
-plt.figure()
-plt.scatter(aoacalc[mask&pow],CD[mask&pow],alpha = 0.5)   
-plt.plot(alpha_fit, polynomial(alpha_fit), label=f'Trendline (Degree 1)', color='r') 
 
-
-#%%
-
-fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
-start = 0
-end = 10000
-ax.plot(x[start:end], y[start:end], z[start:end], color='b')
+# fig = plt.figure()
+# ax = fig.add_subplot(111, projection='3d')
+# start = 0
+# end = 10000
+# ax.plot(x[start:end], y[start:end], z[start:end], color='b')
         
 # # x = pow_turn.x
 # # y = pow_turn.y
@@ -336,7 +320,7 @@ ax.plot(x[start:end], y[start:end], z[start:end], color='b')
 
 
 
-# #%%
+#%%
 # custom_labels = ['13', '14', '15','16']
 # x_ticks = [0, 36000, 72000,108000]
 
@@ -361,45 +345,43 @@ plt.ylabel('Horizontal Wind Speed')
 plt.grid()
 
 plt.figure()
-plt.plot(wdir*180/np.pi)
+plt.plot(t,wdir*180/np.pi)
+plt.fill_between(t, 140, where=straight, color=colors[0], alpha=0.2)
+plt.fill_between(t, 140, where=turn, color=colors[1], alpha=0.2)
+plt.fill_between(t, 140, where=dep, color=colors[2], alpha=0.2)
+plt.fill_between(t, 140, where=trans, color=colors[3], alpha=0.2)
 
 plt.xlabel('Time')
 plt.ylabel('Horizontal Wind Direction')
 # plt.xticks(x_ticks, custom_labels)
 plt.grid()
 
-# Plot wind direction
-plt.figure()
-plt.plot(angle)
-plt.xlabel('Time')
-plt.ylabel('Wind Direction')
-# plt.xticks(x_ticks, custom_labels)
-plt.grid()
 
-
-
+#%%
 # Plot lift coefficient
 plt.figure()
-plt.plot(CLw)
-# plt.plot(CL)
-plt.plot(CLt)
+plt.plot(t,CLw, label = 'Tether model')
+plt.plot(t,CL_EKF,label = 'Sensor fusion')
+plt.plot(t,CLt)
 
 plt.xlabel('Time')
 plt.ylabel('Lift Coefficient')
+plt.fill_between(t, CLw, where=straight, color=colors[0], alpha=0.2)
+plt.fill_between(t, CLw, where=turn, color=colors[1], alpha=0.2)
+plt.fill_between(t, CLw, where=dep, color=colors[2], alpha=0.2)
+plt.fill_between(t, CLw, where=trans, color=colors[3], alpha=0.2)
 # plt.xticks(x_ticks, custom_labels)
 plt.grid()
+plt.legend()
 
-# Plot drag coefficient
 plt.figure()
-plt.plot(t,CDw,label = 'Cd wing')
-plt.plot(t,cd_kcu,label = 'Cd kcu')
-plt.plot(t,CD)
-
+plt.plot(t,CDw, label = 'Tether model')
+plt.plot(t,CD_EKF,label = 'Sensor fusion')
 plt.xlabel('Time')
 plt.ylabel('Drag Coefficient')
 # plt.xticks(x_ticks, custom_labels)
 plt.grid()
-
+plt.legend()
 # Plot drag coefficient
 plt.figure()
 plt.plot(CS)
@@ -472,7 +454,7 @@ end = 40000
 plt.figure()
 plt.plot(z[start:end])
 
-plt.plot(flight_data['rz'].iloc[start:end])
+plt.plot(flight_data['kite_0_rz'].iloc[start:end])
 plt.xlabel('Time')
 plt.ylabel('Height')
 plt.grid()
@@ -480,7 +462,7 @@ plt.grid()
 plt.figure()
 plt.plot(x[start:end])
 
-plt.plot(flight_data['rx'].iloc[start:end])
+plt.plot(flight_data['kite_0_rx'].iloc[start:end])
 plt.xlabel('Time')
 plt.ylabel('Pos east')
 plt.grid()
@@ -488,7 +470,7 @@ plt.grid()
 plt.figure()
 plt.plot(y[start:end])
 
-plt.plot(flight_data['ry'].iloc[start:end])
+plt.plot(flight_data['kite_0_ry'].iloc[start:end])
 plt.xlabel('Time')
 plt.ylabel('Pos north')
 plt.grid()
@@ -506,9 +488,9 @@ plt.grid()
 plt.show()
 
 plt.figure()
-plt.plot(t[start:end],flight_data['kite_set_depower'].iloc[start:end],label = 'Up')
+plt.plot(t[start:end],flight_data['kcu_set_depower'].iloc[start:end],label = 'Up')
 # plt.plot(t[start:end],flight_data['kite_actual_depower'].iloc[start:end],label = 'Up')
-plt.plot(t[start:end],flight_data['kite_set_steering'].iloc[start:end],label = 'Us')
+plt.plot(t[start:end],flight_data['kcu_set_steering'].iloc[start:end],label = 'Us')
 # plt.plot(t[start:end],flight_data['kite_actual_steering'].iloc[start:end],label = 'Us')
 plt.xlabel('Time')
 plt.ylabel('Control inputs')
@@ -528,55 +510,55 @@ plt.plot(meas_pitch)
 plt.plot(meas_pitch1)
 
 #%%
-start = 2000
-end = start+10000
-hours = [13,14,15]
+# start = 2000
+# end = start+36000
+# hours = [13,14,15]
 
-h_ticks = np.arange(0,350,50)
-heights = np.arange(100, 301, step=50)
-ground_wdir = measured_wdir[start:end]
-ground_wvel = measured_wvel[start:end]
-mindir = []
-maxdir = []
-minvel = []
-maxvel = []
+# h_ticks = np.arange(0,350,50)
+# heights = np.arange(100, 301, step=50)
+# ground_wdir = measured_wdir[start:end]
+# ground_wvel = measured_wvel[start:end]
+# mindir = []
+# maxdir = []
+# minvel = []
+# maxvel = []
 
-fig_vel, ax_vel = plt.subplots(1, 3, sharey=True, figsize=(12, 4))
-fig_dir, ax_dir = plt.subplots(1, 3, sharey=True, figsize=(12, 4))
-for i in range(len(hours)):
+# fig_vel, ax_vel = plt.subplots(1, 3, sharey=True, figsize=(12, 4))
+# fig_dir, ax_dir = plt.subplots(1, 3, sharey=True, figsize=(12, 4))
+# for i in range(len(hours)):
 
 
-    ax_vel[i].fill_betweenx(era5_heights[:-2], era5_wvel[i,:-2], era5_wvel[i+1,:-2], color='lightgrey', alpha=0.5)
-    ax_vel[i].scatter(wvel[start:end],z[start:end],color = 'lightblue',alpha = 0.5)
-    ax_vel[i].scatter(wvel_calc[start:end],z[start:end],color = 'lightgreen',alpha = 0.5)
-    ax_vel[i].boxplot([measured_wvel[start:end]],positions = [10],vert = False,widths=(20))
-    ax_vel[i].set_title(str(hours[i])+'h')
-    ax_vel[i].set_xlabel('Wind velocity')
-    ax_vel[i].set_yticks(h_ticks)
-    ax_vel[i].set_yticklabels(h_ticks)
-    ax_vel[i].grid()
+#     ax_vel[i].fill_betweenx(era5_heights[:-2], era5_wvel[i,:-2], era5_wvel[i+1,:-2], color='lightgrey', alpha=0.5)
+#     ax_vel[i].scatter(wvel[start:end],z[start:end],color = 'lightblue',alpha = 0.5)
+
+#     ax_vel[i].boxplot([measured_wvel[start:end]],positions = [10],vert = False,widths=(20))
+#     ax_vel[i].set_title(str(hours[i])+'h')
+#     ax_vel[i].set_xlabel('Wind velocity')
+#     ax_vel[i].set_yticks(h_ticks)
+#     ax_vel[i].set_yticklabels(h_ticks)
+#     ax_vel[i].grid()
     
 
-    ax_dir[i].fill_betweenx(era5_heights[:-2], era5_wdir[i,:-2], era5_wdir[i+1,:-2], color='lightgrey', alpha=0.5)
-    ax_dir[i].scatter(wdir[start:end]*180/np.pi,z[start:end],color = 'lightblue',alpha = 0.5)
-    ax_dir[i].scatter(wdir_calc[start:end],z[start:end],color = 'lightgreen',alpha = 0.5)
-    ax_dir[i].boxplot([measured_wdir[start:end]],positions = [10],vert = False,widths=(20))
-    ax_dir[i].set_title(str(hours[i])+'h')
-    ax_dir[i].set_xlabel('Wind direction')
-    ax_dir[i].set_yticks(h_ticks)
-    ax_dir[i].set_yticklabels(h_ticks)
-    ax_dir[i].grid()
+#     ax_dir[i].fill_betweenx(era5_heights[:-2], era5_wdir[i,:-2], era5_wdir[i+1,:-2], color='lightgrey', alpha=0.5)
+#     ax_dir[i].scatter(wdir[start:end]*180/np.pi,z[start:end],color = 'lightblue',alpha = 0.5)
+
+#     ax_dir[i].boxplot([measured_wdir[start:end]],positions = [10],vert = False,widths=(20))
+#     ax_dir[i].set_title(str(hours[i])+'h')
+#     ax_dir[i].set_xlabel('Wind direction')
+#     ax_dir[i].set_yticks(h_ticks)
+#     ax_dir[i].set_yticklabels(h_ticks)
+#     ax_dir[i].grid()
     
-    ax_dir[i].set_xlim([-30, 50])
-    ax_vel[i].set_xlim([0, 14])
-    if i == 0:
-        ax_dir[i].set_ylabel('Height')
-        ax_vel[i].set_ylabel('Height')
+#     # ax_dir[i].set_xlim([150, 220])
+#     ax_vel[i].set_xlim([0, 14])
+#     if i == 0:
+#         ax_dir[i].set_ylabel('Height')
+#         ax_vel[i].set_ylabel('Height')
         
-    start = end
-    end = start+36000
+#     start = end
+#     end = start+36000
     
-fig_vel.legend(['ERA5','EKF (GPS&groundwvel)','EKF with va','Ground measurement'])
-fig_dir.legend(['ERA5','EKF (GPS&groundwvel)','EKF with va','Ground measurement'])
-# fig_dir.savefig('wind_direction.png',dpi = 300)
-# fig_vel.savefig('wind_velocity.png',dpi = 300)
+# fig_vel.legend(['ERA5','EKF (GPS&groundwvel)','EKF with va','Ground measurement'])
+# fig_dir.legend(['ERA5','EKF (GPS&groundwvel)','EKF with va','Ground measurement'])
+# # fig_dir.savefig('wind_direction.png',dpi = 300)
+# # fig_vel.savefig('wind_velocity.png',dpi = 300)
