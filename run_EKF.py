@@ -13,10 +13,10 @@ import time
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 n_tether_elements = 5
 
-model = 'v3'
-year = '2019'
-month = '10'
-day = '08'
+model = 'v9'
+year = '2023'
+month = '11'
+day = '16'
 
 
 if model == 'v3':
@@ -79,7 +79,13 @@ for i in range(2):
 #%% Initial state vector 
 x0 = np.vstack((flight_data[['kite_0_rx','kite_0_ry','kite_0_rz']].values[0, :],flight_data[['kite_0_vx','kite_0_vy','kite_0_vz']].values[0, :]))
 x0 = np.append(x0,[0.6,np.mean(ground_wind_dir),0.6,0.1,0])
+#%% Measurement vectors 
+measurements = ['GPS_pos', 'GPS_vel']
+meas_dict,Z = get_measurements(flight_data,measurements,False)
+# Z = np.array([flight_data['rx'],flight_data['ry'],flight_data['rz'],flight_data['vx'],flight_data['vy'],flight_data['vz'],
+#               measured_uf,flight_data['airspeed_apparent_windspeed'],np.zeros(len(flight_data)),flight_data['ax'],flight_data['ay'],flight_data['az']]).T
 
+dep = (flight_data['ground_tether_reelout_speed'] < 0) #& (up > 0.1)
 #%% Definition kalman filter matrices
 
 Ts = ca.SX.sym('ts')    # timestep
@@ -95,15 +101,20 @@ CS = ca.SX.sym('CS')    # Side force coefficient
 
 x = ca.vertcat(r,v,uf,wdir,CL,CD,CS) # State vector symbolic
 u_sym = ca.vertcat(Ft) # Input vector symbolic
+fx,calc_Fx,calc_G = state_noise_matrices(x,u_sym,Ts)        # Nonlinear state transition function (fx), state transition matrix (Fx), system noise input matrix(G)
 
+check_obs = False
+if check_obs == True:
+    meas_dict = {'GPS_pos': 1, 'GPS_vel': 1, 'GPS_acc': 0,'apparent_wvel':0,'ground_wvel':0}
+    hx,calc_hx,calc_Hx = observation_matrices(x,u_sym,meas_dict)   # Nonlinear observation function (hx), observation matrix (Hx)
+    O = observability_Lie_method(fx,hx,x)
+    calc_O = ca.Function('calc_O', [x,u_sym],[O])
+    O_app = calc_O(x0,res[8])
 
-#%% Measurement vectors 
-measurements = ['GPS_pos', 'GPS_vel','GPS_acc','']
-meas_dict,Z = get_measurements(flight_data,measurements)
-# Z = np.array([flight_data['rx'],flight_data['ry'],flight_data['rz'],flight_data['vx'],flight_data['vy'],flight_data['vz'],
-#               measured_uf,flight_data['airspeed_apparent_windspeed'],np.zeros(len(flight_data)),flight_data['ax'],flight_data['ay'],flight_data['az']]).T
+    print(np.linalg.matrix_rank(O_app))
 
-dep = (flight_data['ground_tether_reelout_speed'] < 0) #& (up > 0.1)
+hx,calc_hx,calc_Hx = observation_matrices(x,u_sym,meas_dict)   # Nonlinear observation function (hx), observation matrix (Hx)
+
 #%%
 ########################################################################
 ## Set simulation parameters
@@ -115,8 +126,8 @@ m           =  3                # number of inputs
 stdv_xGPS = 2.5
 stdv_vGPS = 1
 stdv_aGPS = 10
-stdv_uf = 0.01
-stdv_va = 0.1
+stdv_uf = 0.1
+stdv_va = 0.2
 stdv_dirw = 10/180*np.pi
 
 R = np.zeros((nm,nm))
@@ -147,21 +158,32 @@ for key, value in meas_dict.items():
             j+=1
 
 #%% Define process noise matrix
-stdv_Ft =200
-stdv_CL = 0.1
-stdv_CD = 0.1
-stdv_CS = 0.01
-stdv_uf = 0
-stdv_wdir = 0/180*np.pi
+stdv_Ft =0
+stdv_CL = 0.1**2
+stdv_CD = 0.1**2
+stdv_CS = 0.1**2
+stdv_uf = 0.025**2
+stdv_x = 0.01
+stdv_v = 0.01
+stdv_wdir = (5/180*np.pi)**2
 
 # Define process noise matrix
-Q = np.zeros((8, 8))
-Q[:3,:3] = np.eye(3)*stdv_Ft**2
-Q[3,3] = stdv_CL**2
-Q[4,4] = stdv_CD**2
-Q[5,5] = stdv_CS**2
+Q = np.zeros((11,11))
+Q[:3,:3] = np.eye(3)*stdv_x**2
+Q[3:6,3:6] = np.eye(3)*stdv_v**2
 Q[6,6] = stdv_uf**2
 Q[7,7] = stdv_wdir**2
+Q[8,8] = stdv_CL**2
+Q[9,9] = stdv_CD**2
+Q[10,10] = stdv_CS**2
+
+# Aerodynamic coefficients correlation
+# Q[6,7] = Q[7,6] = np.sqrt(Q[6,6]*Q[7,7])        # CL,CD
+# Q[6,8] = Q[8,6] = np.sqrt(Q[6,6]*Q[8,8])        # CL,CD
+# Q[6,9] = Q[9,6] = np.sqrt(Q[6,6]*Q[9,9])        # CL,CD
+# Q[6,10] = Q[10,6] = np.sqrt(Q[6,6]*Q[10,10])        # CL,CD
+# Q[6,7] = Q[7,6] = np.sqrt(Q[6,6]*Q[7,7])        # CL,CD
+
 
 # Wind correlation Ft
 # x direction
@@ -200,10 +222,7 @@ Q[7,7] = stdv_wdir**2
 # Q[3,5] = Q[5,3] = np.sqrt(Q[3,3]*Q[5,5])*0.01       
 # Q[4,5] = Q[5,4] = np.sqrt(Q[4,4]*Q[5,5])*0.01        
 
-# Aerodynamic coefficients correlation
-# Q[6,7] = Q[7,6] = np.sqrt(Q[6,6]*Q[7,7])*0.1        # CL,CD
-# Q[6,8] = Q[8,6] = np.sqrt(Q[6,6]*Q[8,8])*0.01       # CL,CS
-# Q[7,8] = Q[8,7] = np.sqrt(Q[7,7]*Q[8,8])*0.01        # CD,CS
+
 
 # Tether force correlation CL
 # Q[0,6] = Q[6,0] = np.sqrt(Q[0,0]*Q[6,6])*0.9      
@@ -237,7 +256,7 @@ ZZ_pred     = np.zeros([nm, N])
 IEKFitcount = np.zeros([N, 1])
 
 epsilon         = 10**(-10)         # IEKF threshold
-doIEKF          = True            # If false, EKF without iterations is used
+doIEKF          = True           # If false, EKF without iterations is used
 maxIterations   = 200               # maximum amount of iterations per sample
 
 # Store Initial values
@@ -265,7 +284,20 @@ tether_pos = [] # Tether positions
 flight_data['ground_tether_length'] = flight_data['ground_tether_length']+22.
 
 fx,calc_Fx,calc_G = state_noise_matrices(x,u_sym,Ts)        # Nonlinear state transition function (fx), state transition matrix (Fx), system noise input matrix(G)
-calc_hx,calc_Hx = observation_matrices(x,u_sym,meas_dict)   # Nonlinear observation function (hx), observation matrix (Hx)
+hx,calc_hx,calc_Hx = observation_matrices(x,u_sym,meas_dict)   # Nonlinear observation function (hx), observation matrix (Hx)
+def print_diagonal(matrix):
+    # Check if the matrix is square
+    if not all(len(row) == len(matrix) for row in matrix):
+        print("The matrix is not square, and therefore, it doesn't have a diagonal.")
+        return
+
+    # Print the diagonal elements
+    diagonal = [matrix[i][i] for i in range(len(matrix))]
+    print("Diagonal elements:", diagonal)
+from scipy.stats import chi2 
+    
+cov_uf = []
+cov_wdir = []
 dae = {'x': x, 'p': u_sym, 'ode': fx}                       # Define ODE system
 intg = ca.integrator('intg', 'cvodes', dae, {'tf': 0.1})    # Define integrator
 start_time = time.time()
@@ -278,18 +310,21 @@ for k in range(n_intervals):
     row = flight_data.iloc[k]
    
     zi = Z[k]
-    
+
+        
+    # Accuracy of the va_sensor depending on the powering state (Depowered -> aligned with flow)
     if jva:
         if dep[k]:
             R[jva,jva] = stdv_va**2
         else:
             R[jva,jva] = 2**2
+            
     if k%600==0:
         elapsed_time = time.time() - start_time
         start_time = time.time()  # Record end time
         mins +=1
         print(f"Real time: {mins} minutes.  Elapsed time: {elapsed_time:.2f} seconds")
-
+    
     sol = intg(x0=x_k1_k1, p=u)
     x_k1_k = np.array(sol["xf"].T)
     Fx = np.array(calc_Fx(x_k1_k.T,u,ts))
@@ -302,7 +337,8 @@ for k in range(n_intervals):
     Phi = sys_dt.A
     Gamma = sys_dt.B
 
-    P_k1_k = Phi@P_k1_k1@Phi.T + Gamma@Q@Gamma.T
+    # P_k1_k = Phi@P_k1_k1@Phi.T + Gamma@Q@Gamma.T
+    P_k1_k = Phi@P_k1_k1@Phi.T + Q
     if (doIEKF == True):
         
         eta2    = x_k1_k
@@ -352,11 +388,11 @@ for k in range(n_intervals):
     # P(k|k) (correction) using the numerically stable form of P_k_1k_1 = (eye(n) - K*Hx) * P_kk_1 
     P_k1_k1 = (np.eye(n) - K @ Hx) @ P_k1_k
     std_x_cor   = np.sqrt(np.diag(P_k1_k1))        # standard deviation of state estimation error (for validation)
-    
-    
+    # if np.trace(P_k1_k1[6::,6::])<1e-4:
+    #     P_k1_k1[6::,6::]= P_k1_k1[6::,6::]*10
     # Find tether shape and force
     args = (row['ground_tether_force'], n_tether_elements, x_k1_k1[0:3], x_k1_k1[3:6],vw,
-            list(row[['kite_1_ax','kite_1_ay','kite_1_az']]),True, False)
+            list(row[['kite_1_ax','kite_1_ay','kite_1_az']]),True, True)
     # Find tether shape
     opt_res = least_squares(get_tether_end_position, opt_res.x, args=args,
                             kwargs={'find_force': False}, verbose=0)
@@ -365,7 +401,34 @@ for k in range(n_intervals):
         opt_res.x, *args, return_values=True, find_force=False)
     
     u = np.array(res[8])        # Input next step
-
+    
+    # # Assuming normalized_innovation is a 1D array or list of normalized innovations
+    # meas_err = (zi - z_k1_k) 
+    
+    # NIS = meas_err.T @ np.linalg.inv(P_zz) @ meas_err
+    # # Calculate the chi-square statistic
+    # chi_square_statistic = np.sum(NIS**2)
+    
+    # # Set the degrees of freedom equal to the dimension of the measurement vector
+    # degrees_of_freedom = len(meas_err)
+    
+    # # Set the significance level (e.g., 0.05)
+    # significance_level = 0.01
+    
+    # # Calculate the critical value from the chi-square distribution
+    # critical_value = chi2.ppf(1 - significance_level, degrees_of_freedom)
+    
+    # # Compare the chi-square statistic to the critical value
+    # if chi_square_statistic < critical_value:
+    #     print("The normalized innovation follows the expected distribution.")
+    # else:
+    #     # P_k1_k1[6::,6::] = P_k1_k1[6::,6::]*2
+    #     print("The normalized innovation does not follow the expected distribution.")
+    
+    
+    # cov_uf.append(P_k1_k1[6,6])
+    # cov_wdir.append(P_k1_k1[7,7])
+    
 
     tether_pos.append(res[0])   # Tether positions
     dcm_b2w = res[2]            # DCM bridle to earth
@@ -418,6 +481,6 @@ path = './results/'+model+'/'
 csv_filename = file_name+'_res_GPS.csv'
 df.to_csv(path+csv_filename, index=False)
 # Save the DataFrame to a CSV file
-csv_filename = file_name+'_fd_GPS.csv'
+csv_filename = file_name+'_fd.csv'
 flight_data.to_csv(path+csv_filename, index=False)
 
