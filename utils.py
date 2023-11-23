@@ -1,6 +1,6 @@
 import numpy as np
 import casadi as ca
-from v3_properties import *
+from v9_properties import *
 import pandas as pd
 
 def project_onto_plane(vector, plane_normal):
@@ -55,7 +55,7 @@ def read_data_new():
     
     return df
 
-def get_measurements(df, measurements):
+def get_measurements(df, measurements,multiple_GPS = True):
     meas_dict = {}
     Z = []
     for meas in measurements:
@@ -73,21 +73,34 @@ def get_measurements(df, measurements):
             col_vx = [col for col in df.columns if 'vx' in col]
             col_vy = [col for col in df.columns if 'vy' in col]
             col_vz = [col for col in df.columns if 'vz' in col]
-            for i in range(len(col_vx)):
-                Z.append(df[col_vx[i]].values)
-                Z.append(df[col_vy[i]].values)
-                Z.append(df[col_vz[i]].values)
-            meas_dict[meas] = len(col_vx)
+            if multiple_GPS:
+                for i in range(len(col_vx)):
+                    Z.append(df[col_vx[i]].values)
+                    Z.append(df[col_vy[i]].values)
+                    Z.append(df[col_vz[i]].values)
+                meas_dict[meas] = len(col_vx)
+            else:
+                Z.append(df['kite_0_vx'].values)
+                Z.append(df['kite_0_vy'].values)
+                Z.append(df['kite_0_vz'].values)
+                meas_dict[meas] = 1
         
         elif meas == 'GPS_acc':
             col_ax = [col for col in df.columns if 'ax' in col]
             col_ay = [col for col in df.columns if 'ay' in col]
             col_az = [col for col in df.columns if 'az' in col]
-            for i in range(len(col_ax)):
-                Z.append(df[col_ax[i]].values)
-                Z.append(df[col_ay[i]].values)
-                Z.append(df[col_az[i]].values)
-            meas_dict[meas] = len(col_ax)
+            if multiple_GPS:
+                for i in range(len(col_ax)):
+                    Z.append(df[col_ax[i]].values)
+                    Z.append(df[col_ay[i]].values)
+                    Z.append(df[col_az[i]].values)
+                meas_dict[meas] = len(col_ax)
+            else:
+                Z.append(df['kite_0_ax'].values)
+                Z.append(df['kite_0_ay'].values)
+                Z.append(df['kite_0_az'].values)
+                meas_dict[meas] = 1
+                
         
         elif meas == 'ground_wvel':
             uf = df['ground_wind_velocity']*kappa/np.log(10/z0)
@@ -384,7 +397,7 @@ def get_forces(x, u,separate_kcu_mass = True,elastic_elements = False):
 
     return aerodynamic_force, tensions[-1,:].T
 
-def get_tether_end_position(x, set_parameter, n_tether_elements, r_kite, v_kite, vw,a_kite, separate_kcu_mass=True, elastic_elements=False, ax_plot_forces=False, return_values=False, find_force=False):
+def get_tether_end_position(x, set_parameter, n_tether_elements, r_kite, v_kite, vw,a_kite, separate_kcu_mass=True, elastic_elements=True, ax_plot_forces=False, return_values=False, find_force=False):
     # Currently neglecting radial velocity of kite.
     if find_force:
         beta_n, phi_n, tension_ground = x
@@ -569,6 +582,13 @@ def get_tether_end_position(x, set_parameter, n_tether_elements, r_kite, v_kite,
         ex_tau = np.cross(ey_tau, ez_tau)
         dcm_tau2w = np.vstack(([ex_tau], [ey_tau], [ez_tau])).T
         
+        # dir_D = va/np.linalg.norm(va)
+        # D = np.dot(Fa,dir_D)
+        # dir_L = Ft[i]/Ft_mod[i] - np.dot(Ft[i]/Ft_mod[i],dir_D)*dir_D
+        # L = np.dot(Fa,dir_L)
+        # dir_S = np.cross(dir_L,dir_D)
+        # S = np.dot(Fa,dir_S)
+        
         D = np.dot(va/np.linalg.norm(va),aerodynamic_force)*va/np.linalg.norm(va)        
         L = aerodynamic_force-D
         CD = np.linalg.norm(D)/(0.5*rho*A_kite*np.linalg.norm(va)**2)
@@ -599,7 +619,10 @@ def state_noise_matrices(x,u,ts):
     uf = x[6]
     wdir = x[7]
     wvel = uf/kappa*ca.log(r[2]/z0)
-    
+    CL = x[8]
+    CD = x[9]
+    CS = x[10]
+
     vw = ca.vertcat(wvel*ca.cos(wdir),wvel*ca.sin(wdir),0)
     Ft = u
     va = vw - v 
@@ -628,7 +651,7 @@ def state_noise_matrices(x,u,ts):
     Fx = ca.jacobian(fx, x)    
     calc_fx = ca.Function('calc_fx',[x,u,ts],[fx])
     calc_Fx = ca.Function('calc_Fx',[x,u,ts],[Fx])
-    noise_vector = ca.vertcat(u,x[8],x[9],x[10],uf,wdir)
+    noise_vector = ca.vertcat(r,v,uf,wdir,CL,CD,CS)
     G = ca.jacobian(fx,noise_vector)
     calc_G = ca.Function('calc_G',[x,u,ts],[G])
     
@@ -696,7 +719,7 @@ def observation_matrices(x,u,meas_dict):
     Hx = ca.jacobian(h,x)
     calc_Hx = ca.Function('calc_Hx', [x,u],[Hx])
     
-    return calc_hx,calc_Hx
+    return h,calc_hx,calc_Hx
 
 def rotate_vector(v, u, theta):
     # Normalize vectors
@@ -731,6 +754,23 @@ def calculate_angle_sym(vector_a, vector_b):
     angle_deg = angle_rad*180/np.pi
     
     return angle_deg
+
+def observability_Lie_method(f,h,x):
+        
+    n = f.shape[0]
+    m = h.shape[0]
+    O = ca.SX.zeros((m*n, n))
+    Li = ca.simplify(ca.jacobian(h,x))
+    O[0*m:(1)*m,:] = Li
+    for i in range(1,m):
+        Hxf = ca.mtimes(Li, f)
+        Hxxf= ca.simplify(ca.jacobian(Hxf,x))
+        Li = Hxxf
+        O[i*m:(i+1)*m,:] = Hxxf
+        
+            
+
+    return O
 
 def rank_observability_matrix(A,C):
     # Construct the observability matrix O_numeric
