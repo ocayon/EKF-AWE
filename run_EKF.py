@@ -13,11 +13,10 @@ import time
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 n_tether_elements = 5
 
-model = 'v9'
-year = '2023'
-month = '11'
-day = '16'
-
+model = 'v3'
+year = '2019'
+month = '10'
+day = '08'
 
 if model == 'v3':
     from v3_properties import *
@@ -80,7 +79,7 @@ for i in range(2):
 x0 = np.vstack((flight_data[['kite_0_rx','kite_0_ry','kite_0_rz']].values[0, :],flight_data[['kite_0_vx','kite_0_vy','kite_0_vz']].values[0, :]))
 x0 = np.append(x0,[0.6,np.mean(ground_wind_dir),0.6,0.1,0])
 #%% Measurement vectors 
-measurements = ['GPS_pos', 'GPS_vel']
+measurements = ['GPS_pos', 'GPS_vel','apparent_wvel']
 meas_dict,Z = get_measurements(flight_data,measurements,False)
 # Z = np.array([flight_data['rx'],flight_data['ry'],flight_data['rz'],flight_data['vx'],flight_data['vy'],flight_data['vz'],
 #               measured_uf,flight_data['airspeed_apparent_windspeed'],np.zeros(len(flight_data)),flight_data['ax'],flight_data['ay'],flight_data['az']]).T
@@ -98,6 +97,8 @@ wdir = ca.SX.sym('wdir')# Wind direction
 CD = ca.SX.sym('CD')    # Drag coefficient
 CL = ca.SX.sym('CL')    # Lift coefficient
 CS = ca.SX.sym('CS')    # Side force coefficient
+vz = ca.SX.sym('vz')    # Apparent wind velocity
+
 
 x = ca.vertcat(r,v,uf,wdir,CL,CD,CS) # State vector symbolic
 u_sym = ca.vertcat(Ft) # Input vector symbolic
@@ -160,12 +161,12 @@ for key, value in meas_dict.items():
 #%% Define process noise matrix
 stdv_Ft =0
 stdv_CL = 0.1**2
-stdv_CD = 0.1**2
-stdv_CS = 0.1**2
+stdv_CD = 0.05**2
+stdv_CS = 0.05**2
 stdv_uf = 0.025**2
-stdv_x = 0.01
-stdv_v = 0.01
-stdv_wdir = (5/180*np.pi)**2
+stdv_x = 0.1**2
+stdv_v = 0.1**2
+stdv_wdir = (2/180*np.pi)**2
 
 # Define process noise matrix
 Q = np.zeros((11,11))
@@ -426,8 +427,8 @@ for k in range(n_intervals):
     #     print("The normalized innovation does not follow the expected distribution.")
     
     
-    # cov_uf.append(P_k1_k1[6,6])
-    # cov_wdir.append(P_k1_k1[7,7])
+    cov_uf.append(P_k1_k1[6,6])
+    cov_wdir.append(P_k1_k1[7,7])
     
 
     tether_pos.append(res[0])   # Tether positions
