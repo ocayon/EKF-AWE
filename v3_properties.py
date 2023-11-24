@@ -28,7 +28,7 @@ cd_t = 1.1
 tether_modulus = 614600/(np.pi*.002**2)  # From Uwe's thesis
 tether_stiffness = tether_modulus*np.pi*(d_t/2)**2
 
-m_kite = 15
+m_kite = 15+5
 m_kcu = 30
 l_bridle = 11.5
 
@@ -48,11 +48,11 @@ KCU = 1
 if KCU == 1:
     l_kcu = 1
     d_kcu = 0.48
-    w_kcu = 18+1.6+8
+    m_kcu = 18+1.6+8
 elif KCU == 2:
     l_kcu = 1.2
     d_kcu = 0.62
-    w_kcu = 18+1.6+12 
+    m_kcu = 18+1.6+12 
 
 ld = l_kcu/d_kcu  # Calculate L/D for the KCU
 
