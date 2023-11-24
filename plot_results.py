@@ -9,8 +9,8 @@ plt.close('all')
 
 model = 'v9'
 year = '2023'
-month = '11'
-day = '16'
+month = '10'
+day = '26'
 
 if model == 'v3':
     from v3_properties import *

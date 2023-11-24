@@ -10,8 +10,8 @@ plt.close('all')
 
 model = 'v9'
 year = '2023'
-month = '11'
-day = '16'
+month = '10'
+day = '26'
 
 onlyGPS = True
 GPSacc = False

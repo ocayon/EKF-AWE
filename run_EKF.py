@@ -13,10 +13,10 @@ import time
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 n_tether_elements = 5
 
-model = 'v3'
-year = '2019'
+model = 'v9'
+year = '2023'
 month = '10'
-day = '08'
+day = '26'
 
 if model == 'v3':
     from v3_properties import *
@@ -165,7 +165,7 @@ stdv_CD = 0.05**2
 stdv_CS = 0.05**2
 stdv_uf = 0.025**2
 stdv_x = 0.1**2
-stdv_v = 0.1**2
+stdv_v = 0.01**2
 stdv_wdir = (2/180*np.pi)**2
 
 # Define process noise matrix
