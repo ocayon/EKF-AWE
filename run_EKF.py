@@ -441,7 +441,7 @@ for k in range(n_intervals):
     CL.append(res[-2])          # Lift coefficient
     CD.append(res[-1])          # Drag coefficient
     cd_kcu.append(res[-3])      # Kite control unit drag coefficient
-    va = x_k1_k1[6:9]-x_k1_k1[3:6]                      # Apparent wind velocity
+    va = vw-x_k1_k1[3:6]                      # Apparent wind velocity
     
     va_proj = project_onto_plane(va, ey_kite)           # Projected apparent wind velocity onto kite y axis
     aoa.append(calculate_angle(ex_kite,va_proj))        # Angle of attack
