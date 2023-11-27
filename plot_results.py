@@ -249,7 +249,7 @@ colors = ['lightblue', 'lightgreen', 'lightcoral', (0.75, 0.6, 0.8)]
 plt.figure()
 plt.plot(t,aoa,label = 'AoA')
 plt.plot(t,aoacalc,label = 'AoA imposed orientation')
-plt.plot(t,measured_aoa+ 4,label = 'AoA measured')
+plt.plot(t,measured_aoa+ 10,label = 'AoA measured')
 plt.fill_between(t, 40, where=straight, color=colors[0], alpha=0.2)
 plt.fill_between(t, 40, where=turn, color=colors[1], alpha=0.2)
 plt.fill_between(t, 40, where=dep, color=colors[2], alpha=0.2)

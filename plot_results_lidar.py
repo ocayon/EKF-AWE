@@ -2,7 +2,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from utils import get_tether_end_position, state_noise_matrices, observation_matrices, R_EG_Body, calculate_angle,project_onto_plane ,read_data, rank_observability_matrix,read_data_new,get_measurements
-
+import csv_reader
+from wind_estimation import WindEstimator
 
 #%%
 
@@ -20,6 +21,9 @@ GPSaccva = False
 GPSvw = False
 GPSaccvw = False
 GPSvavw = False
+
+
+
 
 if model == 'v3':
     from v3_properties import *
@@ -75,6 +79,9 @@ if GPSvavw:
     plt.plot(flight_data['time'],wvel,'k',label='GPSvavw')
 
 plt.plot(flight_data['time'],flight_data['ground_wind_velocity'],'k',label='Ground Sensor')
+
+
+
 
 for column in flight_data.columns:
     if 'Wind Speed' in column:

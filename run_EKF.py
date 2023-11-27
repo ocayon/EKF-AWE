@@ -15,8 +15,8 @@ n_tether_elements = 5
 
 model = 'v9'
 year = '2023'
-month = '10'
-day = '26'
+month = '11'
+day = '16'
 
 if model == 'v3':
     from v3_properties import *
@@ -79,7 +79,7 @@ for i in range(2):
 x0 = np.vstack((flight_data[['kite_0_rx','kite_0_ry','kite_0_rz']].values[0, :],flight_data[['kite_0_vx','kite_0_vy','kite_0_vz']].values[0, :]))
 x0 = np.append(x0,[0.6,np.mean(ground_wind_dir),0.6,0.1,0])
 #%% Measurement vectors 
-measurements = ['GPS_pos', 'GPS_vel','apparent_wvel']
+measurements = ['GPS_pos', 'GPS_vel']
 meas_dict,Z = get_measurements(flight_data,measurements,False)
 # Z = np.array([flight_data['rx'],flight_data['ry'],flight_data['rz'],flight_data['vx'],flight_data['vy'],flight_data['vz'],
 #               measured_uf,flight_data['airspeed_apparent_windspeed'],np.zeros(len(flight_data)),flight_data['ax'],flight_data['ay'],flight_data['az']]).T
@@ -161,12 +161,12 @@ for key, value in meas_dict.items():
 #%% Define process noise matrix
 stdv_Ft =0
 stdv_CL = 0.1**2
-stdv_CD = 0.05**2
-stdv_CS = 0.05**2
+stdv_CD = 0.1**2
+stdv_CS = 0.1**2
 stdv_uf = 0.025**2
 stdv_x = 0.1**2
-stdv_v = 0.01**2
-stdv_wdir = (2/180*np.pi)**2
+stdv_v = 0.1**2
+stdv_wdir = (3/180*np.pi)**2
 
 # Define process noise matrix
 Q = np.zeros((11,11))
