@@ -1,7 +1,7 @@
 import casadi as ca
 import numpy as np
 import pandas as pd
-
+from system_properties import KiteModel, Tether, KCU_cylinder
 from scipy.optimize import least_squares
 from utils import *
 import control
@@ -17,6 +17,8 @@ model = 'v9'
 year = '2023'
 month = '11'
 day = '16'
+
+kite = KiteModel(model)
 
 if model == 'v3':
     from v3_properties import *
@@ -128,7 +130,7 @@ stdv_xGPS = 2.5
 stdv_vGPS = 1
 stdv_aGPS = 10
 stdv_uf = 0.1
-stdv_va = 0.2
+stdv_va = 0.5**2
 stdv_dirw = 10/180*np.pi
 
 R = np.zeros((nm,nm))
@@ -314,11 +316,11 @@ for k in range(n_intervals):
 
         
     # Accuracy of the va_sensor depending on the powering state (Depowered -> aligned with flow)
-    if jva:
-        if dep[k]:
-            R[jva,jva] = stdv_va**2
-        else:
-            R[jva,jva] = 2**2
+    # if jva:
+    #     if dep[k]:
+    #         R[jva,jva] = stdv_va**2
+    #     else:
+    #         R[jva,jva] = 2**2
             
     if k%600==0:
         elapsed_time = time.time() - start_time

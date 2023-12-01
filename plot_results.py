@@ -9,8 +9,8 @@ plt.close('all')
 
 model = 'v9'
 year = '2023'
-month = '10'
-day = '26'
+month = '11'
+day = '16'
 
 if model == 'v3':
     from v3_properties import *
@@ -52,13 +52,13 @@ measured_uf = measured_wvel*kappa/np.log(10/z0)
 measured_va = flight_data['kite_apparent_windspeed']
 measured_Ft = flight_data['ground_tether_force']
 measured_aoa = flight_data['kite_angle_of_attack']
-# measured_ss = flight_data['kite_sideslip_angle']
+measured_ss = flight_data['kite_sideslip_angle']
 measured_aoa = np.array(measured_aoa)
 # measured_aoa = np.convolve(measured_aoa, np.ones(10)/10, mode='same')
 meas_pitch = flight_data['kite_0_pitch']
 meas_pitch1 = flight_data['kite_1_pitch']
-meas_roll = flight_data['kite_0_roll']+4
-meas_roll1 = flight_data['kite_1_roll']+4
+meas_roll = flight_data['kite_0_roll']
+meas_roll1 = flight_data['kite_1_roll']
 meas_yaw = flight_data['kite_0_yaw']-90
 meas_yaw1 = flight_data['kite_1_yaw']-90
 # meas_v = np.vstack((np.array(flight_data['vx1']),np.array(flight_data['vy1']),np.array(flight_data['vz1']))).T
@@ -114,9 +114,14 @@ slack = []
 # acc = []
 Fa = []
 omega = []
+wvel_calc = []
+wdir_calc = []
 CL = np.zeros(len(x))
 CD = np.zeros(len(x))
 CS = np.zeros(len(x))
+
+measured_aoa = measured_aoa+2
+measured_ss = -measured_ss-5
 for i in range(len(CL)):
 
     va_mod.append(np.linalg.norm(va[i]))
@@ -142,22 +147,27 @@ for i in range(len(CL)):
     CL[i] = np.linalg.norm(L)/(0.5*rho*A_kite*va_mod[i]**2)
     CS[i] = np.linalg.norm(S)/(0.5*rho*A_kite*va_mod[i]**2)
     # Calculate angle of attack based on orientation angles and estimated wind speed
-    Transform_Matrix=R_EG_Body(meas_roll1[i]/180*np.pi,meas_pitch1[i]/180*np.pi,(meas_yaw1[i])/180*np.pi)
+    Transform_Matrix=R_EG_Body(meas_roll[i]/180*np.pi,meas_pitch[i]/180*np.pi,(meas_yaw[i])/180*np.pi)
     #    Transform_Matrix=R_EG_Body(kite_roll[i]/180*np.pi,kite_pitch[i]/180*np.pi,kite_yaw_modified[i])
     Transform_Matrix=Transform_Matrix.T
     
     #X_vector
-    ex_kite=Transform_Matrix.dot(np.array([1,0,0]))
+    ex_kite=Transform_Matrix.dot(np.array([-1,0,0]))
     #Y_vector
-    ey_kite=Transform_Matrix.dot(np.array([0,1,0]))
+    ey_kite=Transform_Matrix.dot(np.array([0,-1,0]))
     #Z_vector
     ez_kite=Transform_Matrix.dot(np.array([0,0,1]))
-
-    va_proj = project_onto_plane(va[i], -ey_kite)           # Projected apparent wind velocity onto kite y axis
-    aoacalc.append(calculate_angle(-ex_kite,va_proj))        # Angle of attack
+    
+    va_calc= ex_kite*measured_va[i]*np.cos(measured_ss[i]/180*np.pi)*np.cos(measured_aoa[i]/180*np.pi)+ey_kite*measured_va[i]*np.sin(measured_ss[i]/180*np.pi)*np.cos(measured_aoa[i]/180*np.pi)+ez_kite*measured_va[i]*np.sin(measured_aoa[i]/180*np.pi)
+    vw = va_calc+v_kite[i]
+    wvel_calc.append(np.linalg.norm(vw))
+    wdir_calc.append(np.arctan2(vw[1],vw[0]))
+    
+    va_proj = project_onto_plane(va[i],ey_kite)           # Projected apparent wind velocity onto kite y axis
+    aoacalc.append(calculate_angle(ex_kite,va_proj))        # Angle of attack
     va_proj = project_onto_plane(va[i], ez_kite)           # Projected apparent wind velocity onto kite z axis
-    sideslipcalc.append(calculate_angle(ey_kite,va_proj)-90)   # Sideslip angle
-
+    sideslipcalc.append(calculate_angle(-ey_kite,va_proj)-90)   # Sideslip angle
+    
 
 
 
@@ -186,7 +196,7 @@ plt.grid()
 
 plt.figure()
 plt.plot(sideslipcalc)
-# plt.plot(measured_ss)
+plt.plot(measured_ss)
 plt.grid()
 
 
@@ -248,8 +258,8 @@ plt.ylabel('Cd kcu/Cd wing [%]')
 colors = ['lightblue', 'lightgreen', 'lightcoral', (0.75, 0.6, 0.8)]
 plt.figure()
 plt.plot(t,aoa,label = 'AoA')
-plt.plot(t,aoacalc,label = 'AoA imposed orientation')
-plt.plot(t,measured_aoa+ 10,label = 'AoA measured')
+# plt.plot(t,aoacalc,label = 'AoA imposed orientation')
+plt.plot(t,measured_aoa,label = 'AoA measured')
 plt.fill_between(t, 40, where=straight, color=colors[0], alpha=0.2)
 plt.fill_between(t, 40, where=turn, color=colors[1], alpha=0.2)
 plt.fill_between(t, 40, where=dep, color=colors[2], alpha=0.2)
@@ -277,8 +287,8 @@ sideslipcalc = np.array(sideslipcalc)
 aoacalc = np.array(aoa)
 
 mask = (sideslipcalc<0)& (sideslipcalc>-25)&(pow)#&(aoacalc>3)&(aoacalc<5)
-mask = (up<0.1)&(aoacalc<10)&(z>180)
-coefficients = np.polyfit(sideslipcalc[mask], CL_EKF[mask], 3)
+mask = (up<0.1)&(aoacalc<10)
+coefficients = np.polyfit(sideslipcalc[mask], CL_EKF[mask], 2)
 polynomial = np.poly1d(coefficients)
 alpha_fit = np.linspace(min(sideslipcalc[mask]), max(sideslipcalc[mask]), 100)  # Create a range of alpha values for the trendline
 plt.figure()
@@ -337,6 +347,7 @@ plt.grid()
 # Plot horizontal wind speed
 plt.figure()
 plt.plot(wvel)
+plt.plot(wvel_calc)
 
 # plt.plot(measured_uf/kappa*np.log(z/z0))
 plt.xlabel('Time')
@@ -346,6 +357,7 @@ plt.grid()
 
 plt.figure()
 plt.plot(t,wdir*180/np.pi)
+plt.plot(t,np.array(wdir_calc)*180/np.pi)
 plt.fill_between(t, 140, where=straight, color=colors[0], alpha=0.2)
 plt.fill_between(t, 140, where=turn, color=colors[1], alpha=0.2)
 plt.fill_between(t, 140, where=dep, color=colors[2], alpha=0.2)
@@ -362,8 +374,7 @@ plt.grid()
 plt.figure()
 plt.plot(t,CLw, label = 'Tether model')
 plt.plot(t,CL_EKF,label = 'Sensor fusion')
-plt.plot(t,CLt)
-
+# plt.plot(t,CLt)
 plt.xlabel('Time')
 plt.ylabel('Lift Coefficient')
 plt.fill_between(t, CLw, where=straight, color=colors[0], alpha=0.2)
@@ -373,6 +384,8 @@ plt.fill_between(t, CLw, where=trans, color=colors[3], alpha=0.2)
 # plt.xticks(x_ticks, custom_labels)
 plt.grid()
 plt.legend()
+
+
 
 plt.figure()
 plt.plot(t,CDw, label = 'Tether model')
