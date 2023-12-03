@@ -4,12 +4,14 @@ class KiteModel:
     def __init__(self, model):
         self.model = model
         if model == 'v3':
+            self.KCU = True
             self.mass = 15
             self.area = 19.75
             self.distance_kcu_kite = 11.5
             self.total_length_bridle_lines = 96
             self.diameter_bridle_lines = 2.5e-3
         elif model == 'v9':
+            self.KCU = True
             self.mass = 62
             self.area = 46.854
             self.distance_kcu_kite = 15.45
@@ -51,5 +53,10 @@ class KCU_cylinder:
         self.At = np.pi*(d_kcu/2)**2  # Calculate area of the KCU
         self.Ap = l_kcu*d_kcu  # Calculate area of the KCU
 
-
+class Atmosphere:
+    def __init__(self):
+        self.rho = 1.225
+        self.kappa = 0.4
+        self.g = 9.81
+        self.z0 = 0.1
 
