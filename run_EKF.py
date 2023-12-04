@@ -7,6 +7,7 @@ from utils import *
 import control
 import time
 #%% Kalman filter class
+
 class ExtendedKalmanFilter:
     def __init__(self, Q, R, doIEKF=False, epsilon=1e-6, max_iterations=200):
         self.Q = Q
@@ -102,8 +103,8 @@ n_tether_elements = 5
 
 model = 'v9'
 year = '2023'
-month = '11'
-day = '16'
+month = '10'
+day = '26'
 
 if model == 'v3':
     from v3_properties import *
@@ -300,6 +301,7 @@ ekf.calc_hx = calc_hx
 start_time = time.time()
 mins = -1
 for k in range(n_intervals):
+    
     row = flight_data.iloc[k]
     zi = Z[k]
     
@@ -318,6 +320,8 @@ for k in range(n_intervals):
     ekf.update(x_k1_k,zi,u)
     x_k1_k1 = ekf.x_k1_k1
     
+    if x_k1_k1[9]<0:
+        print('CD is not making sense')
     ############################################################
     # Calculate Input for next step
     ############################################################
@@ -333,7 +337,7 @@ for k in range(n_intervals):
     res = get_tether_end_position(
         opt_res.x, *args, return_values=True, find_force=False)
     u = np.array(res[8])        # Input next step  
-
+    
     ############################################################
     # Store results
     ############################################################
@@ -376,9 +380,9 @@ for k in range(n_intervals):
 ti = 0
 results = XX_k1_k1[:,ti:k]
 results = np.vstack((results,np.array(Ft)[ti:k,:].T,np.array(tether_len[ti:k]),np.array(CL[ti:k]),np.array(CD[ti:k]),np.array(aoa[ti:k])
-                     ,np.array(pitch[ti:k]),np.array(yaw[ti:k]),np.array(roll[ti:k]),np.array(cd_kcu[ti:k])))
+                     ,np.array(sideslip[ti:k]),np.array(pitch[ti:k]),np.array(yaw[ti:k]),np.array(roll[ti:k]),np.array(cd_kcu[ti:k])))
 column_names = ['x','y','z','vx','vy','vz','uf','wdir','CL','CD','CS','Ftx','Fty','Ftz','Lt',
-                'CLw','CDw','aoa','pitch','yaw','roll','cd_kcu']
+                'CLw','CDw','aoa','sideslip','pitch','yaw','roll','cd_kcu']
 df = pd.DataFrame(data=results.T, columns=column_names)
 
 flight_data = flight_data.iloc[ti:k]

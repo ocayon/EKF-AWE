@@ -419,7 +419,8 @@ def get_tether_end_position(x, set_parameter, n_tether_elements, r_kite, v_kite,
     vtau_kite = project_onto_plane(v_kite,r_kite/np.linalg.norm(r_kite)) # Velocity projected onto the tangent plane
     omega_tether = np.cross(r_kite,vtau_kite)/(np.linalg.norm(r_kite)**2) # Tether angular velocity, with respect to the tether attachment point
 
-
+    
+    # Find instantaneuous center of rotation and omega of the kite
     at = np.dot(a_kite,np.array(v_kite)/np.linalg.norm(v_kite))*np.array(v_kite)/np.linalg.norm(v_kite)
     omega_kite = np.cross(a_kite-at,v_kite)/(np.linalg.norm(v_kite)**2)
     ICR = np.cross(v_kite,omega_kite)/(np.linalg.norm(omega_kite)**2)      
@@ -506,6 +507,7 @@ def get_tether_end_position(x, set_parameter, n_tether_elements, r_kite, v_kite,
                 dj = -.25*tether_drag_basis
                 dp= -.5*rho*np.linalg.norm(vajp)*vajp*cdp*Ap  # Adding kcu drag perpendicular to kcu
                 dt= -.5*rho*np.linalg.norm(vajn)*vajn*cdt*At  # Adding kcu drag parallel to kcu
+                # th = -0.5*rho*vaj_sq*np.pi*0.2**2*0.4
                 dj += dp+dt
                 cd_kcu = (np.linalg.norm(dp+dt))/(0.5*rho*A_kite*np.linalg.norm(vaj)**2)
             else:
@@ -513,13 +515,12 @@ def get_tether_end_position(x, set_parameter, n_tether_elements, r_kite, v_kite,
 
         if not separate_kcu_mass:
             if last_element:
-                point_mass = m_s/2 + m_kite + m_kcu            
+                point_mass = m_s/2 + m_kite + m_kcu           
             else:
                 point_mass = m_s
         else:
             if last_element:
-                point_mass = m_kite
-                
+                point_mass = m_kite          
                 # aj = np.zeros(3)
             elif kcu_element:
                 point_mass = m_s/2 + m_kcu
@@ -536,17 +537,9 @@ def get_tether_end_position(x, set_parameter, n_tether_elements, r_kite, v_kite,
             aerodynamic_force = next_tension
             non_conservative_forces[j, :] = dj + aerodynamic_force
 
-        if ax_plot_forces and not last_element:
-            forces = [point_mass*aj, dj, fgj, -tensions[j, :], next_tension]
-            labels = ['resultant', 'drag', 'weight', 'last tension', 'next tension']
-            clrs = ['m', 'r', 'k', 'g', 'b']
-            for f, lbl, clr in zip(forces, labels, clrs):
-                # print("{} = {:.2f} N".format(lbl, np.linalg.norm(f)))
-                plot_vector(positions[j+1, :], f, ax_plot_forces, color=clr)
 
         # Derive position of next point mass from former tension
         if kcu_element:
-            # tensions[j+1,:] = np.linalg.norm(tensions[j+1, :])*z_kite
             positions[j+2, :] = positions[j+1, :] + tensions[j+1, :]/np.linalg.norm(tensions[j+1, :]) * l_bridle
             
         elif not last_element:
@@ -563,7 +556,7 @@ def get_tether_end_position(x, set_parameter, n_tether_elements, r_kite, v_kite,
         va = vwj-vj  # All y-axes are defined perpendicular to apparent wind velocity.
 
         ez_bridle = tensions[-1, :]/np.linalg.norm(tensions[-1, :])
-        ey_bridle = np.cross(ez_bridle, va)/np.linalg.norm(np.cross(ez_bridle, va))
+        ey_bridle = np.cross(ez_bridle, -vj)/np.linalg.norm(np.cross(ez_bridle, -vj))
         ex_bridle = np.cross(ey_bridle, ez_bridle)
         dcm_b2w = np.vstack(([ex_bridle], [ey_bridle], [ez_bridle])).T
 
@@ -633,19 +626,14 @@ def state_noise_matrices(x,u):
     dir_L = Ft/Ft_mod - ca.dot(Ft/Ft_mod,dir_D)*dir_D
     dir_S = ca.cross(dir_L,dir_D) 
 
-    L = x[8]*0.5*rho*A_kite*va_mod**2*dir_L
-    D = x[9]*0.5*rho*A_kite*va_mod**2*dir_D
-    S = x[10]*0.5*rho*A_kite*va_mod**2*dir_S
+    L = CL*0.5*rho*A_kite*va_mod**2*dir_L
+    D = CD*0.5*rho*A_kite*va_mod**2*dir_D
+    S = CS*0.5*rho*A_kite*va_mod**2*dir_S
 
     Fg = ca.vertcat(0, 0, -m_kite*g)
     rp = v
     vp = (-Ft+L+D+S+Fg)/m_kite
 
-
-    
-    # CLn = Lmod/(0.5*rho*A_kite*va_mod**2)
-    # CDn = Dmod/(0.5*rho*A_kite*va_mod**2)
-    # CSn = Smod/(0.5*rho*A_kite*va_mod**2)
 
     fx = ca.vertcat(rp,vp,0,0,0,0,0)
     Fx = ca.jacobian(fx, x)    
