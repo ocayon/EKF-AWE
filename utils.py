@@ -612,7 +612,7 @@ def get_vw_from_aoa(vw,ex_kite,ey_kite,ez_kite, aoa,ss,v_kite):
         return aoacalc-aoa
 
 
-def state_noise_matrices(x,u,ts): 
+def state_noise_matrices(x,u): 
     
     r = x[0:3]
     v = x[3:6]
@@ -649,11 +649,11 @@ def state_noise_matrices(x,u,ts):
 
     fx = ca.vertcat(rp,vp,0,0,0,0,0)
     Fx = ca.jacobian(fx, x)    
-    calc_fx = ca.Function('calc_fx',[x,u,ts],[fx])
-    calc_Fx = ca.Function('calc_Fx',[x,u,ts],[Fx])
+    calc_fx = ca.Function('calc_fx',[x,u],[fx])
+    calc_Fx = ca.Function('calc_Fx',[x,u],[Fx])
     noise_vector = ca.vertcat(r,v,uf,wdir,CL,CD,CS)
     G = ca.jacobian(fx,noise_vector)
-    calc_G = ca.Function('calc_G',[x,u,ts],[G])
+    calc_G = ca.Function('calc_G',[x,u],[G])
     
     return fx,calc_Fx,calc_G
     

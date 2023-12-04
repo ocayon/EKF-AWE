@@ -6,6 +6,93 @@ from scipy.optimize import least_squares
 from utils import *
 import control
 import time
+#%% Kalman filter class
+class ExtendedKalmanFilter:
+    def __init__(self, Q, R, doIEKF=False, epsilon=1e-6, max_iterations=200):
+        self.Q = Q
+        self.R = R
+        self.doIEKF = doIEKF
+        self.epsilon = epsilon
+        self.max_iterations = max_iterations
+
+        # Initialize other attributes as needed
+        self.x_k1_k1 = None
+        self.P_k1_k1 = None
+        self.Phi = None
+        self.Gamma = None
+        self.calc_Fx = None
+        self.calc_Hx = None
+        self.calc_hx = None
+        
+    
+    def initialize(self, x0):
+        self.x_k1_k1 = np.array(x0).reshape(-1)
+        self.P_k1_k1 = np.eye(len(x0)) * 1 ** 2
+
+
+    def predict(self,x,u,ts):
+        # Calculate Jacobians
+        self.Fx = np.array(self.calc_Fx(x,u))
+        self.G = np.array(self.calc_G(x,u))
+    
+        # Calculate discrete time state transition and input-to-state matrices
+        sys_ct = control.ss(self.Fx, self.G, np.zeros(len(x.T)), np.zeros(len(self.Q)))
+        sys_dt = control.sample_system(sys_ct, ts, method='zoh')
+        self.Phi = sys_dt.A
+        # self.Gamma = sys_dt.B
+    
+        # Calculate covariance prediction error
+        self.P_k1_k = self.Phi @ self.P_k1_k1 @ self.Phi.T + self.Q
+
+    def update(self, x, z, u):
+        if (self.doIEKF == True):
+        
+            eta2    = x
+            err     = 2*epsilon
+            itts    = 0
+            
+            while (err > epsilon):
+                if (itts >= maxIterations):
+                    print("Terminating IEKF: exceeded max iterations (%d)\n" %(maxIterations))  
+                    break
+                
+                itts    = itts + 1
+                eta1    = eta2
+                
+                # Construct the Jacobian H = d/dx(h(x))) with h(x) the observation model transition matrix 
+                self.Hx = np.array(self.calc_Hx(eta1,u))
+                
+                # Observation and observation error predictions
+                self.z_k1_k = np.array(self.calc_hx(eta1,u)).reshape(-1)                         # prediction of observation (for validation)   
+                self.P_zz        = self.Hx@self.P_k1_k@self.Hx.T + self.R      # covariance matrix of observation error (for validation)   
+                self.std_z       = np.sqrt(np.diag(self.P_zz))         # standard deviation of observation error (for validation)    
+        
+                # K(k+1) (gain)
+                self.K           =self.P_k1_k @ self.Hx.T @ np.linalg.inv(self.P_zz) 
+                
+                # new observation
+                eta2        = x + self.K@(z - self.z_k1_k - np.array((self.Hx@(x - eta1).T)).reshape(-1))
+                eta2    = np.array(eta2).reshape(-1)
+                err         = np.linalg.norm(eta2-eta1)/np.linalg.norm(eta1)  
+        
+            IEKFitcount[k]  = itts
+            self.x_k1_k1         = eta2
+        
+        else:
+            self.Hx = np.array(self.calc_Hx(self.x_k1_k,u))
+            
+            # correction
+            self.z_k1_k = np.array(self.calc_hx(self.x_k1_k,u)).reshape(-1)
+            self.P_zz = self.Hx@self.P_k1_k@self.Hx.T + self.R     # covariance matrix of observation error (for validation)   
+            self.std_z       = np.sqrt(np.diag(self.P_zz))
+            # K(k+1) (gain)
+            self.K           = self.P_k1_k @ self.Hx.T @  np.linalg.inv(self.P_zz)
+            
+            # Calculate optimal state x(k+1|k+1) 
+            self.x_k1_k1     = np.array(self.x_k1_k + K@(zi - self.z_k1_k)).reshape(-1)
+    
+        self.P_k1_k1 = (np.eye(n) - self.K @ self.Hx) @ self.P_k1_k
+        self.std_x_cor   = np.sqrt(np.diag(self.P_k1_k1))        # standard deviation of state estimation error (for validation)
 
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -47,8 +134,8 @@ opt_res = least_squares(get_tether_end_position, list(calculate_polar_coordinate
 res = get_tether_end_position(
     opt_res.x, *args, return_values=True, find_force=False)
 Ft0 = res[8]        # Tether force
-CL0 = res[-2]       # Lift coefficient
-CD0 = res[-1]       # Drag coefficient
+CL0 = 0.6       # Lift coefficient
+CD0 = 0.1      # Drag coefficient
 CS0 = 0             # Side force coefficient
 
 x0 = np.vstack((flight_data[['kite_0_rx','kite_0_ry','kite_0_rz']].values[0, :],flight_data[['kite_0_vx','kite_0_vy','kite_0_vz']].values[0, :]))
@@ -76,7 +163,7 @@ vz = ca.SX.sym('vz')    # Apparent wind velocity
 
 x = ca.vertcat(r,v,uf,wdir,CL,CD,CS) # State vector symbolic
 u_sym = ca.vertcat(Ft) # Input vector symbolic
-fx,calc_Fx,calc_G = state_noise_matrices(x,u_sym,Ts)            # Nonlinear state transition function (fx), state transition matrix (Fx), system noise input matrix(G)
+fx,calc_Fx,calc_G = state_noise_matrices(x,u_sym)            # Nonlinear state transition function (fx), state transition matrix (Fx), system noise input matrix(G)
 hx,calc_hx,calc_Hx = observation_matrices(x,u_sym,meas_dict)    # Nonlinear observation function (hx), observation matrix (Hx)
 
 # Check observability matrix
@@ -92,13 +179,12 @@ if check_obs == True:
     else:
         print('System is not observable')
 
-#%%
-########################################################################
-## Set simulation parameters
-########################################################################
 n           =  x0.shape[0]      # state dimension
 nm          =  Z.shape[1]       # number of measurements
-m           =  3                # number of inputs
+m           =  u_sym.shape[0]                # number of inputs
+
+#%% Define measurement noise matrix
+
     
 stdv_xGPS = 2.5
 stdv_vGPS = 1
@@ -143,7 +229,6 @@ stdv_uf = 0.025**2
 stdv_x = 0.1**2
 stdv_v = 0.1**2
 stdv_wdir = (3/180*np.pi)**2
-
 # Define process noise matrix
 Q = np.zeros((11,11))
 Q[:3,:3] = np.eye(3)*stdv_x**2
@@ -198,111 +283,60 @@ cd_kcu = []     # Kite control unit drag coefficient
 sideslip = []   # Sideslip angle
 tether_pos = [] # Tether positions
 flight_data['ground_tether_length'] = flight_data['ground_tether_length']+22.
-    
+
+# Define ODE system
 dae = {'x': x, 'p': u_sym, 'ode': fx}                       # Define ODE system
 ts = t[1]-t[0]
 intg = ca.integrator('intg', 'cvodes', dae, {'tf': ts})    # Define integrator
+
+# Initialize EKF
+ekf = ExtendedKalmanFilter(Q, R, doIEKF, epsilon, maxIterations)
+ekf.initialize(x0)  
+ekf.calc_Fx = calc_Fx
+ekf.calc_G = calc_G
+ekf.calc_Hx = calc_Hx
+ekf.calc_hx = calc_hx
+
 start_time = time.time()
 mins = -1
 for k in range(n_intervals):
-    ts = t[k+1]-t[k]
     row = flight_data.iloc[k]
-   
     zi = Z[k]
-
-    # Accuracy of the va_sensor depending on the powering state (Depowered -> aligned with flow)
-    # if jva:
-    #     if dep[k]:
-    #         R[jva,jva] = stdv_va**2
-    #     else:
-    #         R[jva,jva] = 2**2
-            
-    if k%600==0:
-        elapsed_time = time.time() - start_time
-        start_time = time.time()  # Record end time
-        mins +=1
-        print(f"Real time: {mins} minutes.  Elapsed time: {elapsed_time:.2f} seconds")
     
+    ############################################################
+    # Propagate state
+    ############################################################
     sol = intg(x0=x_k1_k1, p=u)
     x_k1_k = np.array(sol["xf"].T)
-    Fx = np.array(calc_Fx(x_k1_k.T,u,ts))
-    G = np.array(calc_G(x_k1_k.T,u,ts))
-    
-    # # Convert continuous-time state-space model to discrete-time model
-    sys_ct = control.ss(Fx, G, np.zeros(n), np.zeros(len(Q)))
-    sys_dt = control.sample_system(sys_ct, ts, method='zoh')
-    # Get discrete-time state transition and input-to-state matrices
-    Phi = sys_dt.A
-    Gamma = sys_dt.B
 
-    # P_k1_k = Phi@P_k1_k1@Phi.T + Gamma@Q@Gamma.T
-    P_k1_k = Phi@P_k1_k1@Phi.T + Q
-    if (doIEKF == True):
-        
-        eta2    = x_k1_k
-        err     = 2*epsilon
-        itts    = 0
-        
-        while (err > epsilon):
-            if (itts >= maxIterations):
-                print("Terminating IEKF: exceeded max iterations (%d)\n" %(maxIterations))  
-                break
-            
-            itts    = itts + 1
-            eta1    = eta2
-              
-            # Construct the Jacobian H = d/dx(h(x))) with h(x) the observation model transition matrix 
-            Hx = np.array(calc_Hx(eta1,u))
-            
-            # Observation and observation error predictions
-            z_k1_k = np.array(calc_hx(eta1,u)).reshape(-1)                         # prediction of observation (for validation)   
-            P_zz        = Hx@P_k1_k@Hx.T + R      # covariance matrix of observation error (for validation)   
-            std_z       = np.sqrt(np.diag(P_zz))         # standard deviation of observation error (for validation)    
+    ############################################################
+    # Update state with Kalmann filter
+    ############################################################
+    # Predict next step
+    ekf.predict(x_k1_k,u,ts)
+    # Update next step
+    ekf.update(x_k1_k,zi,u)
+    x_k1_k1 = ekf.x_k1_k1
     
-            # K(k+1) (gain)
-            K           =P_k1_k @ Hx.T @ np.linalg.inv(P_zz) 
-            
-            # new observation
-            eta2        = x_k1_k + K@(zi - z_k1_k - np.array((Hx@(x_k1_k - eta1).T)).reshape(-1))
-            eta2    = np.array(eta2).reshape(-1)
-            err         = np.linalg.norm(eta2-eta1)/np.linalg.norm(eta1)  
-    
-        IEKFitcount[k]  = itts
-        x_k1_k1         = eta2
-    
-    else:
-        Hx = np.array(calc_Hx(x_k1_k,u))
-        
-        # correction
-        z_k1_k = np.array(calc_hx(x_k1_k,u)).reshape(-1)
-        P_zz = Hx@P_k1_k@Hx.T + R     # covariance matrix of observation error (for validation)   
-        std_z       = np.sqrt(np.diag(P_zz))
-        # K(k+1) (gain)
-        K           = P_k1_k @ Hx.T @  np.linalg.inv(P_zz)
-        
-        # Calculate optimal state x(k+1|k+1) 
-        x_k1_k1     = np.array(x_k1_k + K@(zi - z_k1_k)).reshape(-1)
-    
-    # P(k|k) (correction) using the numerically stable form of P_k_1k_1 = (eye(n) - K*Hx) * P_kk_1 
-    P_k1_k1 = (np.eye(n) - K @ Hx) @ P_k1_k
-    std_x_cor   = np.sqrt(np.diag(P_k1_k1))        # standard deviation of state estimation error (for validation)
-
-    wvel = x_k1_k1[6]/kappa*np.log(x_k1_k1[2]/z0)
-    wdir = x_k1_k1[7]
-    vw = np.array([wvel*np.cos(wdir),wvel*np.sin(wdir),0])
-    # Find tether shape and force
+    ############################################################
+    # Calculate Input for next step
+    ############################################################
+    wvel = x_k1_k1[6]/kappa*np.log(x_k1_k1[2]/z0) # Wind speed
+    wdir = x_k1_k1[7] # Wind direction
+    vw = np.array([wvel*np.cos(wdir),wvel*np.sin(wdir),0]) # Wind velocity
+    # Solve for tether shape and force
     args = (row['ground_tether_force'], n_tether_elements, x_k1_k1[0:3], x_k1_k1[3:6],vw,
             list(row[['kite_0_ax','kite_0_ay','kite_0_az']]),True, True)
-    # Find tether shape
     opt_res = least_squares(get_tether_end_position, opt_res.x, args=args,
                             kwargs={'find_force': False}, verbose=0,xtol = 1e-3,ftol = 1e-3)
-    # Calculate tether force
+    # Get results from optimization
     res = get_tether_end_position(
         opt_res.x, *args, return_values=True, find_force=False)
-    
-    u = np.array(res[8])        # Input next step
-    
+    u = np.array(res[8])        # Input next step  
 
+    ############################################################
+    # Store results
+    ############################################################
     tether_pos.append(res[0])   # Tether positions
     dcm_b2w = res[2]            # DCM bridle to earth
     ey_kite = dcm_b2w[:,1]      # Kite y axis perpendicular to va and tether
@@ -323,21 +357,21 @@ for k in range(n_intervals):
     yaw.append(calculate_angle(ex_kite, [0,1,0]))       # Yaw angle       
     roll.append(calculate_angle(ey_kite, [0,0,1]))      # Roll angle
 
-    # Calculate rank observability matrix
-    # if k ==300:
-    #     rank_O = rank_observability_matrix(Fx,Hx)
-    #     print(rank_O)
-    #     rank_O = rank_observability_matrix(Phi,Hx)
-    #     print(rank_O)
-
-    # # Next step
     # store results
     XX_k1_k1[:,k]   = np.array(x_k1_k1).reshape(-1)
-    STD_x_cor[:,k]  = std_x_cor
-    STD_z[:,k]      = std_z
-    ZZ_pred [:,k]    = z_k1_k
-    err_meas[:,k] = z_k1_k - zi
+    STD_x_cor[:,k]  = ekf.std_x_cor
+    STD_z[:,k]      = ekf.std_z
+    ZZ_pred [:,k]    = ekf.z_k1_k
+    err_meas[:,k] = ekf.z_k1_k - zi
+
+    # Print progress
+    if k%600==0:
+        elapsed_time = time.time() - start_time
+        start_time = time.time()  # Record end time
+        mins +=1
+        print(f"Real time: {mins} minutes.  Elapsed time: {elapsed_time:.2f} seconds")
     
+
 #%% Save results
 ti = 0
 results = XX_k1_k1[:,ti:k]
