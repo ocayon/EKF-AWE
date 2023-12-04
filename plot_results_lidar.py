@@ -11,7 +11,7 @@ plt.close('all')
 model = 'v9'
 year = '2023'
 month = '11'
-day = '16'
+day = '27'
 
 onlyGPS = True
 GPSacc = False
@@ -61,7 +61,7 @@ meas_pitch = flight_data['kite_0_pitch']
 meas_yaw = flight_data['kite_0_yaw']-90
 
 measured_aoa = measured_aoa+2
-measured_ss = -measured_ss-5
+measured_ss = measured_ss
 for i in range(len(measured_aoa)):
 
     
@@ -115,13 +115,13 @@ if GPSvavw:
 plt.plot(flight_data['time'],flight_data['ground_wind_velocity'],'k',label='Ground Sensor')
 
 
-
+plot_heights = [115,160,200,220,240,250]
 
 for column in flight_data.columns:
-    if 'Wind Speed' in column:
+    if 'Wind Speed (m/s)' in column:
         height = ''.join(filter(str.isdigit, column))
         height = int(height)
-        if height in [115,160,200]:
+        if height in plot_heights:
             for i in range(len(flight_data)):
                 if flight_data[column].iloc[i] != flight_data[column].iloc[i-1]:
                     plt.scatter(flight_data['time'].iloc[i],flight_data[column].iloc[i])
@@ -155,7 +155,7 @@ for column in flight_data.columns:
     if 'Wind Direction' in column:
         height = ''.join(filter(str.isdigit, column))
         height = int(height)
-        if height in [115,160,200]:
+        if height in plot_heights:
             for i in range(len(flight_data)):
                 if flight_data[column].iloc[i] != flight_data[column].iloc[i-1]:
                     plt.scatter(flight_data['time'].iloc[i],360-90-flight_data[column].iloc[i])
@@ -182,10 +182,10 @@ axs[0].plot(flight_data['time'],wvel,'c',label='Sensor Fusion',alpha = 0.9)
 axs[0].plot(flight_data['time'],wvel_calc,'grey',label='Pitot tube + vanes',alpha = 0.3)
 
 for column in flight_data.columns:
-    if 'Wind Speed' in column:
+    if 'Wind Speed (m/s)' in column:
         height = ''.join(filter(str.isdigit, column))
         height = int(height)
-        if height in [115, 160, 200]:
+        if height in plot_heights:
             # for i in range(len(flight_data)):
             #     if flight_data[column].iloc[i] != flight_data[column].iloc[i-1]:
             #         axs[0].scatter(flight_data['time'].iloc[i], flight_data[column].iloc[i])
@@ -205,7 +205,7 @@ for column in flight_data.columns:
     if 'Wind Direction' in column:
         height = ''.join(filter(str.isdigit, column))
         height = int(height)
-        if height in [115, 160, 200]:
+        if height in plot_heights:
             # for i in range(len(flight_data)):
             #     if flight_data[column].iloc[i] != flight_data[column].iloc[i-1]:
             #         axs[1].scatter(flight_data['time'].iloc[i], 360 - 90 - flight_data[column].iloc[i])
@@ -215,7 +215,7 @@ axs[1].legend()
 axs[1].grid()
 axs[1].set_xlabel('Time [s]')
 axs[1].set_ylabel('Wind Direction [deg]')
-axs[1].set_ylim([0,180])
+axs[1].set_ylim([np.min(resonlyGPS['wdir'])*180/np.pi-40,np.max(resonlyGPS['wdir'])*180/np.pi+40])
 
 # Adjust layout to prevent overlap
 plt.tight_layout()

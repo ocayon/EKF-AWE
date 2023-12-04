@@ -10,13 +10,9 @@ tether_modulus = 614600/(np.pi*.002**2)  # From Uwe's thesis
 tether_stiffness = tether_modulus*np.pi*(d_t/2)**2
 
 m_kite = 62
-m_kcu = 25
 l_bridle = 15.45
 
 A_kite = 46.854
-
-cd_kcu = 0.6
-frontal_area_kcu = 0.3
 
 L_blines = 300
 d_bridle = 4e-3
