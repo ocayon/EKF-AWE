@@ -31,7 +31,7 @@ ip = 0
 flight_data['cycle'] = np.zeros(len(flight_data))
 for i in range(len(pow)):
     if dep[i] and not in_cycle:
-        flight_data['cycle'].iloc[ip:i] = cycle_count
+        flight_data.loc[ip:i, 'cycle'] = cycle_count
         ip = i
         # Entering a new cycle
         cycle_count += 1
