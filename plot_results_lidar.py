@@ -1,8 +1,8 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from utils import get_tether_end_position, state_noise_matrices, observation_matrices, R_EG_Body, calculate_angle,project_onto_plane ,read_data, rank_observability_matrix,read_data_new,get_measurements
-
+from utils import R_EG_Body
+from config import kappa, z0
 
 #%%
 
@@ -21,10 +21,6 @@ GPSvw = False
 GPSaccvw = False
 GPSvavw = False
 
-if model == 'v3':
-    from v3_properties import *
-elif model == 'v9':
-    from v9_properties import *
 
 path = './results/'+model+'/'
 file_name = model+'_'+year+'-'+month+'-'+day
