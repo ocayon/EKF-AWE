@@ -2,16 +2,13 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from utils import R_EG_Body
-from config import kappa, z0
+from config import kappa, z0, kite_model, year, month, day
 
 #%%
 
 plt.close('all')
 
-model = 'v9'
-year = '2023'
-month = '11'
-day = '27'
+
 
 onlyGPS = True
 GPSacc = False
@@ -22,8 +19,8 @@ GPSaccvw = False
 GPSvavw = False
 
 
-path = './results/'+model+'/'
-file_name = model+'_'+year+'-'+month+'-'+day
+path = './results/'+kite_model+'/'
+file_name = kite_model+'_'+year+'-'+month+'-'+day
 
 flight_data = pd.read_csv(path+file_name+'_fd.csv')
 

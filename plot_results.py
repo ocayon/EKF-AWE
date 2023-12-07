@@ -1,21 +1,15 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from config import kappa, z0, kite_model
+from config import kappa, z0, kite_model, year, month, day
 from utils import get_tether_end_position,  R_EG_Body, calculate_angle,project_onto_plane, create_kite
 
 #%%
 plt.close('all')
 
-model = 'v9'
-year = '2023'
-month = '11'
-day = '27'
 
-
-
-path = './results/'+model+'/'
-file_name = model+'_'+year+'-'+month+'-'+day
+path = './results/'+kite_model+'/'
+file_name = kite_model+'_'+year+'-'+month+'-'+day
 
 results = pd.read_csv(path+file_name+'_res_GPS.csv')
 flight_data = pd.read_csv(path+file_name+'_fd.csv')
@@ -198,6 +192,10 @@ plt.grid()
 plt.figure()
 plt.plot(t,wvel,label = 'EKF')
 plt.plot(t,wvel_calc,label = 'Va probe and vanes')
+plt.fill_between(t, 15, where=straight, color=colors[0], alpha=0.2)
+plt.fill_between(t, 15, where=turn, color=colors[1], alpha=0.2)
+plt.fill_between(t, 15, where=dep, color=colors[2], alpha=0.2)
+plt.fill_between(t, 15, where=trans, color=colors[3], alpha=0.2)
 plt.xlabel('Time')
 plt.ylabel('Horizontal Wind Speed')
 plt.legend()
