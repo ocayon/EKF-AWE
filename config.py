@@ -52,9 +52,9 @@ model_stdv = {
     'v': 0.1,                  # Velocity       
     'uf': 1e-3,               # Friction velocity
     'wdir': (0.1/180 * np.pi),   # Wind direction
-    'CL': 0.005,                 # Lift coefficient
-    'CD': 0.001,                 # Drag coefficient
-    'CS': 0.001                  # Side force coefficient
+    'CL': 1e-2,                 # Lift coefficient
+    'CD': 1e-2,                 # Drag coefficient
+    'CS': 1e-2                  # Side force coefficient
 }
 
 # Get standard deviation vectors
