@@ -68,6 +68,8 @@ model_stdv = {
 #     'CS': 1e-2                  # Side force coefficient
 # }
 
+
+#%%
 # Get standard deviation vectors
 stdv_x = np.array([model_stdv['x'], model_stdv['x'], model_stdv['x'], 
                    model_stdv['v'], model_stdv['v'], model_stdv['v'], 
