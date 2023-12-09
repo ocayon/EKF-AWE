@@ -61,5 +61,5 @@ The `config.py` file contains the following parameters:
 ## Usage
 
 1. Configure the parameters in `config.py` based on your specific flight data and system model.
-2. Run the script `ekf_script.py`.
+2. Run the script `run_ekf.py`.
 
