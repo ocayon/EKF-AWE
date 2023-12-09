@@ -8,7 +8,7 @@ from utils import get_tether_end_position,  R_EG_Body, calculate_angle,project_o
 plt.close('all')
 
 
-path = './results/'+kite_model+'/'
+path = '../results/'+kite_model+'/'
 file_name = kite_model+'_'+year+'-'+month+'-'+day
 
 results = pd.read_csv(path+file_name+'_res_GPS.csv')
@@ -54,12 +54,15 @@ measured_uf = measured_wvel*kappa/np.log(10/z0)
 measured_va = flight_data['kite_apparent_windspeed']
 measured_Ft = flight_data['ground_tether_force']
 measured_aoa = flight_data['kite_angle_of_attack']
-measured_ss = flight_data['kite_sideslip_angle']
+if 'v9' in kite_model:
+    measured_ss = flight_data['kite_sideslip_angle']
+else:
+    measured_ss = np.zeros(len(flight_data))
 measured_aoa = np.array(measured_aoa)
 # Sensor 0 is the one on the kite, sensor 1 is the one on the KCU
-meas_pitch = flight_data['kite_0_pitch']
+meas_pitch = flight_data['kite_0_pitch']+10
 meas_pitch1 = flight_data['kite_1_pitch']
-meas_roll = flight_data['kite_0_roll']
+meas_roll = flight_data['kite_0_roll']+5
 meas_roll1 = flight_data['kite_1_roll']
 meas_yaw = flight_data['kite_0_yaw']-90
 meas_yaw1 = flight_data['kite_1_yaw']-90
@@ -144,7 +147,7 @@ for i in range(len(CL_EKF)):
 #%% Create mask for plotting
 
 cycles_plotted = np.arange(5,10, step=1)
-cycles_plotted = np.arange(0,cycle_count, step=1)
+# cycles_plotted = np.arange(0,cycle_count, step=1)
 
 mask = np.any([flight_data['cycle'] == cycle for cycle in cycles_plotted], axis=0)
 
@@ -191,7 +194,7 @@ plt.grid()
 # Plot horizontal wind speed
 plt.figure()
 plt.plot(t,wvel,label = 'EKF')
-plt.plot(t,wvel_calc,label = 'Va probe and vanes')
+# plt.plot(t,wvel_calc,label = 'Va probe and vanes')
 plt.fill_between(t, 15, where=straight, color=colors[0], alpha=0.2)
 plt.fill_between(t, 15, where=turn, color=colors[1], alpha=0.2)
 plt.fill_between(t, 15, where=dep, color=colors[2], alpha=0.2)
@@ -203,7 +206,7 @@ plt.grid()
 
 plt.figure()
 plt.plot(t,wdir*180/np.pi,label = 'EKF')
-plt.plot(t,np.array(wdir_calc)*180/np.pi,label = 'Va probe and vanes')
+# plt.plot(t,np.array(wdir_calc)*180/np.pi,label = 'Va probe and vanes')
 plt.fill_between(t, 140, where=straight, color=colors[0], alpha=0.2)
 plt.fill_between(t, 140, where=turn, color=colors[1], alpha=0.2)
 plt.fill_between(t, 140, where=dep, color=colors[2], alpha=0.2)
@@ -377,8 +380,8 @@ plt.legend()
 # Plot yaw
 plt.figure()
 plt.plot(t[mask], yaw[mask], label='Yaw EKF respect to v_kite')
-plt.plot(t[mask], meas_yaw[mask]+270, label='Yaw kite sensor')
-plt.plot(t[mask], meas_yaw1[mask]+270, label='Yaw KCU sensor')
+plt.plot(t[mask], meas_yaw[mask]+90, label='Yaw kite sensor')
+plt.plot(t[mask], meas_yaw1[mask]+90, label='Yaw KCU sensor')
 
 plt.xlabel('Time')
 plt.ylabel('Yaw [deg]')
@@ -487,17 +490,18 @@ plt.plot(t,vk)
 
 
 sideslipcalc = np.array(sideslipcalc)
+aoacalc = np.array(aoacalc)
 #%% Make polynomial fits to aerodynamic coefficients
 
 mask = pow & (t>100)
 
 CLt = np.sqrt(CL_EKF**2+CS_EKF**2)
 
-coefficients = np.polyfit(aoa[mask], CLt[mask], 2)
+coefficients = np.polyfit(aoacalc[mask], CLt[mask], 2)
 polynomial = np.poly1d(coefficients)
-alpha_fit = np.linspace(min(aoa[mask]), max(aoa[mask]), 100)  # Create a range of alpha values for the trendline
+alpha_fit = np.linspace(min(aoacalc[mask]), max(aoacalc[mask]), 100)  # Create a range of alpha values for the trendline
 plt.figure()
-plt.scatter(aoa[mask],CLt[mask],alpha = 0.5)   
+plt.scatter(aoacalc[mask],CLt[mask],alpha = 0.5)   
 plt.plot(alpha_fit, polynomial(alpha_fit), label=f'Trendline (Degree 1)', color='r') 
 
 coefficients = np.polyfit(aoa[mask], CD_EKF[mask], 2)

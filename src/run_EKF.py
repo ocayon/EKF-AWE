@@ -14,7 +14,7 @@ import time
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 file_name = kite_model+'_'+year+'-'+month+'-'+day
-file_path = './data/'+ file_name+'.csv'
+file_path = '../processed_data/flight_data/'+kite_model+'/'+ file_name+'.csv'
 
 
 flight_data = pd.read_csv(file_path)
@@ -141,7 +141,7 @@ df = pd.DataFrame(data=results.T, columns=column_names)
 
 flight_data = flight_data.iloc[ti:k]
 
-path = './results/'+kite_model+'/'
+path = '../results/'+kite_model+'/'
 # Save the DataFrame to a CSV file
 csv_filename = file_name+'_res_GPS.csv'
 df.to_csv(path+csv_filename, index=False)

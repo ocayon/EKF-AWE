@@ -19,7 +19,7 @@ GPSaccvw = False
 GPSvavw = False
 
 
-path = './results/'+kite_model+'/'
+path = '../results/'+kite_model+'/'
 file_name = kite_model+'_'+year+'-'+month+'-'+day
 
 flight_data = pd.read_csv(path+file_name+'_fd.csv')
@@ -142,7 +142,7 @@ if GPSaccvw:
 if GPSvavw:
     plt.plot(flight_data['time'],resGPSvavw['wdir']*180/np.pi,'k',label='GPSvavw')
     
-plt.plot(flight_data['time'],360-90-flight_data['ground_wind_direction'],'k',label='Ground Sensor')
+plt.plot(flight_data['time'],flight_data['ground_wind_direction'],'k',label='Ground Sensor')
 
 for column in flight_data.columns:
     if 'Wind Direction' in column:

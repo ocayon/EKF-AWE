@@ -8,8 +8,8 @@ import numpy as np
 #%% Choose flight data
 
 year = '2023'
-month = '11'
-day = '27'
+month = '10'
+day = '26'
 
 #%% Define system parameters
 # Define system parameters
@@ -49,13 +49,24 @@ meas_stdv = {
 # Model standard deviations
 model_stdv = {
     'x': 2.5,                  # Position
-    'v': 0.1,                  # Velocity       
+    'v': 1,                  # Velocity       
     'uf': 1e-3,               # Friction velocity
     'wdir': (0.1/180 * np.pi),   # Wind direction
     'CL': 1e-2,                 # Lift coefficient
     'CD': 1e-2,                 # Drag coefficient
     'CS': 1e-2                  # Side force coefficient
 }
+
+# # Model standard deviations for v3
+# model_stdv = {
+#     'x': 2.5,                  # Position
+#     'v': 1,                  # Velocity       
+#     'uf': 5e-4,               # Friction velocity
+#     'wdir': (0.01/180 * np.pi),   # Wind direction
+#     'CL': 1e-2,                 # Lift coefficient
+#     'CD': 1e-3,                 # Drag coefficient
+#     'CS': 1e-2                  # Side force coefficient
+# }
 
 # Get standard deviation vectors
 stdv_x = np.array([model_stdv['x'], model_stdv['x'], model_stdv['x'], 
