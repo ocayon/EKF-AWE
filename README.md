@@ -8,7 +8,7 @@ The project structure is organized as follows:
 
 - **config.py:** Configuration file containing model parameters and settings.
 - **utils.py:** Utility functions 
-- **ekf_script.py:** Main script for EKF implementation.
+- **run_ekf.py:** Main script for EKF implementation.
 
 To run the script you need a data file that has been processed into the appropiate format. The script to preprocess the data can be found in ./data and the processed data in ./processed_data.
 
