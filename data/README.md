@@ -18,7 +18,7 @@
 ## Reference Systems Changes
 
 - **GPS & IMU Data:**
-  - The coordinates (`kite_0_rx`, `kite_0_ry`, `kite_0_rz`) are transformed into the East-North-Up (ENU) reference frame.
+  - The coordinates,velocities and accelerations are transformed into the East-North-Up (ENU) reference frame.
 
 - **Ground Station Data:**
   - Tether force is converted to Newtons

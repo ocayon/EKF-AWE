@@ -1,6 +1,8 @@
-*.csv
 .vscode/
 __pycache__/
 caca_turn.py
 Scipy_implementation.py
 cd_kcu.py
+data/v9/
+processed_data/flight_data/v9/
+results/v9/
