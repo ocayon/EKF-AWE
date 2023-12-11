@@ -1,0 +1,13 @@
+# This file may be used to create an environment using:
+# $ conda env create --file <this file>
+name: swingkite
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - numpy=1.24.2
+  - matplotlib=3.7.1
+  - pandas=1.5.3
+  - casadi=3.5.5
+  - scipy=1.10.1
