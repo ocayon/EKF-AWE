@@ -63,3 +63,18 @@ The `config.py` file contains the following parameters:
 1. Configure the parameters in `config.py` based on your specific flight data and system model.
 2. Run the script `run_ekf.py`.
 
+### Installation using Anaconda
+
+We assume that a version of Anaconda is installed on your machine. Set the name of your environment in [environment.yml](environment.yml) by a name of your choice and create the virtual environment using the following command:
+
+ ```commandline
+conda env create -f environment.yml
+```
+
+Activate the new environment to use it:
+```commandline
+conda activate [env_name]
+```
+in which [env_name] should be replaced by the chosen name (previously ```source activate [env_name]```).
+
+All the required Python packages (listed in requirements.yml) are installed when creating the environment. Make sure that the new environment is active every time you run any of the Python scripts. Alternatively, linux-64 users may use [environment_linux-64.yml](environment_linux-64.yml) which lists all dependencies explicitly including version and build numbers. 
