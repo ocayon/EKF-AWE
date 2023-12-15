@@ -87,6 +87,9 @@ else:
     flight_data['kite_1_ax'] = df['kite_1_ay']
     flight_data['kite_1_ay'] = df['kite_1_ax']
     flight_data['kite_1_az'] = -df['kite_1_az']
+    flight_data['kite_1_ax']=np.convolve(flight_data['kite_1_ax'], np.ones(window_size)/window_size, mode='same')
+    flight_data['kite_1_ay']=np.convolve(flight_data['kite_1_ay'], np.ones(window_size)/window_size, mode='same')
+    flight_data['kite_1_az']=np.convolve(flight_data['kite_1_az'], np.ones(window_size)/window_size, mode='same')
 
 
 
