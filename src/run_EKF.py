@@ -24,13 +24,13 @@ flight_data = flight_data.reset_index()
 ts = flight_data['time'].iloc[1]-flight_data['time'].iloc[0] # Sample time
 
 #%% Define system model
-kite = create_kite(kite_model)
+KITE = create_kite(kite_model)
 kcu = create_kcu(kcu_model)
 tether = create_tether(tether_material,tether_diameter)
 
 # Declare classes
-dyn_model = DynamicModel(kite,ts)
-obs_model = ObservationModel(dyn_model.x,dyn_model.u,measurements)
+dyn_model = DynamicModel(KITE,ts)
+obs_model = ObservationModel(dyn_model.x,dyn_model.u,measurements,KITE)
 n           =  dyn_model.x.shape[0]                                 # state dimension
 nm          =  obs_model.hx.shape[0]                                 # number of measurements
 m           =  dyn_model.u.shape[0]                                 # number of inputs
@@ -40,7 +40,7 @@ meas_dict,Z = get_measurements(flight_data,measurements,False)
 
 
 #%% Initial state vector 
-x0,u0,opt_guess = initialize_state(flight_data,kite,kcu,tether)
+x0,u0,opt_guess = initialize_state(flight_data,KITE,kcu,tether)
 x0[-3] = 0.8
 x0[-2] = 0.1
 x0[-1] = 0
@@ -82,7 +82,7 @@ ekf.calc_Hx = obs_model.get_hx_jac_fun()
 ekf.calc_hx = obs_model.get_hx_fun()
 
 # Check observability matrix
-check_obs = True
+check_obs = False
 if check_obs == True:
     observability_Lie_method(dyn_model.fx,obs_model.hx,dyn_model.x, dyn_model.u, x0,u0)
 
@@ -112,7 +112,7 @@ for k in range(n_intervals):
     ############################################################
     # Calculate Input for next step with quasi-static tether model
     ############################################################
-    u, res_tether, opt_guess = calculate_quasi_static_tether(x_k1_k1,row,opt_guess, kite, kcu, tether)
+    u, res_tether, opt_guess = calculate_quasi_static_tether(x_k1_k1,row,opt_guess, KITE, kcu, tether)
     
     ############################################################
     # Store results
@@ -136,7 +136,7 @@ for k in range(n_intervals):
 #%% Save results
 ti = 0
 results = np.vstack((XX_k1_k1[:,ti:k],np.array(Ft)[ti:k,:].T,np.array(res_williams)[ti:k,:].T))
-column_names = ['x','y','z','vx','vy','vz','uf','wdir','CL', 'CD', 'CS', 'Ftx','Fty','Ftz','roll', 'pitch', 'yaw', 'aoa', 'sideslip', 'CLw', 'CDw', 'CSw', 'cd_kcu', 'tether_len']
+column_names = ['x','y','z','vx','vy','vz','uf','wdir','CL', 'CD', 'CS', 'bias_lt','bias_aoa','Ftx','Fty','Ftz','roll', 'pitch', 'yaw', 'aoa', 'sideslip', 'CLw', 'CDw', 'CSw', 'cd_kcu', 'tether_len']
 df = pd.DataFrame(data=results.T, columns=column_names)
 
 flight_data = flight_data.iloc[ti:k]
