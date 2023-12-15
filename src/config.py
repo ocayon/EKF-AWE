@@ -8,8 +8,8 @@ import numpy as np
 #%% Choose flight data
 
 year = '2023'
-month = '10'
-day = '26'
+month = '11'
+day = '27'
 
 #%% Define system parameters
 # Define system parameters
@@ -33,7 +33,7 @@ max_iterations = 10                 # Maximum number of iterations for the IEKF
 epsilon = 1e-6                      # Tolerance for the IEKF
 
 # Measurements
-measurements = ['GPS_pos', 'GPS_vel']
+measurements = ['GPS_pos', 'GPS_vel','tether_len']
 
 # Measurement standard deviations
 
@@ -44,9 +44,11 @@ meas_stdv = {
     'uf': 0.1,                 # Friction velocity
     'va': 0.5,                 # Apparent velocity
     'wdir': (10/180 * np.pi),  # Wind direction
+    'tether_len': 0.1,
+    'aoa':      4     # Angle of attack
 }
 
-# Model standard deviations
+# # Model standard deviations v9
 model_stdv = {
     'x': 2.5,                  # Position
     'v': 1,                  # Velocity       
@@ -74,7 +76,8 @@ model_stdv = {
 stdv_x = np.array([model_stdv['x'], model_stdv['x'], model_stdv['x'], 
                    model_stdv['v'], model_stdv['v'], model_stdv['v'], 
                    model_stdv['uf'], model_stdv['wdir'], 
-                   model_stdv['CL'], model_stdv['CD'], model_stdv['CS']])
+                   model_stdv['CL'], model_stdv['CD'], model_stdv['CS'],
+                   1e-6,1e-6])
 
 stdv_y = []
 for key in measurements:
@@ -92,6 +95,10 @@ for key in measurements:
 
     elif key == 'apparent_wvel':
         stdv_y.append(meas_stdv['va'])
+    elif key == 'tether_len':
+        stdv_y.append(meas_stdv['tether_len'])
+    elif key == 'aoa':
+        stdv_y.append(meas_stdv['aoa'])
 stdv_y = np.array(stdv_y)
 
 
