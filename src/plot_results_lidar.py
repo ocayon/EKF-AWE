@@ -83,9 +83,7 @@ for i in range(len(measured_aoa)):
 
 
 plt.figure()
-if onlyGPS:
-    wvel = resonlyGPS['uf']/kappa*np.log(resonlyGPS['z']/z0)
-    plt.plot(flight_data['time'],wvel,'r',label='onlyGPS')
+
 if GPSacc:
     wvel = resGPSacc['uf']/kappa*np.log(resGPSacc['z']/z0)
     plt.plot(flight_data['time'],wvel,'b',label='GPSacc')
@@ -109,16 +107,31 @@ plt.plot(flight_data['time'],flight_data['ground_wind_velocity'],'k',label='Grou
 
 
 plot_heights = [115,160,200,220,240,250]
-
+heights = []
 for column in flight_data.columns:
     if 'Wind Speed (m/s)' in column:
-        height = ''.join(filter(str.isdigit, column))
-        height = int(height)
-        if height in plot_heights:
-            for i in range(len(flight_data)):
-                if flight_data[column].iloc[i] != flight_data[column].iloc[i-1]:
-                    plt.scatter(flight_data['time'].iloc[i],flight_data[column].iloc[i])
-            plt.plot(flight_data['time'],flight_data[column],label = column)
+        heights.append(''.join(filter(str.isdigit, column)))
+
+for height in heights:
+    if int(height) in plot_heights:
+        vw_av_col = height+'m Wind Speed (m/s)'
+        vw_max_col = height+'m Wind Speed max (m/s)'
+        vw_min_col = height+'m Wind Speed min (m/s)'
+        # for i in range(len(flight_data)):
+        #     if flight_data[column].iloc[i] != flight_data[column].iloc[i-1]:
+        #         plt.scatter(flight_data['time'].iloc[i],flight_data[column].iloc[i])
+        # plt.plot(flight_data['time'],flight_data[vw_av_col],label = vw_av_col)
+        err_negative = flight_data[vw_av_col]-flight_data[vw_min_col]
+        err_positive = flight_data[vw_max_col]-flight_data[vw_av_col]
+
+        plt.errorbar(flight_data['time'],flight_data[vw_av_col], yerr=[err_negative,err_positive],
+             fmt='-', ecolor='lightgray', elinewidth=1, capsize=0,label = vw_av_col)
+        
+
+if onlyGPS:
+    wvel = resonlyGPS['uf']/kappa*np.log(resonlyGPS['z']/z0)
+    plt.plot(flight_data['time'],wvel,'r',label='onlyGPS')        
+        
 plt.legend()
 plt.grid()
 plt.xlabel('Time [s]')
@@ -214,5 +227,5 @@ axs[1].set_ylim([np.min(resonlyGPS['wdir'])*180/np.pi-40,np.max(resonlyGPS['wdir
 plt.tight_layout()
 
 # Save or display the figure
-plt.savefig(file_name+'wind_estimations.png',dpi =300)  # You can adjust the filename and format as needed
+# plt.savefig(file_name+'wind_estimations.png',dpi =300)  # You can adjust the filename and format as needed
 plt.show()

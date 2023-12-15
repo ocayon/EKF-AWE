@@ -18,11 +18,11 @@ kite = create_kite(kite_model)
 #%% Define flight phases and count cycles
 up = (flight_data['kcu_actual_depower']-min(flight_data['kcu_actual_depower']))/(max(flight_data['kcu_actual_depower'])-min(flight_data['kcu_actual_depower']))
 us = (flight_data['kcu_actual_steering'])/max(abs(flight_data['kcu_actual_steering']))
-dep = (flight_data['ground_tether_reelout_speed'] < 0) & (up>0.1)
-pow = (flight_data['ground_tether_reelout_speed'] > 0) & (up<0.1)
+dep = (flight_data['ground_tether_reelout_speed'] < 0) & (up>0.3)
+pow = (flight_data['ground_tether_reelout_speed'] > 0) & (up<0.3)
 trans = ~pow & ~dep
-turn = pow & (abs(us) > 0.4)
-straight = pow & (abs(us) < 0.4)
+turn = pow & (abs(us) > 0.25)
+straight = pow & (abs(us) < 0.25)
 
 cycle_count = 0
 in_cycle = False
@@ -60,12 +60,14 @@ else:
     measured_ss = np.zeros(len(flight_data))
 measured_aoa = np.array(measured_aoa)
 # Sensor 0 is the one on the kite, sensor 1 is the one on the KCU
-meas_pitch = flight_data['kite_0_pitch']+10
+meas_pitch = flight_data['kite_0_pitch']
 meas_pitch1 = flight_data['kite_1_pitch']
-meas_roll = flight_data['kite_0_roll']+5
+meas_roll = flight_data['kite_0_roll']
 meas_roll1 = flight_data['kite_1_roll']
 meas_yaw = flight_data['kite_0_yaw']-90
 meas_yaw1 = flight_data['kite_1_yaw']-90
+meas_tetherlen = flight_data['ground_tether_length']
+
 
 t = flight_data.time
 # Results from EKF
@@ -83,7 +85,7 @@ yaw = results.yaw
 CL_EKF = results.CL
 CD_EKF = results.CD
 
-# cd_kcu = results.cd_kcu
+cd_kcu = results.cd_kcu
 CS_EKF = results.CS
 CLw = results.CLw
 CDw = results.CDw
@@ -112,7 +114,7 @@ slack = []
 wvel_calc = []
 wdir_calc = []
 
-measured_aoa = measured_aoa+2
+measured_aoa = measured_aoa
 measured_ss = -measured_ss-5
 for i in range(len(CL_EKF)):
 
@@ -121,7 +123,7 @@ for i in range(len(CL_EKF)):
     slack.append(tether_len[i]+kite.distance_kcu_kite-np.sqrt(x[i]**2+y[i]**2+z[i]**2))
 
     # Calculate tether orientation based on kite sensor measurements
-    Transform_Matrix=R_EG_Body(meas_roll[i]/180*np.pi,meas_pitch[i]/180*np.pi,(meas_yaw[i])/180*np.pi)
+    Transform_Matrix=R_EG_Body(roll[i]/180*np.pi,(pitch[i]-90)/180*np.pi,(meas_yaw[i])/180*np.pi)
     #    Transform_Matrix=R_EG_Body(kite_roll[i]/180*np.pi,kite_pitch[i]/180*np.pi,kite_yaw_modified[i])
     Transform_Matrix=Transform_Matrix.T
     #X_vector
@@ -138,16 +140,20 @@ for i in range(len(CL_EKF)):
     wvel_calc.append(np.linalg.norm(vw))
     wdir_calc.append(np.arctan2(vw[1],vw[0]))
     
-    va_proj = project_onto_plane(va[i],ey_kite)           # Projected apparent wind velocity onto kite y axis
-    aoacalc.append(calculate_angle(ex_kite,va_proj))        # Angle of attack
+    va_proj = project_onto_plane(va[i], ey_kite)           # Projected apparent wind velocity onto kite y axis
+    aoacalc.append(90-calculate_angle(ez_kite,va_proj) )            # Angle of attack
     va_proj = project_onto_plane(va[i], ez_kite)           # Projected apparent wind velocity onto kite z axis
-    sideslipcalc.append(calculate_angle(-ey_kite,va_proj)-90)   # Sideslip angle
+    sideslipcalc.append(90-calculate_angle(ex_kite,va_proj) )        # Sideslip angle
 
-
+pitch_rate = np.concatenate((np.diff(meas_pitch), [0]))
+sideslipcalc = np.array(sideslipcalc)
+aoacalc = np.array(aoacalc)
+turn = pow & (meas_pitch<0)
+straight = pow & (meas_pitch>0)
 #%% Create mask for plotting
 
-cycles_plotted = np.arange(5,10, step=1)
-# cycles_plotted = np.arange(0,cycle_count, step=1)
+cycles_plotted = np.arange(1,6, step=1)
+cycles_plotted = np.arange(0,cycle_count, step=1)
 
 mask = np.any([flight_data['cycle'] == cycle for cycle in cycles_plotted], axis=0)
 
@@ -156,7 +162,7 @@ mask = np.any([flight_data['cycle'] == cycle for cycle in cycles_plotted], axis=
 colors = ['lightblue', 'lightgreen', 'lightcoral', (0.75, 0.6, 0.8)]
 plt.figure()
 plt.plot(t,aoa,label = 'AoA')
-# plt.plot(t,aoacalc,label = 'AoA imposed orientation')
+plt.plot(t,aoacalc,label = 'AoA imposed orientation')
 plt.plot(t,measured_aoa,label = 'AoA measured')
 plt.fill_between(t, 40, where=straight, color=colors[0], alpha=0.2)
 plt.fill_between(t, 40, where=turn, color=colors[1], alpha=0.2)
@@ -169,8 +175,8 @@ plt.grid()
 
 #%% Sideslip vs measured sideslip
 plt.figure()
-# plt.plot(t,sideslip,label = 'Sideslip from EKF')
-plt.plot(t,-measured_ss+4,label = 'Sideslip measured')
+plt.plot(t,sideslip,label = 'Sideslip from EKF')
+plt.plot(t,-measured_ss,label = 'Sideslip measured')
 plt.plot(t,sideslipcalc,label = 'AoA imposed orientation')
 plt.fill_between(t, sideslipcalc, where=straight, color=colors[0], alpha=0.2)
 plt.fill_between(t, sideslipcalc, where=turn, color=colors[1], alpha=0.2)
@@ -182,6 +188,35 @@ plt.grid()
 plt.legend()
 
 
+#%% Sideslip & aoa
+fig, axs = plt.subplots(2, 1, sharex=True, figsize=(18, 10))
+
+# Plot lift coefficient
+axs[0].plot(t[mask], aoa[mask])
+# axs[0].plot(t[mask], CLw[mask])
+axs[0].fill_between(t[mask], aoa[mask], where=straight[mask], color='blue', alpha=0.2, label='Straight')
+axs[0].fill_between(t[mask], aoa[mask], where=turn[mask], color='green', alpha=0.2, label='Turn')
+axs[0].fill_between(t[mask], aoa[mask], where=dep[mask], color='orange', alpha=0.2, label='Depower')
+axs[0].fill_between(t[mask], aoa[mask], where=trans[mask], color='red', alpha=0.2, label='Transition')
+axs[0].set_ylabel('Angle of attack')
+axs[0].grid()
+axs[0].legend()
+
+# Plot drag coefficient
+axs[1].plot(t[mask], sideslipcalc[mask], label='Sensor fusion')
+# axs[1].plot(t[mask],sideslip[mask],label = 'Sideslip from EKF')
+axs[1].set_ylabel('Sideslip')
+axs[1].fill_between(t[mask], sideslipcalc[mask], where=straight[mask], color='blue', alpha=0.2, label='Straight')
+axs[1].fill_between(t[mask], sideslipcalc[mask], where=turn[mask], color='green', alpha=0.2, label='Turn')
+axs[1].fill_between(t[mask], sideslipcalc[mask], where=dep[mask], color='orange', alpha=0.2, label='Depower')
+axs[1].fill_between(t[mask], sideslipcalc[mask], where=trans[mask], color='red', alpha=0.2, label='Transition')
+axs[1].grid()
+axs[1].legend()
+
+
+correlation_matrix = np.corrcoef(aoa[pow],sideslipcalc[pow])
+correlation_coefficient = correlation_matrix[0,1]
+print(f"Correlation Coefficient aoa & ss: {correlation_coefficient}")
 #%% Plot wind speed
 
 # Plot horizontal wind speed
@@ -227,7 +262,7 @@ plt.grid()
 
 #%%
 # Create a figure with three subplots stacked vertically
-fig, axs = plt.subplots(3, 1, sharex=True, figsize=(18, 10))
+fig, axs = plt.subplots(4, 1, sharex=True, figsize=(18, 10))
 
 # Plot lift coefficient
 axs[0].plot(t[mask], CL_EKF[mask])
@@ -260,13 +295,24 @@ axs[2].fill_between(t[mask], aoa[mask], where=trans[mask], color='red', alpha=0.
 axs[2].set_ylabel('Angle of attack [deg]')
 axs[2].grid()
 
+
+# Plot sideslip angle
+axs[3].plot(t[mask], sideslipcalc[mask], label='Sensor fusion')
+axs[3].set_ylabel('Sideslip angle [deg]')
+axs[3].fill_between(t[mask], sideslipcalc[mask], where=straight[mask], color='blue', alpha=0.2, label='Straight')
+axs[3].fill_between(t[mask], sideslipcalc[mask], where=turn[mask], color='green', alpha=0.2, label='Turn')
+axs[3].fill_between(t[mask], sideslipcalc[mask], where=dep[mask], color='orange', alpha=0.2, label='Depower')
+axs[3].set_ylabel('Sideslip angle [deg]')
+axs[3].grid()
+
+
 # Add a common x-axis label
 fig.text(0.5, 0.04, 'Time', ha='center', va='center')
 
 # Add a title to the entire figure
 fig.suptitle('Aerodynamic Coefficients')
 
-plt.savefig('aerodynamic_coefficients_plot.png', dpi=300)
+# plt.savefig('aerodynamic_coefficients_plot.png', dpi=300)
 
 
 
@@ -310,6 +356,18 @@ plt.ylim([0, 20])
 plt.grid()
 plt.legend()
 
+#%% Plot bias tether length
+
+plt.figure()
+plt.plot(t, results.bias_lt)
+plt.fill_between(t[mask], results.bias_lt[mask], where=straight[mask], color='blue', alpha=0.2, label='Straight')
+plt.fill_between(t[mask], results.bias_lt[mask], where=turn[mask], color='green', alpha=0.2, label='Turn')
+plt.fill_between(t[mask], results.bias_lt[mask], where=dep[mask], color='orange', alpha=0.2, label='Depower')
+
+plt.ylabel('Bias tether length')
+plt.xlabel('Time')
+plt.grid()
+plt.legend()
 
 
 #%%
@@ -336,6 +394,19 @@ plt.ylabel('Tether force [N]')
 plt.grid()
 plt.legend()
 
+tether_loss = (Ft_mod-measured_Ft)/Ft_mod*100
+
+plt.figure()
+plt.plot(t[mask], tether_loss[mask], label='Tether force kite')
+plt.fill_between(t[mask], tether_loss[mask], where=straight[mask], color='blue', alpha=0.2, label='Straight')
+plt.fill_between(t[mask], tether_loss[mask], where=turn[mask], color='green', alpha=0.2, label='Turn')
+plt.fill_between(t[mask], tether_loss[mask], where=dep[mask], color='orange', alpha=0.2, label='Depower')
+plt.fill_between(t[mask], tether_loss[mask], where=trans[mask], color='red', alpha=0.2, label='Transition')
+plt.xlabel('Time')
+plt.ylabel('Tether force loss (%)')
+plt.grid()
+plt.legend()
+
 
 #%% Plot trajectory
 meas_z = flight_data['kite_0_rz']
@@ -355,9 +426,25 @@ plt.legend()
 
 #%% Plot euler angles
 
+# Unwrap the phase
+unwrapped_angles = np.unwrap(np.radians(meas_yaw))
+# Convert back to degrees
+meas_yaw = np.degrees(unwrapped_angles)
+
+# Unwrap the phase
+unwrapped_angles = np.unwrap(np.radians(meas_yaw1))
+# Convert back to degrees
+meas_yaw1 = np.degrees(unwrapped_angles)
+
+# Unwrap the phase
+unwrapped_angles = np.unwrap(np.radians(yaw))
+# Convert back to degrees
+yaw = np.degrees(unwrapped_angles)
+
+
 # Plot pitch
 plt.figure()
-plt.plot(t[mask], pitch[mask]-90, label='Pitch EKF respect to v_kite')
+plt.plot(t[mask], pitch[mask], label='Pitch EKF respect to v_kite')
 plt.plot(t[mask], meas_pitch[mask], label='Pitch kite sensor')
 plt.plot(t[mask], meas_pitch1[mask], label='Pitch KCU sensor')
 
@@ -379,16 +466,26 @@ plt.legend()
 
 # Plot yaw
 plt.figure()
-plt.plot(t[mask], yaw[mask], label='Yaw EKF respect to v_kite')
-plt.plot(t[mask], meas_yaw[mask]+90, label='Yaw kite sensor')
-plt.plot(t[mask], meas_yaw1[mask]+90, label='Yaw KCU sensor')
+plt.plot(t[mask], yaw[mask]-360, label='Yaw EKF respect to v_kite')
+plt.plot(t[mask], meas_yaw[mask]-90, label='Yaw kite sensor')
+plt.plot(t[mask], meas_yaw1[mask]-90, label='Yaw KCU sensor')
 
 plt.xlabel('Time')
 plt.ylabel('Yaw [deg]')
 plt.grid()
 plt.legend()
 
+#%% 
+r = np.sqrt(x**2+y**2+z**2)
 
+plt.figure()
+plt.plot(t,r,label = 'GPS radius')
+plt.plot(t,meas_tetherlen-results.bias_lt,label = 'Meas. tether length')
+plt.plot(t,tether_len,label = 'Tether length')
+plt.xlabel('Time')
+plt.ylabel('Distance [m]')
+plt.grid()
+plt.legend()
 #%%
 # start = 2000
 # end = start+36000
@@ -463,11 +560,13 @@ plt.fill_between(t[mask], ax[mask], where=dep[mask], color='orange', alpha=0.2)
 plt.legend()
 plt.grid()
 
-a0 = np.sqrt(ax**2+ay**2+az**2)
-a1 = np.sqrt(ax1**2+ay1**2+az1**2)
-plt.figure()
-plt.plot(t,a0)
-plt.plot(t,a1)
+# a0 = np.sqrt(ax**2+ay**2+az**2)
+# a1 = np.sqrt(ax1**2+ay1**2+az1**2)
+# plt.figure()
+# plt.plot(t,a0)
+# plt.plot(t,a1)
+
+
 
 #%%
 vx = np.array(flight_data['kite_0_vx'])
@@ -483,64 +582,78 @@ vk = np.linalg.norm(v_kite,axis=1)
 v0 = np.sqrt(vx**2+vy**2+vz**2)
 v1 = np.sqrt(vx1**2+vy1**2+vz1**2)
 plt.figure()
-plt.plot(t,v0)
-plt.plot(t,v1)
-plt.plot(t,vk)
+plt.plot(t,v0,label = 'Kite measurement')
+plt.plot(t,v1,label =  'KCU measurement')
+plt.plot(t,vk,label =  'EKF')
 
+plt.legend()
+plt.grid()
 
-
-sideslipcalc = np.array(sideslipcalc)
-aoacalc = np.array(aoacalc)
 #%% Make polynomial fits to aerodynamic coefficients
+# aoa = measured_aoa
+# sideslipcalc = measured_ss
 
-mask = pow & (t>100)
+mask = pow & (t>100) 
 
 CLt = np.sqrt(CL_EKF**2+CS_EKF**2)
 
-coefficients = np.polyfit(aoacalc[mask], CLt[mask], 2)
+coefficients = np.polyfit(aoa[mask], CLt[mask], 2)
 polynomial = np.poly1d(coefficients)
-alpha_fit = np.linspace(min(aoacalc[mask]), max(aoacalc[mask]), 100)  # Create a range of alpha values for the trendline
+alpha_fit = np.linspace(min(aoa[mask]), max(aoa[mask]), 100)  # Create a range of alpha values for the trendline
 plt.figure()
-plt.scatter(aoacalc[mask],CLt[mask],alpha = 0.5)   
-plt.plot(alpha_fit, polynomial(alpha_fit), label=f'Trendline (Degree 1)', color='r') 
+plt.scatter(aoa[mask],CLt[mask],alpha = 0.5)   
+plt.plot(alpha_fit, polynomial(alpha_fit), label='Trendline (Degree 1)', color='r') 
 
 coefficients = np.polyfit(aoa[mask], CD_EKF[mask], 2)
 polynomial = np.poly1d(coefficients)
 alpha_fit = np.linspace(min(aoa[mask]), max(aoa[mask]), 100)  # Create a range of alpha values for the trendline
 plt.figure()
 plt.scatter(aoa[mask],CD_EKF[mask],alpha = 0.5)   
-plt.plot(alpha_fit, polynomial(alpha_fit), label=f'Trendline (Degree 1)', color='r') 
+plt.plot(alpha_fit, polynomial(alpha_fit), label= 'Trendline (Degree 1)', color='r') 
 
 
+mask = pow & (t>100) 
 coefficients = np.polyfit(sideslipcalc[mask], CLt[mask], 2)
 polynomial = np.poly1d(coefficients)
 alpha_fit = np.linspace(min(sideslipcalc[mask]), max(sideslipcalc[mask]), 100)  # Create a range of alpha values for the trendline
 plt.figure()
 plt.scatter(sideslipcalc[mask],CLt[mask],alpha = 0.5)   
-plt.plot(alpha_fit, polynomial(alpha_fit), label=f'Trendline (Degree 1)', color='r') 
+plt.plot(alpha_fit, polynomial(alpha_fit), label='Trendline (Degree 1)', color='r') 
 
 coefficients = np.polyfit(sideslipcalc[mask], CD_EKF[mask], 2)
 polynomial = np.poly1d(coefficients)
 alpha_fit = np.linspace(min(sideslipcalc[mask]), max(sideslipcalc[mask]), 100)  # Create a range of alpha values for the trendline
 plt.figure()
 plt.scatter(sideslipcalc[mask],CD_EKF[mask],alpha = 0.5)   
-plt.plot(alpha_fit, polynomial(alpha_fit), label=f'Trendline (Degree 1)', color='r') 
+plt.plot(alpha_fit, polynomial(alpha_fit), label='Trendline (Degree 1)', color='r') 
 
 
-mask = turn
+mask = pow & (t>100)
 coefficients = np.polyfit(us[mask], CL_EKF[mask], 2)
 polynomial = np.poly1d(coefficients)
 alpha_fit = np.linspace(min(us[mask]), max(us[mask]), 100)  # Create a range of alpha values for the trendline
 plt.figure()
 plt.scatter(us[mask],CL_EKF[mask],alpha = 0.5)   
-plt.plot(alpha_fit, polynomial(alpha_fit), label=f'Trendline (Degree 2)', color='r') 
+plt.plot(alpha_fit, polynomial(alpha_fit), label='Trendline (Degree 2)', color='r') 
 
 coefficients = np.polyfit(us[mask], CD_EKF[mask], 2)
 polynomial = np.poly1d(coefficients)
 alpha_fit = np.linspace(min(us[mask]), max(us[mask]), 100)  # Create a range of alpha values for the trendline
 plt.figure()
 plt.scatter(us[mask],CD_EKF[mask],alpha = 0.5)   
-plt.plot(alpha_fit, polynomial(alpha_fit), label=f'Trendline (Degree 2)', color='r') 
+plt.plot(alpha_fit, polynomial(alpha_fit), label='Trendline (Degree 2)', color='r') 
 
 
 
+mask = pow & (t>100) 
+coefficients = np.polyfit(us[mask], CS_EKF[mask], 2)
+polynomial = np.poly1d(coefficients)
+alpha_fit = np.linspace(min(us[mask]), max(us[mask]), 100)  # Create a range of alpha values for the trendline
+plt.figure()
+mask = pow & (t>100) & (pitch_rate<0)
+plt.scatter(us[mask],CS_EKF[mask],alpha = 0.5)   
+mask = pow & (t>100) & (pitch_rate>0)
+# plt.scatter(us[mask],CS_EKF[mask],alpha = 0.5)   
+plt.plot(alpha_fit, polynomial(alpha_fit), label='Trendline (Degree 2)', color='r') 
+
+mask = np.any([flight_data['cycle'] == cycle for cycle in cycles_plotted], axis=0)
