@@ -107,6 +107,8 @@ class DynamicModel:
         self.CD = ca.SX.sym('CD')    # Drag coefficient
         self.CS = ca.SX.sym('CS')    # Side force coefficient
         self.Ft = ca.SX.sym('Ft',3)  # Tether force
+        self.bias_lt = ca.SX.sym('bias_lt') # Bias tether length
+        self.bias_aoa = ca.SX.sym('bias_aoa') # Bias angle of attack
         
         self.x = self.get_state()
         self.u = self.get_input()
@@ -114,10 +116,10 @@ class DynamicModel:
         
         # Define ODE system
         dae = {'x': self.x, 'p': self.u, 'ode': self.fx}                       # Define ODE system
-        self.intg = ca.integrator('intg', 'cvodes', dae, {'tf': ts})    # Define integrator
+        self.intg = ca.integrator('intg', 'cvodes', dae, 0,ts)    # Define integrator
 
     def get_state(self):    
-        return ca.vertcat(self.r,self.v,self.uf,self.wdir,self.CL,self.CD,self.CS)
+        return ca.vertcat(self.r,self.v,self.uf,self.wdir,self.CL,self.CD,self.CS,self.bias_lt,self.bias_aoa)
     
     def get_input(self):
         return ca.vertcat(self.Ft)
@@ -138,7 +140,7 @@ class DynamicModel:
         Fg = ca.vertcat(0, 0, -kite.mass*g)
         rp = self.v
         vp = (-self.Ft+L+D+S+Fg)/kite.mass
-        return ca.vertcat(rp,vp,0,0,0,0,0)
+        return ca.vertcat(rp,vp,0,0,0,0,0,0,0)
     
     def get_fx_jac(self):
         return ca.jacobian(self.fx,self.x)
@@ -152,19 +154,24 @@ class DynamicModel:
 
 class ObservationModel:
 
-    def __init__(self,x,u,measurements):
+    def __init__(self,x,u,measurements,KITE):
         self.x = x
         self.u = u
         self.measurements = measurements
-        self.hx = self.get_hx()
+        self.hx = self.get_hx(KITE)
     
-    def get_hx(self):
+    def get_hx(self,KITE):
         uf = self.x[6]
         wdir = self.x[7]
         wvel = uf/kappa*ca.log(self.x[2]/z0)
         vw = ca.vertcat(wvel*ca.cos(wdir),wvel*ca.sin(wdir),0)
         va = vw - self.x[3:6] 
 
+
+        ez_kite = self.u/ca.norm_2(self.u)
+        ey_kite = ca.cross(ez_kite, - self.x[3:6] )/ca.norm_2(ca.cross(ez_kite, - self.x[3:6] ))
+        va_proj = project_onto_plane_sym(va, ey_kite)           # Projected apparent wind velocity onto kite y axis
+        aoa = 90-calculate_angle_sym(ez_kite,va_proj)             # Angle of attack
         h = ca.SX()
 
         for key in self.measurements:
@@ -178,16 +185,21 @@ class ObservationModel:
                 h = ca.vertcat(h,self.x[6])
             elif key == 'apparent_wvel':
                 h = ca.vertcat(h,ca.norm_2(va))
+            elif key == 'tether_len':
+                h = ca.vertcat(h,ca.norm_2(self.x[0:3])-KITE.distance_kcu_kite+self.x[11])
+            elif key == 'aoa':
+                h = ca.vertcat(h,aoa+self.x[12])
+
         return h
 
     def get_hx_jac(self):
-        return ca.jacobian(self.get_hx(),self.x)
+        return ca.jacobian(self.hx,self.x)
     
     def get_hx_jac_fun(self):
         return ca.Function('calc_Hx', [self.x,self.u],[self.get_hx_jac()])
     
     def get_hx_fun(self):
-        return ca.Function('calc_hx', [self.x,self.u],[self.get_hx()])
+        return ca.Function('calc_hx', [self.x,self.u],[self.hx])
     
 class KiteModel:
     def __init__(self, model_name, mass, area, distance_kcu_kite, total_length_bridle_lines, diameter_bridle_lines):
@@ -232,6 +244,7 @@ class TetherModel:
         self.diameter = diameter
         self.density = density
         self.cd = cd
+        self.cf = 0.02
         self.E = Youngs_modulus
         self.area = np.pi*(self.diameter/2)**2
         self.EA = self.E*self.area
@@ -262,6 +275,7 @@ def create_tether(material_name,diameter):
 
 def project_onto_plane(vector, plane_normal):
     return vector - np.dot(vector, plane_normal) * plane_normal
+
 
 def project_onto_plane_sym(vector, plane_normal):
     return vector - ca.dot(vector, plane_normal) * plane_normal
@@ -325,6 +339,12 @@ def get_measurements(df, measurements,multiple_GPS = True):
                 Z.append(df[col_va[i]].values)
                 meas_dict[meas] = len(col_va)
 
+        elif meas == 'tether_len':
+            Z.append(df['ground_tether_length'].values)
+
+        elif meas == 'aoa':
+            Z.append(df['kite_angle_of_attack'].values)
+
     Z = np.array(Z)
     Z = Z.T
 
@@ -359,7 +379,7 @@ def get_tether_end_position(x, set_parameter, n_tether_elements, r_kite, v_kite,
     omega_kite = np.cross(a_kite-at,v_kite)/(np.linalg.norm(v_kite)**2)
     ICR = np.cross(v_kite,omega_kite)/(np.linalg.norm(omega_kite)**2)      
     alpha = np.cross(at,ICR)/np.linalg.norm(ICR)**2
-
+    
 
         
 
@@ -416,8 +436,14 @@ def get_tether_end_position(x, set_parameter, n_tether_elements, r_kite, v_kite,
         vajn = vaj - vajp  # Perpendicular to tether element
 
         vaj_sq = np.linalg.norm(vaj)*vaj
+
+        # Determina angle between  va and tether
+        theta = calculate_angle(-vaj,ej,False)
         # vaj_sq = np.linalg.norm(vajn)*vajn
-        tether_drag_basis = rho*l_unstrained*tether.diameter*tether.cd*vaj_sq
+        CD_tether = tether.cd*np.sin(theta)**3+tether.cf
+        # CL_tether = tether.cd*np.sin(theta)**2*np.cos(theta)
+        tether_drag_basis = rho*l_unstrained*tether.diameter*CD_tether*vaj_sq
+        
         # Determine drag at point mass j.
         if not separate_kcu_mass:
             if n_tether_elements == 1:
@@ -439,11 +465,24 @@ def get_tether_end_position(x, set_parameter, n_tether_elements, r_kite, v_kite,
                 cd_kcu = (np.linalg.norm(dp+dt))/(0.5*rho*kite.area*np.linalg.norm(vaj)**2)
             elif kcu_element:
                 dj = -.25*tether_drag_basis
-                dp= -.5*rho*np.linalg.norm(vajp)*vajp*kcu.cdp*kcu.Ap  # Adding kcu drag perpendicular to kcu
-                dt= -.5*rho*np.linalg.norm(vajn)*vajn*kcu.cdt*kcu.At  # Adding kcu drag parallel to kcu
+
+                cd_kcu = kcu.cdt*np.sin(theta)**3+tether.cf
+                cl_kcu = kcu.cdt*np.sin(theta)**2*np.cos(theta)
+                # D_turbine = 0.5*rho*np.linalg.norm(vaj)**2*np.pi*0.2**2*1
+                # dp= -.5*rho*np.linalg.norm(vajp)*vajp*kcu.cdp*kcu.Ap  # Adding kcu drag perpendicular to kcu
+                # dt= -.5*rho*np.linalg.norm(vajn)*vajn*kcu.cdt*kcu.At  # Adding kcu drag parallel to kcu
                 # th = -0.5*rho*vaj_sq*np.pi*0.2**2*0.4
-                dj += dp+dt
-                cd_kcu = (np.linalg.norm(dp+dt))/(0.5*rho*kite.area*np.linalg.norm(vaj)**2)
+                # dj += dp+dt
+
+                # Approach described in Hoerner, taken from Paul Thedens dissertation
+                dir_D = -vaj/np.linalg.norm(vaj)
+                dir_L = ej - np.dot(ej,dir_D)*dir_D
+                L_kcu = 0.5*rho*np.linalg.norm(vaj)**2*kcu.At*cl_kcu
+                D_kcu = 0.5*rho*np.linalg.norm(vaj)**2*cd_kcu*kcu.At
+                dj += L_kcu*dir_L + D_kcu*dir_D #+ D_turbine*dir_D
+
+                # cd_kcu = (np.linalg.norm(dp+dt))/(0.5*rho*kite.area*np.linalg.norm(vaj)**2)
+
             else:
                 dj = -.5*tether_drag_basis
 
@@ -533,7 +572,7 @@ def rotate_vector(v, u, theta):
 
     return v_rot    
 
-def calculate_angle(vector_a, vector_b):
+def calculate_angle(vector_a, vector_b,deg = True):
     dot_product = np.dot(vector_a, vector_b)
     magnitude_a = np.linalg.norm(vector_a)
     magnitude_b = np.linalg.norm(vector_b)
@@ -542,7 +581,10 @@ def calculate_angle(vector_a, vector_b):
     angle_rad = np.arccos(cos_theta)
     angle_deg = np.degrees(angle_rad)
     
-    return angle_deg
+    if deg:
+        return angle_deg
+    else:
+        return angle_rad
 
 def calculate_angle_sym(vector_a, vector_b):
     dot_product = ca.dot(vector_a, vector_b)
@@ -633,9 +675,18 @@ def initialize_state(flight_data,kite,kcu,tether):
     CL0 = res[-3]     # Lift coefficient
     CD0 = res[-2]     # Drag coefficient
     CS0 = res[-1]     # Side force coefficient
+    dcm_b2w = res[2]            # DCM bridle to earth
+    ey_kite = dcm_b2w[:,1]      # Kite y axis perpendicular to va and tether
+    ez_kite = dcm_b2w[:,2]      # Kite z axis pointing in the direction of the tension
+    ex_kite = dcm_b2w[:,0]      # Kite x axis 
+    va = vw-kite_vel            # Apparent wind velocity
+    va_proj = project_onto_plane(va, ey_kite)           # Projected apparent wind velocity onto kite y axis
+    aoa = 90-calculate_angle(ez_kite,va_proj)             # Angle of attack
+    bias_tether = res[1]- row['ground_tether_length']
+    
 
     x0 = np.vstack((flight_data[['kite_0_rx','kite_0_ry','kite_0_rz']].values[0, :],flight_data[['kite_0_vx','kite_0_vy','kite_0_vz']].values[0, :]))
-    x0 = np.append(x0,[0.6,ground_wdir0,CL0,CD0,CS0])
+    x0 = np.append(x0,[0.6,ground_wdir0,CL0,CD0,CS0,bias_tether,0])
 
     return x0, u0, opt_res.x
 
@@ -666,10 +717,10 @@ def calculate_quasi_static_tether(x, fd, opt_guess, kite, kcu, tether):
     va = vw-x[3:6]              # Apparent wind velocity
     
     va_proj = project_onto_plane(va, ey_kite)           # Projected apparent wind velocity onto kite y axis
-    aoa = calculate_angle(ex_kite,va_proj)              # Angle of attack
+    aoa = 90-calculate_angle(ez_kite,va_proj)             # Angle of attack
     va_proj = project_onto_plane(va, ez_kite)           # Projected apparent wind velocity onto kite z axis
     sideslip = calculate_angle(ey_kite,va_proj)         # Sideslip angle
-    pitch = calculate_angle(ex_kite, [0,0,1])           # Pitch angle
+    pitch = 90-calculate_angle(-ex_kite, [0,0,1])           # Pitch angle
     yaw = np.arctan2(ex_kite[0],ex_kite[1])*180/np.pi   # Yaw angle       
     roll = calculate_angle(ey_kite, [0,0,1])            # Roll angle
 
