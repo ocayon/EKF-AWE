@@ -186,7 +186,7 @@ class ObservationModel:
             elif key == 'apparent_wvel':
                 h = ca.vertcat(h,ca.norm_2(va))
             elif key == 'tether_len':
-                h = ca.vertcat(h,ca.norm_2(self.x[0:3])-KITE.distance_kcu_kite+self.x[11])
+                h = ca.vertcat(h,ca.norm_2(self.x[0:3])-KITE.distance_kcu_kite-self.x[11])
             elif key == 'aoa':
                 h = ca.vertcat(h,aoa+self.x[12])
 
@@ -209,8 +209,6 @@ class KiteModel:
         self.distance_kcu_kite = distance_kcu_kite
         self.total_length_bridle_lines = total_length_bridle_lines
         self.diameter_bridle_lines = diameter_bridle_lines
-
-
 class KCUModel:
 
     # Exracted from Applied fluid dynamics handbook
@@ -250,7 +248,6 @@ class TetherModel:
         self.EA = self.E*self.area
         
 #%% Function definitions
-
 def create_kite(model_name):
     if model_name in kite_models:
         model_params = kite_models[model_name]
@@ -376,10 +373,15 @@ def get_tether_end_position(x, set_parameter, n_tether_elements, r_kite, v_kite,
     
     # Find instantaneuous center of rotation and omega of the kite
     at = np.dot(a_kite,np.array(v_kite)/np.linalg.norm(v_kite))*np.array(v_kite)/np.linalg.norm(v_kite)
-    omega_kite = np.cross(a_kite-at,v_kite)/(np.linalg.norm(v_kite)**2)
+    # at = np.dot(a_kite,np.array(v_kite-vtau_kite)/np.linalg.norm(v_kite-vtau_kite))*np.array(v_kite-vtau_kite)/np.linalg.norm(v_kite-vtau_kite)
+    if np.linalg.norm(a_kite)<1e-3:
+        omega_kite = omega_tether
+    else:
+        omega_kite = np.cross(a_kite-at,v_kite)/(np.linalg.norm(v_kite)**2)
     ICR = np.cross(v_kite,omega_kite)/(np.linalg.norm(omega_kite)**2)      
     alpha = np.cross(at,ICR)/np.linalg.norm(ICR)**2
     
+    # omega_kite = omega_tether
 
         
 
@@ -419,13 +421,16 @@ def get_tether_end_position(x, set_parameter, n_tether_elements, r_kite, v_kite,
         if last_element:
             vj = np.array(v_kite)
             aj = np.array(a_kite)
-        if kcu_element:       
+        if kcu_element: 
+                  
             vkcu = v_kite + np.cross(omega_kite,positions[j+1, :]-r_kite)
             vj = vkcu
             velocities[j+1, :] = vj
             akcu = a_kite+ np.cross(alpha,positions[j+1, :]-r_kite) +np.cross(omega_kite,np.cross(omega_kite,positions[j+1, :]-r_kite))
             aj = akcu
             accelerations[j+1, :] = aj
+            if kite.model_name == 'v9':
+                aj = np.array(a_kite)
 
             ej = (r_kite-np.array(positions[j+1, :]))/np.linalg.norm(r_kite-np.array(positions[j+1, :]))
         # Determine flow at point mass j.
@@ -465,7 +470,7 @@ def get_tether_end_position(x, set_parameter, n_tether_elements, r_kite, v_kite,
                 cd_kcu = (np.linalg.norm(dp+dt))/(0.5*rho*kite.area*np.linalg.norm(vaj)**2)
             elif kcu_element:
                 dj = -.25*tether_drag_basis
-
+                theta = np.pi/2-theta
                 cd_kcu = kcu.cdt*np.sin(theta)**3+tether.cf
                 cl_kcu = kcu.cdt*np.sin(theta)**2*np.cos(theta)
                 # D_turbine = 0.5*rho*np.linalg.norm(vaj)**2*np.pi*0.2**2*1
@@ -477,14 +482,20 @@ def get_tether_end_position(x, set_parameter, n_tether_elements, r_kite, v_kite,
                 # Approach described in Hoerner, taken from Paul Thedens dissertation
                 dir_D = -vaj/np.linalg.norm(vaj)
                 dir_L = ej - np.dot(ej,dir_D)*dir_D
-                L_kcu = 0.5*rho*np.linalg.norm(vaj)**2*kcu.At*cl_kcu
-                D_kcu = 0.5*rho*np.linalg.norm(vaj)**2*cd_kcu*kcu.At
+                L_kcu = 0.5*rho*np.linalg.norm(vaj)**2*kcu.Ap*cl_kcu
+                D_kcu = 0.5*rho*np.linalg.norm(vaj)**2*cd_kcu*kcu.Ap
                 dj += L_kcu*dir_L + D_kcu*dir_D #+ D_turbine*dir_D
 
                 # cd_kcu = (np.linalg.norm(dp+dt))/(0.5*rho*kite.area*np.linalg.norm(vaj)**2)
 
             else:
-                dj = -.5*tether_drag_basis
+                dir_D = -vaj/np.linalg.norm(vaj)
+                dir_L = ej - np.dot(ej,dir_D)*dir_D
+                cd_t = tether.cd*np.sin(theta)**3+tether.cf
+                cl_t = tether.cd*np.sin(theta)**2*np.cos(theta)
+                L_t = 0.5*rho*np.linalg.norm(vaj)**2*l_unstrained*tether.diameter*cl_t
+                D_t = 0.5*rho*np.linalg.norm(vaj)**2*l_unstrained*tether.diameter*cd_t
+                dj = L_t*dir_L + D_t*dir_D
 
         if not separate_kcu_mass:
             if last_element:
@@ -529,7 +540,7 @@ def get_tether_end_position(x, set_parameter, n_tether_elements, r_kite, v_kite,
         va = vwj-vj  # All y-axes are defined perpendicular to apparent wind velocity.
 
         ez_bridle = tensions[-1, :]/np.linalg.norm(tensions[-1, :])
-        ey_bridle = np.cross(ez_bridle, -vj)/np.linalg.norm(np.cross(ez_bridle, -vj))
+        ey_bridle = np.cross(ez_bridle, va)/np.linalg.norm(np.cross(ez_bridle, va))
         ex_bridle = np.cross(ey_bridle, ez_bridle)
         dcm_b2w = np.vstack(([ex_bridle], [ey_bridle], [ez_bridle])).T
 
@@ -572,15 +583,21 @@ def rotate_vector(v, u, theta):
 
     return v_rot    
 
-def calculate_angle(vector_a, vector_b,deg = True):
+def calculate_angle(vector_a, vector_b, deg=True):
     dot_product = np.dot(vector_a, vector_b)
     magnitude_a = np.linalg.norm(vector_a)
     magnitude_b = np.linalg.norm(vector_b)
-    
+
     cos_theta = dot_product / (magnitude_a * magnitude_b)
     angle_rad = np.arccos(cos_theta)
+
+    # Determine the sign of the angle
+    cross_product = np.cross(vector_a, vector_b)
+    if cross_product[2] < 0:
+        angle_rad = -angle_rad
+
     angle_deg = np.degrees(angle_rad)
-    
+
     if deg:
         return angle_deg
     else:
@@ -660,6 +677,9 @@ def initialize_state(flight_data,kite,kcu,tether):
     ground_wvel0 = np.mean(flight_data['ground_wind_velocity'].iloc[0:3000]) # Initial wind velocity
     uf0 = ground_wvel0*kappa/np.log(10/z0)
     wvel0 = uf0/kappa*np.log(flight_data['kite_0_rz'].iloc[0]/z0)
+    if np.isnan(wvel0):
+        wvel0 = 9
+        ground_wdir0 = 180/180*np.pi
     vw = [wvel0*np.cos(ground_wdir0),wvel0*np.sin(ground_wdir0),0] # Initial wind velocity
     row = flight_data.iloc[0] # Initial row of flight data
     kite_pos = np.array([row['kite_0_rx'],row['kite_0_ry'],row['kite_0_rz']]) # Initial kite position
@@ -690,20 +710,42 @@ def initialize_state(flight_data,kite,kcu,tether):
 
     return x0, u0, opt_res.x
 
-def calculate_quasi_static_tether(x, fd, opt_guess, kite, kcu, tether):
+def calculate_quasi_static_tether(x, fd, opt_guess, kite, kcu, tether,find_force = False,find_height = False):
     wvel = x[6]/kappa*np.log(x[2]/z0) # Wind speed
     wdir = x[7] # Wind direction
     vw = np.array([wvel*np.cos(wdir),wvel*np.sin(wdir),0]) # Wind velocity
     # Solve for tether shape and force
-    args = (fd['ground_tether_force'], n_tether_elements, x[0:3], x[3:6],vw,
-            list(fd[['kite_0_ax','kite_0_ay','kite_0_az']]), kite, kcu, tether, True, True)
-    opt_res = least_squares(get_tether_end_position, opt_guess, args=args,
-                            kwargs={'find_force': False}, verbose=0,xtol = 1e-3,ftol = 1e-3)
-    opt_guess = opt_res.x
-    # Get results from optimization
-    res = get_tether_end_position(
-        opt_res.x, *args, return_values=True, find_force=False)
-
+    if find_force == True:
+        args = (fd['ground_tether_length'], 30, x[0:3], x[3:6],vw,
+            list(fd[['kite_1_ax','kite_1_ay','kite_1_az']]), kite, kcu, tether, True, True)
+        opt_res = least_squares(get_tether_end_position, opt_guess, args=args,
+                            kwargs={'find_force': find_force}, verbose=0,xtol = 1e-3,ftol = 1e-3)
+        opt_guess = opt_res.x
+        # Get results from optimization
+        res = get_tether_end_position(
+            opt_res.x, *args, return_values=True, find_force=False)
+    elif find_force == False and find_height == False:
+        args = (fd['ground_tether_force'], n_tether_elements, x[0:3], x[3:6],vw,
+                list(fd[['kite_1_ax','kite_1_ay','kite_1_az']]), kite, kcu, tether, True, True)
+        opt_res = least_squares(get_tether_end_position, opt_guess, args=args,
+                            kwargs={'find_force': find_force}, verbose=0,xtol = 1e-3,ftol = 1e-3)
+        opt_guess = opt_res.x
+        # Get results from optimization
+        res = get_tether_end_position(
+            opt_res.x, *args, return_values=True, find_force=False)
+    
+    elif find_height == True:
+        args =  (fd['ground_tether_length'], fd['ground_tether_force'], n_tether_elements, x[0:3], x[3:6],vw,
+                list(fd[['kite_1_ax','kite_1_ay','kite_1_az']]), kite, kcu, tether, True, True)
+        
+        opt_res = least_squares(get_tether_end_height, opt_guess, args=args,
+                                kwargs={'find_force': find_force}, verbose=0,xtol = 1e-3,ftol = 1e-3)
+        opt_guess = opt_res.x
+        # Get results from optimization
+        res = get_tether_end_height(
+            opt_res.x, *args, return_values=True, find_force=False)
+        
+    positions = res[0]
     dcm_b2w = res[2]            # DCM bridle to earth
     ey_kite = dcm_b2w[:,1]      # Kite y axis perpendicular to va and tether
     ez_kite = dcm_b2w[:,2]      # Kite z axis pointing in the direction of the tension
@@ -720,10 +762,229 @@ def calculate_quasi_static_tether(x, fd, opt_guess, kite, kcu, tether):
     aoa = 90-calculate_angle(ez_kite,va_proj)             # Angle of attack
     va_proj = project_onto_plane(va, ez_kite)           # Projected apparent wind velocity onto kite z axis
     sideslip = calculate_angle(ey_kite,va_proj)         # Sideslip angle
-    pitch = 90-calculate_angle(-ex_kite, [0,0,1])           # Pitch angle
-    yaw = np.arctan2(ex_kite[0],ex_kite[1])*180/np.pi   # Yaw angle       
-    roll = calculate_angle(ey_kite, [0,0,1])            # Roll angle
+    pitch = 90-calculate_angle(ex_kite, [0,0,1])          # Pitch angle
+    yaw = np.arctan2(ex_kite[1],ex_kite[0])*180/np.pi   # Yaw angle       
+    roll = 90-calculate_angle(ey_kite, [0,0,1])            # Roll angle
 
-    res_williams = np.array([roll,pitch,yaw,aoa,sideslip,CL,CD,CS,cd_kcu,tether_len])
+    res_williams = np.array([roll,pitch,yaw,aoa,sideslip,CL,CD,CS,cd_kcu,tether_len,positions[-1,2]])
 
     return Ft, res_williams, opt_guess
+
+
+def get_tether_end_height(x, tether_length,tension_ground, n_tether_elements, r_kite, v_kite, vw,a_kite, kite, kcu, tether, separate_kcu_mass=True, elastic_elements=True, return_values=False, find_force=False):
+    # Currently neglecting radial velocity of kite.
+    
+    beta_n, phi_n = x
+    l_unstrained = tether_length/n_tether_elements
+    m_s = np.pi*tether.diameter**2/4 * l_unstrained * tether.density
+
+    n_elements = n_tether_elements
+    if separate_kcu_mass:
+        n_elements += 1
+    
+    wvel = np.linalg.norm(vw)
+    wdir = vw/wvel
+
+    vtau_kite = project_onto_plane(v_kite,r_kite/np.linalg.norm(r_kite)) # Velocity projected onto the tangent plane
+    omega_tether = np.cross(r_kite,vtau_kite)/(np.linalg.norm(r_kite)**2) # Tether angular velocity, with respect to the tether attachment point
+
+    
+    # Find instantaneuous center of rotation and omega of the kite
+    at = np.dot(a_kite,np.array(v_kite)/np.linalg.norm(v_kite))*np.array(v_kite)/np.linalg.norm(v_kite)
+    # at = np.dot(a_kite,np.array(v_kite-vtau_kite)/np.linalg.norm(v_kite-vtau_kite))*np.array(v_kite-vtau_kite)/np.linalg.norm(v_kite-vtau_kite)
+    if np.linalg.norm(a_kite)<1e-3:
+        omega_kite = omega_tether
+    else:
+        omega_kite = np.cross(a_kite-at,v_kite)/(np.linalg.norm(v_kite)**2)
+    ICR = np.cross(v_kite,omega_kite)/(np.linalg.norm(omega_kite)**2)      
+    alpha = np.cross(at,ICR)/np.linalg.norm(ICR)**2
+    
+    # omega_kite = omega_tether
+
+        
+
+    tensions = np.zeros((n_elements, 3))
+    tensions[0, 0] = np.cos(beta_n)*np.cos(phi_n)*tension_ground
+    tensions[0, 1] = np.cos(beta_n)*np.sin(phi_n)*tension_ground
+    tensions[0, 2] = np.sin(beta_n)*tension_ground
+
+    positions = np.zeros((n_elements+1, 3))
+    if elastic_elements:
+        l_s = (tension_ground/(tether.EA)+1)*l_unstrained
+        # print((tension_ground/tether_stiffness+1))
+    else:
+        l_s = l_unstrained
+    positions[1, 0] = np.cos(beta_n)*np.cos(phi_n)*l_s
+    positions[1, 1] = np.cos(beta_n)*np.sin(phi_n)*l_s
+    positions[1, 2] = np.sin(beta_n)*l_s
+
+    velocities = np.zeros((n_elements+1, 3))
+    accelerations = np.zeros((n_elements+1, 3))
+    non_conservative_forces = np.zeros((n_elements, 3))
+
+    stretched_tether_length = l_s  # Stretched
+    for j in range(n_elements):  # Iterate over point masses.
+        last_element = j == n_elements - 1
+        kcu_element = separate_kcu_mass and j == n_elements - 2
+
+        # Determine kinematics at point mass j.
+        vj = np.cross(omega_tether, positions[j+1, :])
+        velocities[j+1, :] = vj
+        aj = np.cross(omega_tether, vj)
+        accelerations[j+1, :] = aj
+        delta_p = positions[j+1, :] - positions[j, :]
+        ej = delta_p/np.linalg.norm(delta_p)  # Axial direction of tether element
+        vwj = wvel*np.log(positions[j+1,2]/z0)/np.log(r_kite[2]/z0)*wdir # Wind
+        
+        if last_element:
+            vj = np.array(v_kite)
+            aj = np.array(a_kite)
+        if kcu_element: 
+                  
+            vkcu = v_kite + np.cross(omega_kite,positions[j+1, :]-r_kite)
+            vj = vkcu
+            velocities[j+1, :] = vj
+            akcu = a_kite+ np.cross(alpha,positions[j+1, :]-r_kite) +np.cross(omega_kite,np.cross(omega_kite,positions[j+1, :]-r_kite))
+            aj = akcu
+            accelerations[j+1, :] = aj
+            if kite.model_name == 'v9':
+                aj = np.array(a_kite)
+
+            ej = (r_kite-np.array(positions[j+1, :]))/np.linalg.norm(r_kite-np.array(positions[j+1, :]))
+        # Determine flow at point mass j.
+        vaj = vj - vwj  # Apparent wind velocity
+        
+        vajp = np.dot(vaj, ej)*ej  # Parallel to tether element
+        # TODO: check whether to use vajn
+        vajn = vaj - vajp  # Perpendicular to tether element
+
+        vaj_sq = np.linalg.norm(vaj)*vaj
+
+        # Determina angle between  va and tether
+        theta = calculate_angle(-vaj,ej,False)
+        # vaj_sq = np.linalg.norm(vajn)*vajn
+        CD_tether = tether.cd*np.sin(theta)**3+tether.cf
+        # CL_tether = tether.cd*np.sin(theta)**2*np.cos(theta)
+        tether_drag_basis = rho*l_unstrained*tether.diameter*CD_tether*vaj_sq
+        
+        # Determine drag at point mass j.
+        if not separate_kcu_mass:
+            if n_tether_elements == 1:
+                dj = -.125*tether_drag_basis
+            elif last_element:
+                dj = -.25*tether_drag_basis  # TODO: add bridle drag
+            else:
+                dj = -.5*tether_drag_basis
+        else:
+            if last_element:
+                # dj = -0.25*rho*L_blines*d_bridle*vaj_sq*cd_t # Bridle lines drag
+                dj = 0
+                
+            elif n_tether_elements == 1:
+                dj = -.25*tether_drag_basis
+                dp= -.5*rho*np.linalg.norm(vajp)*vajp*kcu.cdp*kcu.Ap  # Adding kcu drag perpendicular to kcu
+                dt= -.5*rho*np.linalg.norm(vajn)*vajn*kcu.cdt*kcu.At  # Adding kcu drag parallel to kcu
+                dj += dp+dt
+                cd_kcu = (np.linalg.norm(dp+dt))/(0.5*rho*kite.area*np.linalg.norm(vaj)**2)
+            elif kcu_element:
+                dj = -.25*tether_drag_basis
+                theta = np.pi/2-theta
+                cd_kcu = kcu.cdt*np.sin(theta)**3+tether.cf
+                cl_kcu = kcu.cdt*np.sin(theta)**2*np.cos(theta)
+                # D_turbine = 0.5*rho*np.linalg.norm(vaj)**2*np.pi*0.2**2*1
+                # dp= -.5*rho*np.linalg.norm(vajp)*vajp*kcu.cdp*kcu.Ap  # Adding kcu drag perpendicular to kcu
+                # dt= -.5*rho*np.linalg.norm(vajn)*vajn*kcu.cdt*kcu.At  # Adding kcu drag parallel to kcu
+                # th = -0.5*rho*vaj_sq*np.pi*0.2**2*0.4
+                # dj += dp+dt
+
+                # Approach described in Hoerner, taken from Paul Thedens dissertation
+                dir_D = -vaj/np.linalg.norm(vaj)
+                dir_L = ej - np.dot(ej,dir_D)*dir_D
+                L_kcu = 0.5*rho*np.linalg.norm(vaj)**2*kcu.Ap*cl_kcu
+                D_kcu = 0.5*rho*np.linalg.norm(vaj)**2*cd_kcu*kcu.Ap
+                dj += L_kcu*dir_L + D_kcu*dir_D #+ D_turbine*dir_D
+
+                # cd_kcu = (np.linalg.norm(dp+dt))/(0.5*rho*kite.area*np.linalg.norm(vaj)**2)
+
+            else:
+                dir_D = -vaj/np.linalg.norm(vaj)
+                dir_L = ej - np.dot(ej,dir_D)*dir_D
+                cd_t = tether.cd*np.sin(theta)**3+tether.cf
+                cl_t = tether.cd*np.sin(theta)**2*np.cos(theta)
+                L_t = 0.5*rho*np.linalg.norm(vaj)**2*l_unstrained*tether.diameter*cl_t
+                D_t = 0.5*rho*np.linalg.norm(vaj)**2*l_unstrained*tether.diameter*cd_t
+                dj = L_t*dir_L + D_t*dir_D
+
+        if not separate_kcu_mass:
+            if last_element:
+                point_mass = m_s/2 + kite.mass + kcu.mass           
+            else:
+                point_mass = m_s
+        else:
+            if last_element:
+                point_mass = kite.mass          
+                # aj = np.zeros(3)
+            elif kcu_element:
+                point_mass = m_s/2 + kcu.mass
+            else:
+                point_mass = m_s
+
+        # Use force balance to infer tension on next element.
+        fgj = np.array([0, 0, -point_mass*g])
+        next_tension = point_mass*aj + tensions[j, :] - fgj - dj  # a_kite gave better fit
+        if not last_element:
+            tensions[j+1, :] = next_tension
+            non_conservative_forces[j, :] = dj
+        else:
+            aerodynamic_force = next_tension
+            non_conservative_forces[j, :] = dj + aerodynamic_force
+
+
+        # Derive position of next point mass from former tension
+        if kcu_element:
+            positions[j+2, :] = positions[j+1, :] + tensions[j+1, :]/np.linalg.norm(tensions[j+1, :]) * kite.distance_kcu_kite
+            
+        elif not last_element:
+            if elastic_elements:
+                l_s = (np.linalg.norm(tensions[j+1, :])/tether.EA+1)*l_unstrained
+            else:
+                l_s = l_unstrained
+            stretched_tether_length += l_s
+            positions[j+2, :] = positions[j+1, :] + tensions[j+1, :]/np.linalg.norm(tensions[j+1, :]) * l_s
+
+    if return_values == 2:
+        return positions, velocities, accelerations, tensions, aerodynamic_force, non_conservative_forces
+    elif return_values:
+        va = vwj-vj  # All y-axes are defined perpendicular to apparent wind velocity.
+
+        ez_bridle = tensions[-1, :]/np.linalg.norm(tensions[-1, :])
+        ey_bridle = np.cross(ez_bridle, -vj)/np.linalg.norm(np.cross(ez_bridle, -vj))
+        ex_bridle = np.cross(ey_bridle, ez_bridle)
+        dcm_b2w = np.vstack(([ex_bridle], [ey_bridle], [ez_bridle])).T
+
+        ez_tether = tensions[-2, :]/np.linalg.norm(tensions[-2, :])
+        ey_tether = np.cross(ez_tether, va)/np.linalg.norm(np.cross(ez_tether, va))
+        ex_tether = np.cross(ey_tether, ez_tether)
+        dcm_t2w = np.vstack(([ex_tether], [ey_tether], [ez_tether])).T
+
+        ez_f_aero = aerodynamic_force/np.linalg.norm(aerodynamic_force)
+        ey_f_aero = np.cross(ez_f_aero, va)/np.linalg.norm(np.cross(ez_f_aero, va))
+        ex_f_aero = np.cross(ey_f_aero, ez_f_aero)
+        dcm_fa2w = np.vstack(([ex_f_aero], [ey_f_aero], [ez_f_aero])).T
+
+        ez_tau = r_kite/np.linalg.norm(r_kite)
+        ey_tau = np.cross(ez_tau, va)/np.linalg.norm(np.cross(ez_tau, va))
+        ex_tau = np.cross(ey_tau, ez_tau)
+        dcm_tau2w = np.vstack(([ex_tau], [ey_tau], [ez_tau])).T
+        
+        dir_D = va/np.linalg.norm(va)
+        CD = np.dot(aerodynamic_force,dir_D)/(0.5*rho*kite.area*np.linalg.norm(va)**2)
+        dir_L = tensions[-1, :]/np.linalg.norm(tensions[-1, :]) - np.dot(tensions[-1, :]/np.linalg.norm(tensions[-1, :]),dir_D)*dir_D
+        CL = np.dot(aerodynamic_force,dir_L)/(0.5*rho*kite.area*np.linalg.norm(va)**2)
+        dir_S = np.cross(dir_L,dir_D)
+        CS = np.dot(aerodynamic_force,dir_S)/(0.5*rho*kite.area*np.linalg.norm(va)**2)
+
+        return positions, stretched_tether_length, dcm_b2w, dcm_t2w, dcm_fa2w, \
+               dcm_tau2w, aerodynamic_force, va,tensions[-1,:], dcm_t2w[:,1],cd_kcu, CL,CD,CS
+    else:
+        return np.array([positions[-1, 0] - r_kite[0], positions[-1, 1] - r_kite[1]])

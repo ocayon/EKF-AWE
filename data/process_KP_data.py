@@ -6,19 +6,28 @@ model = 'v3'
 file_path = './'+model+'/'
 file_name = '2019-10-08_11.csv'
 
-# file_path = './v9/'
-# file_name = '2023-11-27_13-37-48_ProtoLogger_lidar.csv'
+model = 'v9'
+file_path = './'+model+'/'
+file_name = '2023-11-27_13-37-48_ProtoLogger_lidar.csv'
 # file_name = '2023-11-16_12-47-08_ProtoLogger_lidar.csv'
 # file_name = '2023-10-26_12-21-08_ProtoLogger_lidar.csv'
+# file_name = '2023-06-21_11-48-37_ProtoLogger.csv'
+# file_name = '2023-03-29_15-56-58_ProtoLogger.csv'
+# file_name = '2021-10-07_19-38-15_ProtoLogger.csv'
+# file_name = '2023-12-11_13-15-42_ProtoLogger_lidar.csv'
+# file_name = '2024-01-09_12-28-51_ProtoLogger_lidar.csv'
+
+# Smooth radius
+window_size = 20
 
 
 #%%
 
 df = pd.read_csv(file_path+file_name,delimiter = ' ')
 
+#%%
 
-
-df = df[df['kite_height'] > 30] #Select the indexes where the kite is flying
+df = df[df['kite_height'] > 50] #Select the indexes where the kite is flying
 
 dt = df['time'].iloc[1] - df['time'].iloc[0]  # Time step
 df = df.reset_index() # Reset the index
@@ -44,7 +53,7 @@ flight_data['kite_0_pitch'] = df['kite_0_pitch']
 flight_data['kite_0_roll'] = df['kite_0_roll']
 flight_data['kite_0_yaw'] = df['kite_0_yaw']
 
-window_size = 20
+window_size = 5
 if df['kite_0_ax'].isnull().all():
     ax = np.diff(df['kite_0_vy']) / dt
     ay = np.diff(df['kite_0_vx']) / dt
@@ -146,7 +155,60 @@ if 'lidar' in file_name:
             
             flight_data[column] = df[column]
 
+if 'v9' in file_path:
+    radius_kcu = []
+    radius_kite = []
+    for i in range(len(flight_data)):
+        row = flight_data.iloc[i]
+        # Calculate KCU omega and turn radius from acceleration and velocity
+        a_kcu = np.array([row['kite_1_ax'],row['kite_1_ay'],row['kite_1_az']]).T
+        v_kcu = np.array([row['kite_1_vx'],row['kite_1_vy'],row['kite_1_vz']]).T
+        at = np.dot(a_kcu,np.array(v_kcu)/np.linalg.norm(v_kcu))*np.array(v_kcu)/np.linalg.norm(v_kcu)
+        omega_kcu = np.cross(a_kcu-at,v_kcu)/(np.linalg.norm(v_kcu)**2)
+        ICR_kcu = np.cross(v_kcu,omega_kcu)/(np.linalg.norm(omega_kcu)**2)      
+        alpha = np.cross(at,ICR_kcu)/np.linalg.norm(ICR_kcu)**2
+        radius_kcu.append(np.linalg.norm(ICR_kcu))
+        
+        # Calculate kite omega and turn radius from acceleration and velocity
+        a_kite = np.array([row['kite_0_ax'],row['kite_0_ay'],row['kite_0_az']]).T
+        v_kite = np.array([row['kite_0_vx'],row['kite_0_vy'],row['kite_0_vz']]).T
+        at = np.dot(a_kite,np.array(v_kite)/np.linalg.norm(v_kite))*np.array(v_kite)/np.linalg.norm(v_kite)
+        omega_kite = np.cross(a_kite-at,v_kite)/(np.linalg.norm(v_kite)**2)
+        ICR_kite = np.cross(v_kite,omega_kite)/(np.linalg.norm(omega_kite)**2)
+        alpha = np.cross(at,ICR_kite)/np.linalg.norm(ICR_kite)**2
+        radius_kite.append(np.linalg.norm(ICR_kite))
 
+# # Smooth radius
+# window_size = 10
+# radius_kcu = np.convolve(radius_kcu, np.ones(window_size)/window_size, mode='same')
+# radius_kite = np.convolve(radius_kite, np.ones(window_size)/window_size, mode='same')
+
+#%% Find tether length offset
+# Function to compute mean squared error for a given offset
+def compute_mse(sig1, sig2, offset):
+    shifted_sig2 = sig2 + offset
+    mse = np.mean((sig1 - shifted_sig2) ** 2)
+    return mse
+
+up = (flight_data['kcu_actual_depower']-min(flight_data['kcu_actual_depower']))/(max(flight_data['kcu_actual_depower'])-min(flight_data['kcu_actual_depower']))
+us = (flight_data['kcu_actual_steering'])/max(abs(flight_data['kcu_actual_steering']))
+dep = (up>0.25)
+pow = (flight_data['ground_tether_reelout_speed'] > 0) & (up<0.25)
+trans = ~pow & ~dep
+turn = pow & (flight_data['kite_0_vz']<0)
+straight = pow & ~turn
+
+# Tether length
+r = np.sqrt(flight_data['kite_0_rx']**2+flight_data['kite_0_ry']**2+flight_data['kite_0_rz']**2)
+# Try different offsets and find the one with the minimum MSE
+offsets = np.linspace(-50,50,500)  # Adjust range and step size as needed
+mse_values = [compute_mse( r[pow], flight_data['ground_tether_length'][pow],offset) for offset in offsets]
+off_lt = offsets[np.argmin(mse_values)]
+
+
+flight_data['ground_tether_length'] = flight_data['ground_tether_length']+off_lt
+
+print('Offset tether length:',off_lt)
 
 #%%
 csv_filepath = '../processed_data/flight_data/'+model+'/'
