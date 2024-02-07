@@ -23,6 +23,7 @@ flight_data = flight_data.reset_index()
 
 ts = flight_data['time'].iloc[1]-flight_data['time'].iloc[0] # Sample time
 
+
 #%% Define system model
 KITE = create_kite(kite_model)
 kcu = create_kcu(kcu_model)
@@ -34,16 +35,15 @@ obs_model = ObservationModel(dyn_model.x,dyn_model.u,measurements,KITE)
 n           =  dyn_model.x.shape[0]                                 # state dimension
 nm          =  obs_model.hx.shape[0]                                 # number of measurements
 m           =  dyn_model.u.shape[0]                                 # number of inputs
-
 #%% Define measurement noise matrix 
 meas_dict,Z = get_measurements(flight_data,measurements,False)
 
 
 #%% Initial state vector 
 x0,u0,opt_guess = initialize_state(flight_data,KITE,kcu,tether)
-x0[-3] = 0.8
-x0[-2] = 0.1
-x0[-1] = 0
+# x0[-3] = 0.8
+x0[-2] = 20
+# x0[-1] = 0
 
 #%%
 ########################################################################
@@ -89,11 +89,13 @@ if check_obs == True:
 
 start_time = time.time()
 mins = -1
+# opt_guess = opt_guess[:2]
+res_tether = [x0[2]]
 for k in range(n_intervals):
     
     row = flight_data.iloc[k]
     zi = Z[k]
-    
+    # zi[2] = res_tether[-1]
     ############################################################
     # Propagate state with dynamic model
     ############################################################
@@ -112,15 +114,15 @@ for k in range(n_intervals):
     ############################################################
     # Calculate Input for next step with quasi-static tether model
     ############################################################
-    u, res_tether, opt_guess = calculate_quasi_static_tether(x_k1_k1,row,opt_guess, KITE, kcu, tether)
+    u, res_tether, opt_guess = calculate_quasi_static_tether(x_k1_k1,row,opt_guess, KITE, kcu, tether,find_height=False)
     
     ############################################################
     # Store results
     ############################################################
-    XX_k1_k1[:,k]   = np.array(x_k1_k1).reshape(-1)
-    STD_x_cor[:,k]  = ekf.std_x_cor
-    STD_z[:,k]      = ekf.std_z
-    ZZ_pred [:,k]    = ekf.z_k1_k
+    XX_k1_k1[:,k] = np.array(x_k1_k1).reshape(-1)
+    STD_x_cor[:,k] = ekf.std_x_cor
+    STD_z[:,k] = ekf.std_z
+    ZZ_pred [:,k] = ekf.z_k1_k
     err_meas[:,k] = ekf.z_k1_k - zi
     res_williams.append(res_tether)
     Ft.append(u)
@@ -136,16 +138,17 @@ for k in range(n_intervals):
 #%% Save results
 ti = 0
 results = np.vstack((XX_k1_k1[:,ti:k],np.array(Ft)[ti:k,:].T,np.array(res_williams)[ti:k,:].T))
-column_names = ['x','y','z','vx','vy','vz','uf','wdir','CL', 'CD', 'CS', 'bias_lt','bias_aoa','Ftx','Fty','Ftz','roll', 'pitch', 'yaw', 'aoa', 'sideslip', 'CLw', 'CDw', 'CSw', 'cd_kcu', 'tether_len']
+column_names = ['x','y','z','vx','vy','vz','uf','wdir','CL', 'CD', 'CS', 'bias_lt','bias_aoa','Ftx','Fty','Ftz','roll', 'pitch', 'yaw', 'aoa', 'sideslip', 'CLw', 'CDw', 'CSw', 'cd_kcu', 'tether_len','zwill']
 df = pd.DataFrame(data=results.T, columns=column_names)
 
 flight_data = flight_data.iloc[ti:k]
 
+addition = ''
 path = '../results/'+kite_model+'/'
 # Save the DataFrame to a CSV file
-csv_filename = file_name+'_res_GPS.csv'
+csv_filename = file_name+'_res_GPS'+addition+'.csv'
 df.to_csv(path+csv_filename, index=False)
 # Save the DataFrame to a CSV file
-csv_filename = file_name+'_fd.csv'
+csv_filename = file_name+'_fd'+addition+'.csv'
 flight_data.to_csv(path+csv_filename, index=False)
 

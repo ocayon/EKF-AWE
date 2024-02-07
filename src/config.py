@@ -7,15 +7,15 @@ import numpy as np
 
 #%% Choose flight data
 
-year = '2023'
-month = '11'
-day = '27'
+year = '2019'
+month = '10'
+day = '08'
 
 #%% Define system parameters
 # Define system parameters
-kite_model = 'v9'                   # Kite model name, if Costum, change the kite parameters next
+kite_model = 'v3'                   # Kite model name, if Costum, change the kite parameters next
 kcu_model = 'KP2'                   # KCU model name
-tether_diameter = 0.014             # Tether diameter [m]
+tether_diameter = 0.01            # Tether diameter [m]
 tether_material = 'Dyneema-SK78'    # Tether material
 
 #%% Define atmospheric parameters
@@ -29,11 +29,11 @@ z0 = 0.1                            # Surface roughness [m]
 n_tether_elements = 5              # Number of tether elements
 # Kalman filter parameters
 doIEKF = True                       # Use the iterated extended Kalman filter
-max_iterations = 10                 # Maximum number of iterations for the IEKF
+max_iterations = 100                 # Maximum number of iterations for the IEKF
 epsilon = 1e-6                      # Tolerance for the IEKF
 
 # Measurements
-measurements = ['GPS_pos', 'GPS_vel','tether_len']
+measurements = ['GPS_pos', 'GPS_vel']
 
 # Measurement standard deviations
 
@@ -48,27 +48,32 @@ meas_stdv = {
     'aoa':      4     # Angle of attack
 }
 
-# # Model standard deviations v9
-model_stdv = {
-    'x': 2.5,                  # Position
-    'v': 1,                  # Velocity       
-    'uf': 1e-3,               # Friction velocity
-    'wdir': (0.1/180 * np.pi),   # Wind direction
-    'CL': 1e-2,                 # Lift coefficient
-    'CD': 1e-2,                 # Drag coefficient
-    'CS': 1e-2                  # Side force coefficient
-}
+if kite_model=='v9':
+    model_stdv = {
+        'x': 2.5,                  # Position
+        'v': 1,                  # Velocity       
+        'uf': 3e-3,               # Friction velocity
+        'wdir': (0.1/180 * np.pi),   # Wind direction
+        'CL': 2e-2,                 # Lift coefficient
+        'CD': 1e-2,                 # Drag coefficient
+        'CS': 1e-2,                  # Side force coefficient
+        'bias_lt': 1e-1,        # Bias in tether length
+        'bias_aoa': 1e-6        # Bias in angle of attack
+    }
 
-# # Model standard deviations for v3
-# model_stdv = {
-#     'x': 2.5,                  # Position
-#     'v': 1,                  # Velocity       
-#     'uf': 5e-4,               # Friction velocity
-#     'wdir': (0.01/180 * np.pi),   # Wind direction
-#     'CL': 1e-2,                 # Lift coefficient
-#     'CD': 1e-3,                 # Drag coefficient
-#     'CS': 1e-2                  # Side force coefficient
-# }
+elif kite_model == 'v3':
+    # Model standard deviations for v3
+    model_stdv = {
+        'x': 2.5,                  # Position
+        'v': 1,                  # Velocity       
+        'uf': 5e-4,               # Friction velocity
+        'wdir': (0.01/180 * np.pi),   # Wind direction
+        'CL': 1e-2,                 # Lift coefficient
+        'CD': 5e-3,                 # Drag coefficient
+        'CS': 1e-2,                  # Side force coefficient
+        'bias_lt': 1e-6,        # Bias in tether length
+        'bias_aoa': 1e-6        # Bias in angle of attack
+    }
 
 
 #%%
@@ -77,7 +82,7 @@ stdv_x = np.array([model_stdv['x'], model_stdv['x'], model_stdv['x'],
                    model_stdv['v'], model_stdv['v'], model_stdv['v'], 
                    model_stdv['uf'], model_stdv['wdir'], 
                    model_stdv['CL'], model_stdv['CD'], model_stdv['CS'],
-                   1e-6,1e-6])
+                   model_stdv['bias_lt'], model_stdv['bias_aoa']])
 
 stdv_y = []
 for key in measurements:
@@ -134,8 +139,13 @@ tether_materials = {
     "Dyneema-SK78": {
         "density": 970,
         "cd": 1.1,
-        "Youngs_modulus": 110e9,
+        "Youngs_modulus": 132e9,
     },
+    "Dyneema-SK75": {
+        "density": 970,
+        "cd": 1.1,
+        "Youngs_modulus": 109e9,
+        }
 }
 kcu_cylinders = {
     "KP1": {
