@@ -33,7 +33,7 @@ max_iterations = 100                 # Maximum number of iterations for the IEKF
 epsilon = 1e-6                      # Tolerance for the IEKF
 
 # Measurements
-measurements = ['GPS_pos', 'GPS_vel']
+measurements = ['kite_pos', 'kite_vel']
 
 # Measurement standard deviations
 
@@ -68,7 +68,7 @@ elif kite_model == 'v3':
         'v': 1,                  # Velocity       
         'uf': 5e-4,               # Friction velocity
         'wdir': (0.01/180 * np.pi),   # Wind direction
-        'CL': 1e-2,                 # Lift coefficient
+        'CL': 1e-1,                 # Lift coefficient
         'CD': 5e-3,                 # Drag coefficient
         'CS': 1e-2,                  # Side force coefficient
         'bias_lt': 1e-6,        # Bias in tether length
@@ -86,13 +86,13 @@ stdv_x = np.array([model_stdv['x'], model_stdv['x'], model_stdv['x'],
 
 stdv_y = []
 for key in measurements:
-    if key == 'GPS_pos':
+    if key == 'kite_pos':
         for _ in range(3):
             stdv_y.append(meas_stdv['x'])
-    elif key == 'GPS_vel':
+    elif key == 'kite_vel':
         for _ in range(3):
             stdv_y.append(meas_stdv['v'])
-    elif key == 'GPS_acc':   
+    elif key == 'kite_acc':   
         for _ in range(3):
             stdv_y.append(meas_stdv['a'])
     elif key == 'ground_wvel':

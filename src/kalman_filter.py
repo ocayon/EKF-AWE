@@ -173,11 +173,11 @@ class ObservationModel:
         h = ca.SX()
 
         for key in self.measurements:
-            if key == 'GPS_pos':
+            if key == 'kite_pos':
                 h = ca.vertcat(self.x[0:3])
-            elif key == 'GPS_vel':        
+            elif key == 'kite_vel':        
                 h = ca.vertcat(h,self.x[3:6])
-            elif key == 'GPS_acc':
+            elif key == 'kite_acc':
                 h = ca.vertcat(h,self.fx[3:6])
             elif key == 'ground_wvel':
                 h = ca.vertcat(h,self.x[6])
