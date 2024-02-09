@@ -3,17 +3,17 @@ import numpy as np
 import pandas as pd
 from config import kite_model, kcu_model, tether_diameter, tether_material, year, month, day, \
                      doIEKF, max_iterations, epsilon, measurements, stdv_x, stdv_y, n_tether_elements, z0, kappa
-from utils import create_kite, create_kcu,  get_measurements, calculate_vw_loglaw, calculate_euler_from_reference_frame, calculate_airflow_angles
+from utils import create_kite, create_kcu,  get_measurements, calculate_vw_loglaw, calculate_euler_from_reference_frame, calculate_airflow_angles, create_input_from_KP_csv
 from kalman_filter import ExtendedKalmanFilter, DynamicModel, ObservationModel, observability_Lie_method
 from tether_model import create_tether
 import time
-
-def run_EKF(Z,x0,u0,ekf,tether,meas_ft,meas_lt,meas_akite, meas_akcu,meas_vkcu):
+### NEED to improve inputs and outputs
+def run_EKF(efk,tether,ekf_input,tether_input):
     # Define results matrices
-    n_intervals = Z.shape[0]   
+    n_intervals = ekf_input.Z.shape[0]   
     N = n_intervals
-    n = x0.shape[0]
-    nm = Z.shape[1]
+    n = ekf_input.x0.shape[0]
+    nm = ekf_input.Z.shape[1]
     # allocate space to store traces and other Kalman filter params
     XX_k1_k1    = np.zeros([n, N])
     err_meas    = np.zeros([nm, N])
@@ -31,21 +31,21 @@ def run_EKF(Z,x0,u0,ekf,tether,meas_ft,meas_lt,meas_akite, meas_akcu,meas_vkcu):
     Ft = []             # Tether force
 
     # Store Initial values
-    XX_k1_k1[:,0]   = x0
-    ZZ_pred[:,0]    = Z[0]
+    XX_k1_k1[:,0]   = ekf_input.x0
+    ZZ_pred[:,0]    = ekf_input.Z[0]
 
     # Define Initial Matrix P
     P_k1_k1 = np.eye(n)*1**2
     
     # Initial conditions
-    x_k1_k1 = x0
-    u = u0
+    x_k1_k1 = ekf_input.x0
+    u = ekf_input.u0
      
     start_time = time.time()
     mins = -1
     
     for k in range(n_intervals-1):
-        zi = Z[k]
+        zi = ekf_input.current_z(k)
         # zi[2] = res_tether[-1]
         ############################################################
         # Propagate state with dynamic model
@@ -68,14 +68,10 @@ def run_EKF(Z,x0,u0,ekf,tether,meas_ft,meas_lt,meas_akite, meas_akcu,meas_vkcu):
         r_kite = x_k1_k1[:3]
         v_kite = x_k1_k1[3:6]
         vw = calculate_vw_loglaw(x_k1_k1[6], z0, x_k1_k1[2], x_k1_k1[7])
-        if meas_akcu is None:
-            v_kcu = None
-            a_kcu = None
-        else:
-            v_kcu = meas_vkcu[k]
-            a_kcu = meas_akcu[k]
-        tether.solve_tether_shape(n_tether_elements, r_kite, v_kite, vw, kite, kcu, tension_ground = meas_ft[k], tether_length = None,
-                                a_kite = meas_akite[k], a_kcu = a_kcu, v_kcu = v_kcu)
+        
+        kite_acc, fti, lti, kcu_acc, kcu_vel = tether_input.current_state(k)
+        tether.solve_tether_shape(n_tether_elements, r_kite, v_kite, vw, kite, kcu, tension_ground = fti, tether_length = lti,
+                                a_kite = kite_acc, a_kcu = kcu_acc, v_kcu = kcu_vel)
         u = tether.Ft_kite
         ############################################################
         # Store results
@@ -110,81 +106,40 @@ def run_EKF(Z,x0,u0,ekf,tether,meas_ft,meas_lt,meas_akite, meas_akcu,meas_vkcu):
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Read and process data
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-file_name = kite_model+'_'+year+'-'+month+'-'+day
-file_path = '../processed_data/flight_data/'+kite_model+'/'+ file_name+'.csv'
-
-
-flight_data = pd.read_csv(file_path)
-flight_data = flight_data.reset_index()
-
-flight_data = flight_data.iloc[:600*10]
-
-ts = flight_data['time'].iloc[1]-flight_data['time'].iloc[0] # Sample time
-
-
 #%% Define system model
 kite = create_kite(kite_model)
 kcu = create_kcu(kcu_model)
 tether = create_tether(tether_material,tether_diameter)
 
-# Declare classes
-dyn_model = DynamicModel(kite,ts)
+#%% File path
+file_name = kite_model+'_'+year+'-'+month+'-'+day
+file_path = '../processed_data/flight_data/'+kite_model+'/'+ file_name+'.csv'
+
+
+
+# Create input classes
+ekf_input, tether_input = create_input_from_KP_csv(file_path, measurements, kite, kcu, tether, kite_sensor = 0, kcu_sensor = None)
+# Alternatively, you can use the following code to create the input classes
+# ekf_input = EKF_input(Z,timestep,x0,u0)
+# tether_input = tether_model_input(n_tether_elements, kite_acc, tether_force, tether_length, kcu_vel, kcu_acc)
+
+dyn_model = DynamicModel(kite,ekf_input.ts)
 obs_model = ObservationModel(dyn_model.x,dyn_model.u,measurements,kite)
 n           =  dyn_model.x.shape[0]                                 # state dimension
 nm          =  obs_model.hx.shape[0]                                 # number of measurements
 m           =  dyn_model.u.shape[0]                                 # number of inputs
-#%% Get measurement array
-meas_dict,Z = get_measurements(flight_data,measurements,False)
 
-#%% Define inputs tether model
 
-meas_ft = np.array(flight_data['ground_tether_force'])
-meas_lt = np.array(flight_data['ground_tether_length'])
-if kite.model_name == 'v3':
-    meas_akite = np.vstack((np.array(flight_data['kite_0_ax']),np.array(flight_data['kite_0_ay']),np.array(flight_data['kite_0_az']))).T
-    meas_akcu = None
-    meas_vkcu = None
-else:
-    meas_akite = np.vstack((np.array(flight_data['kite_0_ax']),np.array(flight_data['kite_0_ay']),np.array(flight_data['kite_0_az']))).T
-    meas_akcu = np.vstack((np.array(flight_data['kite_1_ax']),np.array(flight_data['kite_1_ay']),np.array(flight_data['kite_1_az']))).T
-    meas_vkcu = np.vstack((np.array(flight_data['kite_1_vx']),np.array(flight_data['kite_1_vy']),np.array(flight_data['kite_1_vz']))).T
-
-#%% Initial state vector 
-ground_wdir0 = np.mean(flight_data['ground_wind_direction'].iloc[0:3000])/180*np.pi # Initial wind direction
-ground_wvel0 = np.mean(flight_data['ground_wind_velocity'].iloc[0:3000]) # Initial wind velocity
-uf0 = ground_wvel0*kappa/np.log(10/z0)
-wvel0 = uf0/kappa*np.log(flight_data['kite_0_rz'].iloc[0]/z0)
-if np.isnan(wvel0):
-    wvel0 = 9
-    ground_wdir0 = 180/180*np.pi
-vw = [wvel0*np.cos(ground_wdir0),wvel0*np.sin(ground_wdir0),0] # Initial wind velocity
-row = flight_data.iloc[0] # Initial row of flight data
-kite_pos = np.array([row['kite_0_rx'],row['kite_0_ry'],row['kite_0_rz']]) # Initial kite position
-kite_vel = np.array([row['kite_0_vx'],row['kite_0_vy'],row['kite_0_vz']]) # Initial kite velocity
-if meas_akcu is None:
-        v_kcu = None
-        a_kcu = None
-else:
-    v_kcu = meas_vkcu[0]
-    a_kcu = meas_akcu[0]
-a_kite = meas_akite[0]
-# tether.opt_guess = list(calculate_polar_coordinates(np.array(kite_pos)))
-tether.solve_tether_shape(n_tether_elements, kite_pos, kite_vel, vw, kite, kcu, tension_ground = meas_ft[0], tether_length = None,
-                            a_kite = a_kite, a_kcu = a_kcu, v_kcu = v_kcu)
-x0 = np.vstack((kite_pos,kite_vel))
-x0 = np.append(x0,[0.6,ground_wdir0,tether.CL,tether.CD,tether.CS,0,0])     # Initial state vector (Last two elements are bias, used if needed)
-u0 = tether.Ft_kite
 #%%
 ########################################################################
 ## Initialize Extended Kalman filter
 ########################################################################
-
 # Initialize EKF
-ekf = ExtendedKalmanFilter(stdv_x, stdv_y, ts, doIEKF, epsilon, max_iterations)
+ekf = ExtendedKalmanFilter(stdv_x, stdv_y, ekf_input.ts, doIEKF, epsilon, max_iterations)
 ekf.calc_Fx = dyn_model.get_fx_jac_fun()
 ekf.calc_Hx = obs_model.get_hx_jac_fun()
 ekf.calc_hx = obs_model.get_hx_fun()
+
 
 # Check observability matrix
 check_obs = False
@@ -193,17 +148,12 @@ if check_obs == True:
 
 
 #%% Main loop
-df = run_EKF(Z,x0,u0,ekf,tether,meas_ft,meas_lt,meas_akite, meas_akcu,meas_vkcu)
+df = run_EKF(ekf,tether,ekf_input,tether_input)
 
 #%% Save results
-
-
 addition = ''
 path = '../results/'+kite_model+'/'
 # Save the DataFrame to a CSV file
 csv_filename = file_name+'_res_GPS'+addition+'.csv'
 df.to_csv(path+csv_filename, index=False)
-# Save the DataFrame to a CSV file
-csv_filename = file_name+'_fd'+addition+'.csv'
-flight_data.to_csv(path+csv_filename, index=False)
 

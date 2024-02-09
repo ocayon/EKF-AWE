@@ -3,6 +3,7 @@ import casadi as ca
 from config import kite_models,kcu_cylinders, tether_materials, kappa, z0, rho, g, n_tether_elements
 from scipy.interpolate import splrep, splev
 from scipy.optimize import least_squares
+import pandas as pd
 #%% Class definitions
 class KiteModel:
     def __init__(self, model_name, mass, area, distance_kcu_kite, total_length_bridle_lines, diameter_bridle_lines, KCU):
@@ -39,6 +40,128 @@ class KCUModel:
 
         self.At = np.pi*(self.diameter/2)**2  # Calculate area of the KCU
         self.Ap = self.diameter*self.length  # Calculate area of the KCU
+
+class EKF_input:
+    def __init__(self, Z, ts,x0,u0):
+        self.Z = Z
+        self.ts = ts
+        self.x0 = x0
+        self.u0 = u0
+    def current_z(self, current_index):
+        return self.Z[current_index]
+    
+class tether_model_input:
+    def __init__(self, n_tether_elements, kite_acc, tether_force, tether_length=None, kcu_vel = None, kcu_acc = None):
+        self.n_tether_elements = n_tether_elements
+        self.kite_acc = kite_acc
+        self.tether_force = tether_force
+        self.tether_length = tether_length
+        self.kcu_vel = kcu_vel
+        self.kcu_acc = kcu_acc
+
+    def current_state(self, current_index):
+        if self.kcu_vel is None:
+            kcu_vel = None
+        else:
+            kcu_vel = self.kcu_vel[current_index]
+        if self.kcu_acc is None:
+            kcu_acc = None
+        else:
+            kcu_acc = self.kcu_acc[current_index]
+        if self.tether_length is None:
+            tether_length = None
+        else:
+            tether_length = self.tether_length[current_index]
+
+        return self.kite_acc[current_index], self.tether_force[current_index], tether_length, kcu_vel, kcu_acc
+
+
+    
+def create_input_from_KP_csv(file_path, measurements, kite,kcu,tether,kite_sensor = 0, kcu_sensor = None, correct_height = False):
+    flight_data = pd.read_csv(file_path)
+    flight_data = flight_data.reset_index()
+    Z = []
+
+    ## Get measurements
+
+    # Kite measurements
+    kite_pos = np.array([flight_data['kite_'+str(kite_sensor)+'_rx'],flight_data['kite_'+str(kite_sensor)+'_ry'],flight_data['kite_'+str(kite_sensor)+'_rz']]).T
+    kite_vel = np.array([flight_data['kite_'+str(kite_sensor)+'_vx'],flight_data['kite_'+str(kite_sensor)+'_vy'],flight_data['kite_'+str(kite_sensor)+'_vz']]).T
+    kite_acc = np.array([flight_data['kite_'+str(kite_sensor)+'_ax'],flight_data['kite_'+str(kite_sensor)+'_ay'],flight_data['kite_'+str(kite_sensor)+'_az']]).T
+    # KCU measurements
+    if kcu_sensor is not None:
+        kcu_vel = np.array([flight_data['kite_'+str(kcu_sensor)+'_vx'],flight_data['kite_'+str(kcu_sensor)+'_vy'],flight_data['kite_'+str(kcu_sensor)+'_vz']]).T
+        kcu_acc = np.array([flight_data['kite_'+str(kcu_sensor)+'_ax'],flight_data['kite_'+str(kcu_sensor)+'_ay'],flight_data['kite_'+str(kcu_sensor)+'_az']]).T
+    else:
+        kcu_vel = None
+        kcu_acc = None
+    # Tether measurements
+    tether_force = np.array(flight_data['ground_tether_force'])
+    if correct_height:
+        tether_length = np.array(flight_data['ground_tether_length'])
+    else:
+        tether_length = None        
+    # Airflow measurements
+    ground_windspeed = np.array(flight_data['ground_wind_velocity'])
+    ground_winddir = np.array(flight_data['ground_wind_direction'])
+    apparent_windspeed = np.array(flight_data['kite_apparent_windspeed'])
+    kite_aoa = np.array(flight_data['kite_angle_of_attack'])
+    
+    timestep = flight_data['time'].iloc[1]-flight_data['time'].iloc[0]
+
+    # Create measurement array for the EKF
+    if 'kite_pos' in measurements:
+        Z.append(kite_pos[:,0])
+        Z.append(kite_pos[:,1])
+        Z.append(kite_pos[:,2])
+    if 'kite_vel' in measurements:
+        Z.append(kite_vel[:,0])
+        Z.append(kite_vel[:,1])
+        Z.append(kite_vel[:,2])
+    if 'kite_acc' in measurements:
+        Z.append(kite_acc[:,0])
+        Z.append(kite_acc[:,1])
+        Z.append(kite_acc[:,2])
+    if 'ground_wvel' in measurements:
+        Z.append(ground_windspeed)*kappa/np.log(10/z0)
+    if 'apparent_wvel' in measurements:
+        Z.append(apparent_windspeed)
+    if 'tether_len' in measurements:
+        Z.append(tether_length)      
+    if 'aoa' in measurements:
+        Z.append(kite_aoa)
+    Z = np.array(Z).T
+    
+    if correct_height:
+        tether_len0 = tether_length[0]
+    else:
+        tether_len0 = None
+    x0, u0 = find_initial_state_vector(kite_pos[0], kite_vel[0], kite_acc[0], np.mean(ground_winddir[0:3000]), np.mean(ground_windspeed[0]), tether_force[0], tether_len0, n_tether_elements, kite, kcu,tether)
+
+    # Create input classes
+    ekf_input = EKF_input(Z,timestep,x0,u0)
+    tether_input = tether_model_input(n_tether_elements, kite_acc, tether_force, tether_length, kcu_vel, kcu_acc)
+    
+    return ekf_input, tether_input
+
+def find_initial_state_vector(kite_pos, kite_vel, kite_acc, ground_winddir, ground_windspeed, tether_force, tether_length, n_tether_elements, kite, kcu,tether):
+
+    # Solve for the tether shape
+
+    
+    uf = ground_windspeed*kappa/np.log(10/z0)
+    wvel0 = uf/kappa*np.log(kite_pos[2]/z0)
+    if np.isnan(wvel0):
+        raise ValueError('Initial wind velocity is NaN')
+    vw = [wvel0*np.cos(ground_winddir),wvel0*np.sin(ground_winddir),0] # Initial wind velocity
+
+    tether.solve_tether_shape(n_tether_elements, kite_pos, kite_vel, vw, kite, kcu, tension_ground = tether_force, tether_length = tether_length,
+                                a_kite = kite_acc)
+    x0 = np.vstack((kite_pos,kite_vel))
+    x0 = np.append(x0,[uf,ground_winddir,tether.CL,tether.CD,tether.CS,0,0])     # Initial state vector (Last two elements are bias, used if needed)
+    u0 = tether.Ft_kite
+
+    return x0, u0
 
 #%% Function definitions
 def create_kite(model_name):
