@@ -32,7 +32,7 @@ def calculate_yaw_rate(x, us, va, beta, yaw,v_kite,radius,forces):
     yaw_rate = x[0]*norm_va**2*(us)
     
     if 'weight' in forces:
-        yaw_rate += x[1]*np.cos(beta)*np.sin(yaw)
+        yaw_rate += -9.81*x[2]*np.cos(beta)*np.sin(yaw)
     if 'centripetal' in forces:  
         yaw_rate += x[2]*norm_v**2/radius
     
@@ -258,17 +258,14 @@ def calculate_wind_speed_airborne_sensors(results, flight_data, IMU_0 =False, IM
 
     return flight_data
 
-def plot_wind_speed(results, flight_data, lidar_heights, IMU_0 = False, IMU_1=False, EKF_tether=False, EKF = True):
+def plot_wind_speed(results, flight_data, lidar_heights, IMU_0 = False, IMU_1=False, EKF_tether=False, EKF = True, savefig = False):
     """
     Plot wind speed based on kite and KCU IMU data
     :param flight_data: flight data
     :return: wind speed plot
     """
     palette = sns.color_palette("tab10")
-    fig, axs = plt.subplots(3, 1, figsize=(10, 10), sharex=True)
-    fig.suptitle('Wind speed comparison')
-
-    
+    fig, axs = plt.subplots(3, 1, figsize=(8, 10), sharex=True)
 
     i = 1
     for column in flight_data.columns:
@@ -302,7 +299,7 @@ def plot_wind_speed(results, flight_data, lidar_heights, IMU_0 = False, IMU_1=Fa
                 
     if IMU_0:
         vw_mod = np.sqrt(flight_data['vwx_IMU_0']**2+flight_data['vwy_IMU_0']**2+flight_data['vwz_IMU_0']**2)
-        axs[0].plot(flight_data['time'], vw_mod, label='IMU_0', alpha = 0.8)
+        axs[0].plot(flight_data['time'], vw_mod, label='Pitot+Vanes', alpha = 0.8)
         vw_dir = np.arctan2(flight_data['vwy_IMU_0'],flight_data['vwx_IMU_0'])
         axs[1].plot(flight_data['time'], np.degrees(vw_dir)%360, alpha = 0.8)
         axs[2].plot(flight_data['time'], flight_data['vwz_IMU_0'], label='IMU_0', alpha = 0.5)
@@ -331,28 +328,33 @@ def plot_wind_speed(results, flight_data, lidar_heights, IMU_0 = False, IMU_1=Fa
     
     y1 = np.full(len(flight_data), min_wdir-20)
     y2 = np.full(len(flight_data), max_wdir+20)
-
-    mask = (flight_data['turn_straight'] == 'straight') & (flight_data['powered'] == 'powered')
-    axs[1].fill_between(flight_data['time'], y1,y2,where=mask, color='blue', alpha=0.2, label='Straight')
-    mask = (flight_data['turn_straight'] == 'turn') & (flight_data['powered'] == 'powered')
-    axs[1].fill_between(flight_data['time'], y1,y2,where=mask, color='red', alpha=0.2, label='Turn')
-    mask = (flight_data['powered'] == 'depowered')
-    axs[1].fill_between(flight_data['time'], y1,y2,where=mask, color='green', alpha=0.2, label='Depowered')
+    # mask = (flight_data['turn_straight'] == 'straight') & (flight_data['powered'] == 'powered')
+    # axs[1].fill_between(flight_data['time'], y1,y2,where=mask, color='blue', alpha=0.2, label='Straight')
+    # mask = (flight_data['turn_straight'] == 'turn') & (flight_data['powered'] == 'powered')
+    # axs[1].fill_between(flight_data['time'], y1,y2,where=mask, color='red', alpha=0.2, label='Turn')
+    # mask = (flight_data['powered'] == 'depowered')
+    # axs[1].fill_between(flight_data['time'], y1,y2,where=mask, color='green', alpha=0.2, label='Depowered')
      
+    axs[0].plot(flight_data['time'], flight_data['ground_wind_velocity'], label='Ground', color = 'grey', alpha = 0.8)
+    axs[1].plot(flight_data['time'],flight_data['ground_wind_direction'], label='Ground', color = 'grey', alpha = 0.8)
+
     axs[0].set_ylim([0,20])
     axs[0].legend()
     axs[0].set_ylabel('Wind speed (m/s)')
     axs[0].set_xlabel('Time (s)')
     axs[0].grid()
-    axs[1].legend()
+    # axs[1].legend()
     axs[1].set_ylabel('Wind direction (rad)')
     axs[1].set_xlabel('Time (s)')
     axs[1].grid()
-    axs[2].legend()
+    # axs[2].legend()
     axs[2].set_ylabel('Wind speed (m/s)')
     axs[2].set_xlabel('Time (s)')
     axs[2].grid()
 
+    if savefig:
+        plt.tight_layout()
+        plt.savefig('wind_speed.png', dpi=300)
 
 def calculate_reference_frame_euler(roll, pitch, yaw):
 
@@ -433,7 +435,7 @@ def plot_aero_coeff_vs_aoa_ss(results,flight_data,cycles_plotted, IMU_0 = False,
     axs[2].plot(results[mask_cycle]['time'], results[mask_cycle]['CS'])
     if EKF:
         axs[3].plot(results[mask_cycle]['time'], results[mask_cycle]['aoa'], label='aoa EKF')
-        axs[4].plot(results[mask_cycle]['time'], np.zeros(len(results[mask_cycle]['time'])), label='ss EKF')
+        axs[4].plot(results[mask_cycle]['time'], results[mask_cycle]['ss'], label='ss EKF')
     if IMU_0:
         axs[3].plot(results[mask_cycle]['time'], results[mask_cycle]['aoa_IMU_0'], label='aoa IMU 0')
         axs[4].plot(results[mask_cycle]['time'], results[mask_cycle]['ss_IMU_0'], label='ss IMU 0')
@@ -546,22 +548,22 @@ def plot_aero_coeff_vs_up_us(results,flight_data,cycles_plotted, IMU_0 = False, 
         plt.savefig('aero_coeff_vs_up_us.png', dpi=300)
 
     
-def determine_turn_straight(row):
+def determine_turn_straight(row, threshold_us = 0.3):
     
-    if (abs(row['us']) > 0.3):
+    if (abs(row['us']) >threshold_us):
         return 'turn'
     else:
         return 'straight'
     
-def determine_powered_depowered(row):
+def determine_powered_depowered(row, threshold_up = 0.25):
     
-    if (row['up']>0.25):
+    if (row['up']>threshold_up):
         return 'depowered'
     else:
         return 'powered'
 
-def determine_left_right(row):
-    if (row['kite_azimuth']<0):
+def determine_left_right(row, threshold_azimuth = 0):
+    if (row['kite_azimuth']<threshold_azimuth):
         return 'right'
     else:
         return 'left'
@@ -572,6 +574,7 @@ def calculate_densities(x, y):
     xy = np.vstack([x, y])
     z = gaussian_kde(xy)(xy)
     return z
+
 def plot_probability_density(x,y,fig,axs,xlabel=None,ylabel=None):
     z1 = calculate_densities(x, y)
     sc1 = axs.scatter(x, y, c=z1, cmap='viridis', label = 'Sensor Fusion')
@@ -654,6 +657,53 @@ def plot_time_series(flight_data, y, ylabel, ax, color='blue', label=None,plot_p
 
 
 # def plot_kinematic_yaw(flight_data, results):
-    
+def plot_wind_profile(flight_data, results,savefig=False):
 
+    palette = sns.color_palette("tab10")
+    fig, axs = plt.subplots(1, 2, figsize=(10, 5), sharey=True)
 
+    i = 1
+    lidar_heights = []
+    min_vel = []
+    max_vel = []
+    min_dir = []
+    max_dir = []
+    for column in flight_data.columns:
+        if 'Wind Speed (m/s)' in column:
+            height = ''.join(filter(str.isdigit, column))
+            vw_max_col = height + 'm Wind Speed max (m/s)'
+            vw_min_col = height + 'm Wind Speed min (m/s)'
+            label = 'Lidar ' + height +'m height'
+            height = int(height)
+            lidar_heights.append(height)
+            min_vel.append(min(flight_data[column]))
+            max_vel.append(max(flight_data[column]))
+
+            i +=1
+        if 'Wind Direction' in column:
+            height = ''.join(filter(str.isdigit, column))
+            label = 'Lidar ' + height +'m height'
+            height = int(height)
+            min_dir.append(min(360-90-flight_data[column]))
+            max_dir.append(max(360-90-flight_data[column]))
+
+            
+    axs[0].fill_betweenx(lidar_heights, min_vel, max_vel, color=palette[0], alpha=0.3, label='Lidar')
+    axs[1].fill_betweenx(lidar_heights, min_dir, max_dir, color=palette[0], alpha=0.3, label='Lidar')
+
+    wvelEKF = np.array(results['uf']/kappa*np.log(results['z']/z0))
+    axs[0].scatter( wvelEKF, results['z'], color=palette[1], label='EKF', alpha = 0.1)
+    axs[1].scatter(np.degrees(results['wdir'])%360, results['z'], color=palette[1], label='EKF', alpha = 0.1)
+
+    axs[0].legend()
+    axs[0].set_xlabel('Wind speed (m/s)')
+    axs[0].set_ylabel('Height (m)')
+    axs[0].grid()
+    axs[0].set_xlim([0, 17])
+    axs[1].legend()
+    axs[1].set_xlabel('Wind direction (deg)')
+    axs[1].grid()
+
+    if savefig:
+        plt.tight_layout()
+        plt.savefig('wind_profile.png', dpi=300)
