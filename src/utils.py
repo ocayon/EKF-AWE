@@ -42,11 +42,43 @@ class KCUModel:
         self.Ap = self.diameter*self.length  # Calculate area of the KCU
 
 class EKF_input:
-    def __init__(self, Z, ts,x0,u0):
-        self.Z = Z
+    def __init__(self, kite_pos, kite_vel, ts,x0,u0, kite_acc = None, apparent_windspeed = None, kite_aoa = None, tether_length = None, ground_windspeed = None):
         self.ts = ts
         self.x0 = x0
         self.u0 = u0
+
+        measurements = ['kite_pos','kite_vel']
+        Z = []
+        # Create measurement array for the EKF
+        Z.append(kite_pos[:,0])
+        Z.append(kite_pos[:,1])
+        Z.append(kite_pos[:,2])
+
+        Z.append(kite_vel[:,0])
+        Z.append(kite_vel[:,1])
+        Z.append(kite_vel[:,2])
+
+        if kite_acc is not None:
+            Z.append(kite_acc[:,0])
+            Z.append(kite_acc[:,1])
+            Z.append(kite_acc[:,2])
+            measurements.append('kite_acc')
+        if ground_windspeed is not None:
+            Z.append(ground_windspeed)*kappa/np.log(10/z0)
+            measurements.append('ground_wvel')
+        if apparent_windspeed is not None:
+            Z.append(apparent_windspeed)
+            measurements.append('apparent_wvel')
+        if tether_length is not None:
+            Z.append(tether_length)  
+            measurements.append('tether_len')    
+        if kite_aoa is not None:
+            Z.append(kite_aoa)
+            measurements.append('aoa')
+        Z = np.array(Z).T
+        self.Z = Z
+        self.measurements = measurements
+
     def current_z(self, current_index):
         return self.Z[current_index]
     
@@ -77,9 +109,8 @@ class tether_model_input:
 
 
     
-def create_input_from_KP_csv(file_path, measurements, kite,kcu,tether,kite_sensor = 0, kcu_sensor = None, correct_height = False):
-    flight_data = pd.read_csv(file_path)
-    flight_data = flight_data.reset_index()
+def create_input_from_KP_csv(flight_data, measurements, kite,kcu,tether,kite_sensor = 0, kcu_sensor = None, correct_height = False):
+    
     Z = []
 
     ## Get measurements
@@ -109,28 +140,8 @@ def create_input_from_KP_csv(file_path, measurements, kite,kcu,tether,kite_senso
     
     timestep = flight_data['time'].iloc[1]-flight_data['time'].iloc[0]
 
-    # Create measurement array for the EKF
-    if 'kite_pos' in measurements:
-        Z.append(kite_pos[:,0])
-        Z.append(kite_pos[:,1])
-        Z.append(kite_pos[:,2])
-    if 'kite_vel' in measurements:
-        Z.append(kite_vel[:,0])
-        Z.append(kite_vel[:,1])
-        Z.append(kite_vel[:,2])
-    if 'kite_acc' in measurements:
-        Z.append(kite_acc[:,0])
-        Z.append(kite_acc[:,1])
-        Z.append(kite_acc[:,2])
-    if 'ground_wvel' in measurements:
-        Z.append(ground_windspeed)*kappa/np.log(10/z0)
-    if 'apparent_wvel' in measurements:
-        Z.append(apparent_windspeed)
-    if 'tether_len' in measurements:
-        Z.append(tether_length)      
-    if 'aoa' in measurements:
-        Z.append(kite_aoa)
-    Z = np.array(Z).T
+    
+    tether_input = tether_model_input(n_tether_elements, kite_acc, tether_force, tether_length, kcu_vel, kcu_acc)
     
     if correct_height:
         tether_len0 = tether_length[0]
@@ -138,9 +149,19 @@ def create_input_from_KP_csv(file_path, measurements, kite,kcu,tether,kite_senso
         tether_len0 = None
     x0, u0 = find_initial_state_vector(kite_pos[0], kite_vel[0], kite_acc[0], np.mean(ground_winddir[0:3000]), np.mean(ground_windspeed[0]), tether_force[0], tether_len0, n_tether_elements, kite, kcu,tether)
 
+    if 'kite_acc' not in measurements:
+        kite_acc = None
+    if 'ground_wvel' not in measurements:
+        ground_windspeed = None
+    if 'apparent_wvel' not in measurements:
+        apparent_windspeed = None
+    if 'tether_len' not in measurements:
+        tether_length = None
+    if 'aoa' not in measurements:
+        kite_aoa = None
     # Create input classes
-    ekf_input = EKF_input(Z,timestep,x0,u0)
-    tether_input = tether_model_input(n_tether_elements, kite_acc, tether_force, tether_length, kcu_vel, kcu_acc)
+    ekf_input = EKF_input(kite_pos,kite_vel,timestep,x0,u0, kite_acc = kite_acc, apparent_windspeed = apparent_windspeed, kite_aoa = kite_aoa, tether_length = tether_length, ground_windspeed = ground_windspeed)
+    
     
     return ekf_input, tether_input
 
