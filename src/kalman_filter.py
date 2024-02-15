@@ -6,7 +6,7 @@ import control
 from utils import project_onto_plane_sym, calculate_angle_2vec_sym
 #%% 
 class ExtendedKalmanFilter:
-    def __init__(self, stdv_x, stdv_y, ts, doIEKF=False, epsilon=1e-6, max_iterations=200):
+    def __init__(self, stdv_x, stdv_y, ts,dyn_model,obs_model, doIEKF=False, epsilon=1e-6, max_iterations=200):
         self.Q = self.get_state_noise_covariance(stdv_x)
         self.R = self.get_observation_noise_covariance(stdv_y)
         self.doIEKF = doIEKF
@@ -15,6 +15,10 @@ class ExtendedKalmanFilter:
         self.ts = ts
         self.n = len(stdv_x)
         self.P_k1_k1 = np.eye(self.n) * 1 ** 2
+        self.calc_Fx = dyn_model.get_fx_jac_fun()
+        self.calc_Hx = obs_model.get_hx_jac_fun()
+        self.calc_hx = obs_model.get_hx_fun()
+
     
     def initialize(self, x_k1_k, u,z):
         self.x_k1_k = np.array(x_k1_k).reshape(-1)
