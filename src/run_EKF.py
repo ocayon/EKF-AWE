@@ -8,7 +8,7 @@ from kalman_filter import ExtendedKalmanFilter, DynamicModel, ObservationModel, 
 from tether_model import create_tether
 import time
 ### NEED to improve inputs and outputs
-def run_EKF(efk,tether,ekf_input,tether_input):
+def run_EKF(efk,tether,kite, kcu,ekf_input,tether_input):
     # Define results matrices
     n_intervals = ekf_input.Z.shape[0]   
     N = n_intervals
@@ -44,7 +44,7 @@ def run_EKF(efk,tether,ekf_input,tether_input):
     start_time = time.time()
     mins = -1
     
-    for k in range(n_intervals-1):
+    for k in range(n_intervals):
         zi = ekf_input.current_z(k)
         # zi[2] = res_tether[-1]
         ############################################################
@@ -97,63 +97,59 @@ def run_EKF(efk,tether,ekf_input,tether_input):
         
     # Store results
     ti = 0
+    k +=1
     results = np.vstack((XX_k1_k1[:,ti:k],np.array(Ft)[ti:k,:].T,np.array(euler_angles)[ti:k,:].T,np.array(airflow_angles)[ti:k,:].T,np.array(tether_length)[ti:k].T))
     column_names = ['x','y','z','vx','vy','vz','uf','wdir','CL', 'CD', 'CS', 'bias_lt','bias_aoa','Ftx','Fty','Ftz','roll', 'pitch', 'yaw', 'aoa','ss','tether_len']
     df = pd.DataFrame(data=results.T, columns=column_names)
 
     return df
 
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-# Read and process data
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-#%% Define system model
-kite = create_kite(kite_model)
-kcu = create_kcu(kcu_model)
-tether = create_tether(tether_material,tether_diameter)
+#%% Read and process data 
+if __name__ == "__main__":
+    # File path
+    file_name = kite_model+'_'+year+'-'+month+'-'+day
+    file_path = '../processed_data/flight_data/'+kite_model+'/'+ file_name+'.csv'
+    flight_data = pd.read_csv(file_path)
+    flight_data = flight_data.reset_index()
+    # flight_data = flight_data.iloc[:18000]
 
-#%% File path
-file_name = kite_model+'_'+year+'-'+month+'-'+day
-file_path = '../processed_data/flight_data/'+kite_model+'/'+ file_name+'.csv'
+    # Define system model
+    kite = create_kite(kite_model)
+    kcu = create_kcu(kcu_model)
+    tether = create_tether(tether_material,tether_diameter)
 
+    # Create input classes
+    ekf_input, tether_input = create_input_from_KP_csv(flight_data, measurements, kite, kcu, tether, kite_sensor = 0, kcu_sensor = None)
+    # Alternatively, you can use the following code to create the input classes
+    # ekf_input = EKF_input(kite_pos,kite_vel,timestep,x0,u0, apparent_windspeed = va/None,...)
+    # tether_input = tether_model_input(n_tether_elements, kite_acc, tether_force, tether_length, kcu_vel, kcu_acc)
 
+    # Create dynamic model and observation model
+    dyn_model = DynamicModel(kite,ekf_input.ts)
+    obs_model = ObservationModel(dyn_model.x,dyn_model.u,ekf_input.measurements,kite)
 
-# Create input classes
-ekf_input, tether_input = create_input_from_KP_csv(file_path, measurements, kite, kcu, tether, kite_sensor = 0, kcu_sensor = None)
-# Alternatively, you can use the following code to create the input classes
-# ekf_input = EKF_input(Z,timestep,x0,u0)
-# tether_input = tether_model_input(n_tether_elements, kite_acc, tether_force, tether_length, kcu_vel, kcu_acc)
+    # Initialize EKF
+    ekf = ExtendedKalmanFilter(stdv_x, stdv_y, ekf_input.ts,dyn_model,obs_model, doIEKF, epsilon, max_iterations)
 
-dyn_model = DynamicModel(kite,ekf_input.ts)
-obs_model = ObservationModel(dyn_model.x,dyn_model.u,measurements,kite)
-n           =  dyn_model.x.shape[0]                                 # state dimension
-nm          =  obs_model.hx.shape[0]                                 # number of measurements
-m           =  dyn_model.u.shape[0]                                 # number of inputs
+    # Check observability matrix
+    check_obs = False
+    if check_obs == True:
+        observability_Lie_method(dyn_model.fx,obs_model.hx,dyn_model.x, dyn_model.u, ekf_input.x0,ekf_input.u0)
+        
+    #%% Main loop
+    ekf_output = run_EKF(ekf,tether,kite, kcu,ekf_input,tether_input)
 
+    save_results = True
+    if save_results == True:
+        #%% Save results
+        addition = ''
+        path = '../results/'+kite_model+'/'
+        # Save the DataFrame to a CSV file
+        csv_filename = file_name+'_res_GPS'+addition+'.csv'
+        ekf_output.to_csv(path+csv_filename, index=False)
 
-#%%
-########################################################################
-## Initialize Extended Kalman filter
-########################################################################
-# Initialize EKF
-ekf = ExtendedKalmanFilter(stdv_x, stdv_y, ekf_input.ts, doIEKF, epsilon, max_iterations)
-ekf.calc_Fx = dyn_model.get_fx_jac_fun()
-ekf.calc_Hx = obs_model.get_hx_jac_fun()
-ekf.calc_hx = obs_model.get_hx_fun()
+        # Save the DataFrame to a CSV file
+        csv_filename = file_name+'_fd.csv'
+        flight_data.to_csv(path+csv_filename, index=False)
 
-
-# Check observability matrix
-check_obs = False
-if check_obs == True:
-    observability_Lie_method(dyn_model.fx,obs_model.hx,dyn_model.x, dyn_model.u, x0,u0)
-
-
-#%% Main loop
-df = run_EKF(ekf,tether,ekf_input,tether_input)
-
-#%% Save results
-addition = ''
-path = '../results/'+kite_model+'/'
-# Save the DataFrame to a CSV file
-csv_filename = file_name+'_res_GPS'+addition+'.csv'
-df.to_csv(path+csv_filename, index=False)
-
+    
