@@ -7,15 +7,15 @@ import numpy as np
 
 #%% Choose flight data
 
-year = '2019'
-month = '10'
-day = '08'
+year = '2023'
+month = '11'
+day = '27'
 
 #%% Define system parameters
 # Define system parameters
-kite_model = 'v3'                   # Kite model name, if Costum, change the kite parameters next
+kite_model = 'v9'                   # Kite model name, if Costum, change the kite parameters next
 kcu_model = 'KP2'                   # KCU model name
-tether_diameter = 0.01            # Tether diameter [m]
+tether_diameter = 0.014            # Tether diameter [m]
 tether_material = 'Dyneema-SK78'    # Tether material
 
 #%% Define atmospheric parameters
@@ -33,7 +33,7 @@ max_iterations = 100                 # Maximum number of iterations for the IEKF
 epsilon = 1e-6                      # Tolerance for the IEKF
 
 # Measurements
-measurements = ['kite_pos', 'kite_vel']
+opt_measurements = []
 
 # Measurement standard deviations
 
@@ -44,7 +44,7 @@ meas_stdv = {
     'uf': 0.1,                 # Friction velocity
     'va': 0.5,                 # Apparent velocity
     'wdir': (10/180 * np.pi),  # Wind direction
-    'tether_len': 0.1,
+    'tether_length': 0.1,
     'aoa':      4     # Angle of attack
 }
 
@@ -85,23 +85,21 @@ stdv_x = np.array([model_stdv['x'], model_stdv['x'], model_stdv['x'],
                    model_stdv['bias_lt'], model_stdv['bias_aoa']])
 
 stdv_y = []
-for key in measurements:
-    if key == 'kite_pos':
-        for _ in range(3):
-            stdv_y.append(meas_stdv['x'])
-    elif key == 'kite_vel':
-        for _ in range(3):
-            stdv_y.append(meas_stdv['v'])
-    elif key == 'kite_acc':   
+for _ in range(3):
+    stdv_y.append(meas_stdv['x'])
+for _ in range(3):
+    stdv_y.append(meas_stdv['v'])
+for key in opt_measurements:
+    if key == 'kite_acc':   
         for _ in range(3):
             stdv_y.append(meas_stdv['a'])
     elif key == 'ground_wvel':
         stdv_y.append(meas_stdv['uf'])
 
-    elif key == 'apparent_wvel':
+    elif key == 'apparent_windspeed':
         stdv_y.append(meas_stdv['va'])
-    elif key == 'tether_len':
-        stdv_y.append(meas_stdv['tether_len'])
+    elif key == 'tether_length':
+        stdv_y.append(meas_stdv['tether_length'])
     elif key == 'aoa':
         stdv_y.append(meas_stdv['aoa'])
 stdv_y = np.array(stdv_y)

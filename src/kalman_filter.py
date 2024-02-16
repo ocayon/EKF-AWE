@@ -6,7 +6,7 @@ import control
 from utils import project_onto_plane_sym, calculate_angle_2vec_sym
 #%% 
 class ExtendedKalmanFilter:
-    def __init__(self, stdv_x, stdv_y, ts,dyn_model,obs_model, doIEKF=False, epsilon=1e-6, max_iterations=200):
+    def __init__(self, stdv_x, stdv_y, ts,dyn_model,obs_model, doIEKF=True, epsilon=1e-6, max_iterations=200):
         self.Q = self.get_state_noise_covariance(stdv_x)
         self.R = self.get_observation_noise_covariance(stdv_y)
         self.doIEKF = doIEKF
@@ -156,10 +156,10 @@ class DynamicModel:
 
 class ObservationModel:
 
-    def __init__(self,x,u,measurements,KITE):
+    def __init__(self,x,u,opt_measurements,KITE):
         self.x = x
         self.u = u
-        self.measurements = measurements
+        self.opt_measurements = opt_measurements
         self.hx = self.get_hx(KITE)
     
     def get_hx(self,KITE):
@@ -175,19 +175,16 @@ class ObservationModel:
         va_proj = project_onto_plane_sym(va, ey_kite)           # Projected apparent wind velocity onto kite y axis
         aoa = 90-calculate_angle_2vec_sym(ez_kite,va_proj)*180/np.pi             # Angle of attack
         h = ca.SX()
-
-        for key in self.measurements:
-            if key == 'kite_pos':
-                h = ca.vertcat(self.x[0:3])
-            elif key == 'kite_vel':        
-                h = ca.vertcat(h,self.x[3:6])
-            elif key == 'kite_acc':
+        h = ca.vertcat(self.x[0:3])
+        h = ca.vertcat(h,self.x[3:6])
+        for key in self.opt_measurements:
+            if key == 'kite_acc':
                 h = ca.vertcat(h,self.fx[3:6])
             elif key == 'ground_wvel':
                 h = ca.vertcat(h,self.x[6])
-            elif key == 'apparent_wvel':
+            elif key == 'apparent_windspeed':
                 h = ca.vertcat(h,ca.norm_2(va))
-            elif key == 'tether_len':
+            elif key == 'tether_length':
                 h = ca.vertcat(h,ca.norm_2(self.x[0:3])-KITE.distance_kcu_kite-self.x[11])
             elif key == 'aoa':
                 h = ca.vertcat(h,aoa+self.x[12])

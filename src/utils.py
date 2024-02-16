@@ -2,9 +2,9 @@ import numpy as np
 import casadi as ca
 from config import kite_models,kcu_cylinders, tether_materials, kappa, z0, rho, g, n_tether_elements
 from scipy.interpolate import splrep, splev
-from scipy.optimize import least_squares
-import pandas as pd
 #%% Class definitions
+
+
 class KiteModel:
     def __init__(self, model_name, mass, area, distance_kcu_kite, total_length_bridle_lines, diameter_bridle_lines, KCU):
         self.model_name = model_name
@@ -15,7 +15,6 @@ class KiteModel:
         self.diameter_bridle_lines = diameter_bridle_lines
         self.KCU = KCU
 class KCUModel:
-
     # Exracted from Applied fluid dynamics handbook
     ldt_data = np.array([0,0.5,1.0,1.5,2.0,3.0,4.0,5.0])  # L/D values
     cdt_data = np.array([1.15,1.1,0.93,0.85,0.83,0.85,0.85,0.85])  # Cd values for tangential flow
@@ -40,130 +39,72 @@ class KCUModel:
 
         self.At = np.pi*(self.diameter/2)**2  # Calculate area of the KCU
         self.Ap = self.diameter*self.length  # Calculate area of the KCU
-
-class EKF_input:
-    def __init__(self, kite_pos, kite_vel, ts,x0,u0, kite_acc = None, apparent_windspeed = None, kite_aoa = None, tether_length = None, ground_windspeed = None):
-        self.ts = ts
-        self.x0 = x0
-        self.u0 = u0
-
-        measurements = ['kite_pos','kite_vel']
-        Z = []
-        # Create measurement array for the EKF
-        Z.append(kite_pos[:,0])
-        Z.append(kite_pos[:,1])
-        Z.append(kite_pos[:,2])
-
-        Z.append(kite_vel[:,0])
-        Z.append(kite_vel[:,1])
-        Z.append(kite_vel[:,2])
-
-        if kite_acc is not None:
-            Z.append(kite_acc[:,0])
-            Z.append(kite_acc[:,1])
-            Z.append(kite_acc[:,2])
-            measurements.append('kite_acc')
-        if ground_windspeed is not None:
-            Z.append(ground_windspeed)*kappa/np.log(10/z0)
-            measurements.append('ground_wvel')
-        if apparent_windspeed is not None:
-            Z.append(apparent_windspeed)
-            measurements.append('apparent_wvel')
-        if tether_length is not None:
-            Z.append(tether_length)  
-            measurements.append('tether_len')    
-        if kite_aoa is not None:
-            Z.append(kite_aoa)
-            measurements.append('aoa')
-        Z = np.array(Z).T
-        self.Z = Z
-        self.measurements = measurements
-
-    def current_z(self, current_index):
-        return self.Z[current_index]
-    
-class tether_model_input:
-    def __init__(self, n_tether_elements, kite_acc, tether_force, tether_length=None, kcu_vel = None, kcu_acc = None):
-        self.n_tether_elements = n_tether_elements
+        
+class EKFInput:
+    def __init__(self, kite_pos,kite_vel,kite_acc,tether_force,apparent_windspeed = None, tether_length = None,kite_aoa = None, kcu_vel = None, kcu_acc = None):
+        self.kite_pos = kite_pos
+        self.kite_vel = kite_vel
         self.kite_acc = kite_acc
-        self.tether_force = tether_force
+        self.apparent_windspeed = apparent_windspeed
         self.tether_length = tether_length
-        self.kcu_vel = kcu_vel
+        self.tether_force = tether_force
+        self.kite_aoa = kite_aoa
         self.kcu_acc = kcu_acc
+        self.kcu_vel = kcu_vel
 
-    def current_state(self, current_index):
-        if self.kcu_vel is None:
-            kcu_vel = None
-        else:
-            kcu_vel = self.kcu_vel[current_index]
-        if self.kcu_acc is None:
-            kcu_acc = None
-        else:
-            kcu_acc = self.kcu_acc[current_index]
-        if self.tether_length is None:
-            tether_length = None
-        else:
-            tether_length = self.tether_length[current_index]
+def get_measurement_vector(input_class, opt_measurements):
+    z = np.array([])  # Initialize an empty NumPy array
 
-        return self.kite_acc[current_index], self.tether_force[current_index], tether_length, kcu_vel, kcu_acc
+    # Append values to the NumPy array
+    z = np.append(z, input_class.kite_pos)
+    z = np.append(z, input_class.kite_vel)
+    if 'kite_acc' in opt_measurements:
+        z = np.append(z, input_class.kite_acc)
+    if 'apparent_windspeed' in opt_measurements:
+        z = np.append(z, input_class.apparent_windspeed)
+    if 'tether_length' in opt_measurements:
+        z = np.append(z, input_class.tether_length)
+    if 'kite_aoa' in opt_measurements:
+        z = np.append(z, input_class.kite_aoa)
 
+    return z
 
-    
-def create_input_from_KP_csv(flight_data, measurements, kite,kcu,tether,kite_sensor = 0, kcu_sensor = None, correct_height = False):
-    
-    Z = []
-
-    ## Get measurements
-
-    # Kite measurements
-    kite_pos = np.array([flight_data['kite_'+str(kite_sensor)+'_rx'],flight_data['kite_'+str(kite_sensor)+'_ry'],flight_data['kite_'+str(kite_sensor)+'_rz']]).T
-    kite_vel = np.array([flight_data['kite_'+str(kite_sensor)+'_vx'],flight_data['kite_'+str(kite_sensor)+'_vy'],flight_data['kite_'+str(kite_sensor)+'_vz']]).T
-    kite_acc = np.array([flight_data['kite_'+str(kite_sensor)+'_ax'],flight_data['kite_'+str(kite_sensor)+'_ay'],flight_data['kite_'+str(kite_sensor)+'_az']]).T
-    # KCU measurements
-    if kcu_sensor is not None:
-        kcu_vel = np.array([flight_data['kite_'+str(kcu_sensor)+'_vx'],flight_data['kite_'+str(kcu_sensor)+'_vy'],flight_data['kite_'+str(kcu_sensor)+'_vz']]).T
-        kcu_acc = np.array([flight_data['kite_'+str(kcu_sensor)+'_ax'],flight_data['kite_'+str(kcu_sensor)+'_ay'],flight_data['kite_'+str(kcu_sensor)+'_az']]).T
+def tether_input(input_class, model_specs):
+    if model_specs.correct_height:
+        tether_length = input_class.tether_length
     else:
-        kcu_vel = None
-        kcu_acc = None
-    # Tether measurements
-    tether_force = np.array(flight_data['ground_tether_force'])
-    if correct_height:
-        tether_length = np.array(flight_data['ground_tether_length'])
-    else:
-        tether_length = None        
-    # Airflow measurements
-    ground_windspeed = np.array(flight_data['ground_wind_velocity'])
-    ground_winddir = np.array(flight_data['ground_wind_direction'])
-    apparent_windspeed = np.array(flight_data['kite_apparent_windspeed'])
-    kite_aoa = np.array(flight_data['kite_angle_of_attack'])
-    
-    timestep = flight_data['time'].iloc[1]-flight_data['time'].iloc[0]
-
-    
-    tether_input = tether_model_input(n_tether_elements, kite_acc, tether_force, tether_length, kcu_vel, kcu_acc)
-    
-    if correct_height:
-        tether_len0 = tether_length[0]
-    else:
-        tether_len0 = None
-    x0, u0 = find_initial_state_vector(kite_pos[0], kite_vel[0], kite_acc[0], np.mean(ground_winddir[0:3000]), np.mean(ground_windspeed[0]), tether_force[0], tether_len0, n_tether_elements, kite, kcu,tether)
-
-    if 'kite_acc' not in measurements:
-        kite_acc = None
-    if 'ground_wvel' not in measurements:
-        ground_windspeed = None
-    if 'apparent_wvel' not in measurements:
-        apparent_windspeed = None
-    if 'tether_len' not in measurements:
         tether_length = None
-    if 'aoa' not in measurements:
-        kite_aoa = None
-    # Create input classes
-    ekf_input = EKF_input(kite_pos,kite_vel,timestep,x0,u0, kite_acc = kite_acc, apparent_windspeed = apparent_windspeed, kite_aoa = kite_aoa, tether_length = tether_length, ground_windspeed = ground_windspeed)
     
-    
-    return ekf_input, tether_input
+    if model_specs.kcu_data:
+        kcu_acc = input_class.kcu_acc
+        kcu_vel = input_class.kcu_vel
+    else:
+        kcu_acc = None
+        kcu_vel = None
+
+    return input_class.kite_acc, input_class.tether_force, tether_length, kcu_acc, kcu_vel
+class ModelSpecs:
+    def __init__(self,timestep, n_tether_elements, opt_measurements = [], correct_height = False,  kcu_data = False, doIEKF = True, epsilon = 1e-6, max_iterations = 100):
+        self.ts = timestep
+        self.n_tether_elements = n_tether_elements
+        self.opt_measurements = opt_measurements
+        self.correct_height = correct_height
+        self.kcu_data = kcu_data
+        self.doIEKF = doIEKF
+        self.epsilon = epsilon
+        self.max_iterations = max_iterations
+
+class SystemSpecs:
+    # Class to store the system specifications
+    def __init__(self, kite_model, kcu_model, tether_material, tether_diameter, stdv_dynamic_model, stdv_measurements):
+        self.kite_model = kite_model
+        self.kcu_model = kcu_model
+        self.tether_material = tether_material
+        self.tether_diameter = tether_diameter
+        self.stdv_dynamic_model = stdv_dynamic_model
+        self.stdv_measurements = stdv_measurements
+
+
 
 def find_initial_state_vector(kite_pos, kite_vel, kite_acc, ground_winddir, ground_windspeed, tether_force, tether_length, n_tether_elements, kite, kcu,tether):
 
@@ -185,20 +126,6 @@ def find_initial_state_vector(kite_pos, kite_vel, kite_acc, ground_winddir, grou
     return x0, u0
 
 #%% Function definitions
-def create_kite(model_name):
-    if model_name in kite_models:
-        model_params = kite_models[model_name]
-        return KiteModel(model_name, model_params["mass"], model_params["area"], model_params["distance_kcu_kite"],
-                     model_params["total_length_bridle_lines"], model_params["diameter_bridle_lines"],model_params['KCU'])
-    else:
-        raise ValueError("Invalid kite model")
-    
-def create_kcu(model_name):
-    if model_name in kcu_cylinders:
-        model_params = kcu_cylinders[model_name]
-        return KCUModel(model_params["length"], model_params["diameter"], model_params["mass"])
-    else:
-        raise ValueError("Invalid KCU model")
 
 def project_onto_plane(vector, plane_normal):
     return vector - np.dot(vector, plane_normal) * plane_normal
@@ -206,76 +133,6 @@ def project_onto_plane(vector, plane_normal):
 
 def project_onto_plane_sym(vector, plane_normal):
     return vector - ca.dot(vector, plane_normal) * plane_normal
-
-
-def get_measurements(df, measurements,multiple_GPS = True):
-    meas_dict = {}
-    Z = []
-    for meas in measurements:
-        if meas == 'GPS_pos':
-            col_rx = [col for col in df.columns if 'rx' in col]
-            col_ry = [col for col in df.columns if 'ry' in col]
-            col_rz = [col for col in df.columns if 'rz' in col]
-            for i in range(len(col_rx)):
-                Z.append(df[col_rx[i]].values)
-                Z.append(df[col_ry[i]].values)
-                Z.append(df[col_rz[i]].values)
-            meas_dict[meas] = len(col_rx)
-
-        elif meas == 'GPS_vel':
-            col_vx = [col for col in df.columns if 'vx' in col]
-            col_vy = [col for col in df.columns if 'vy' in col]
-            col_vz = [col for col in df.columns if 'vz' in col]
-            if multiple_GPS:
-                for i in range(len(col_vx)):
-                    Z.append(df[col_vx[i]].values)
-                    Z.append(df[col_vy[i]].values)
-                    Z.append(df[col_vz[i]].values)
-                meas_dict[meas] = len(col_vx)
-            else:
-                Z.append(df['kite_0_vx'].values)
-                Z.append(df['kite_0_vy'].values)
-                Z.append(df['kite_0_vz'].values)
-                meas_dict[meas] = 1
-        
-        elif meas == 'GPS_acc':
-            col_ax = [col for col in df.columns if 'ax' in col]
-            col_ay = [col for col in df.columns if 'ay' in col]
-            col_az = [col for col in df.columns if 'az' in col]
-            if multiple_GPS:
-                for i in range(len(col_ax)):
-                    Z.append(df[col_ax[i]].values)
-                    Z.append(df[col_ay[i]].values)
-                    Z.append(df[col_az[i]].values)
-                meas_dict[meas] = len(col_ax)
-            else:
-                Z.append(df['kite_0_ax'].values)
-                Z.append(df['kite_0_ay'].values)
-                Z.append(df['kite_0_az'].values)
-                meas_dict[meas] = 1
-                
-        
-        elif meas == 'ground_wvel':
-            uf = df['ground_wind_velocity']*kappa/np.log(10/z0)
-            Z.append(uf.values)
-            meas_dict[meas] = 1
-
-        elif meas == 'apparent_wvel':
-            col_va = [col for col in df.columns if 'apparent' in col]
-            for i in range(len(col_va)):
-                Z.append(df[col_va[i]].values)
-                meas_dict[meas] = len(col_va)
-
-        elif meas == 'tether_len':
-            Z.append(df['ground_tether_length'].values)
-
-        elif meas == 'aoa':
-            Z.append(df['kite_angle_of_attack'].values)
-
-    Z = np.array(Z)
-    Z = Z.T
-
-    return meas_dict, Z
 
 def rotate_vector(v, u, theta):
     # Normalize vectors
@@ -351,13 +208,13 @@ def rank_observability_matrix(A,C):
 def R_EG_Body(Roll,Pitch,Yaw):#!!In radians!!
     
     #Rotational matrix for Roll
-    R_Roll=np.array([[1, 0, 0],[0,np.cos(Roll),np.sin(Roll)],[0,-np.sin(Roll),np.cos(Roll)]])#OK checked with Blender
+    R_Roll=np.array([[1, 0, 0],[0,np.cos(Roll),np.sin(Roll)],[0,-np.sin(Roll),np.cos(Roll)]])
     
     #Rotational matrix for Pitch
-    R_Pitch=np.array([[np.cos(Pitch), 0, np.sin(Pitch)],[0,1,0],[-np.sin(Pitch), 0, np.cos(Pitch)]])#Checked with blender
-    
+    R_Pitch=np.array([[np.cos(Pitch), 0, np.sin(Pitch)],[0,1,0],[-np.sin(Pitch), 0, np.cos(Pitch)]])
+
     #Rotational matrix for Roll
-    R_Yaw= np.array([[np.cos(Yaw),-np.sin(Yaw),0],[np.sin(Yaw),np.cos(Yaw),0],[0,0,1]])#Checked with Blender
+    R_Yaw= np.array([[np.cos(Yaw),-np.sin(Yaw),0],[np.sin(Yaw),np.cos(Yaw),0],[0,0,1]])
     
     #Total Rotational Matrix
     return R_Roll.dot(R_Pitch.dot(R_Yaw))
@@ -379,7 +236,6 @@ def calculate_euler_from_reference_frame(dcm):
     ex_kite = dcm[:,0]      # Kite x axis 
     ey_kite = dcm[:,1]      # Kite y axis perpendicular to va and tether
     ez_kite = dcm[:,2]      # Kite z axis pointing in the direction of the tension
-
     pitch = 90-calculate_angle(ex_kite, [0,0,1])          # Pitch angle
     yaw = np.arctan2(ex_kite[1],ex_kite[0])*180/np.pi   # Yaw angle       
     roll = 90-calculate_angle(ey_kite, [0,0,1])            # Roll angle
@@ -396,3 +252,4 @@ def calculate_airflow_angles(dcm, v_kite, vw):
     va_proj = project_onto_plane(va, ez_kite)           # Projected apparent wind velocity onto kite z axis
     sideslip = 90-calculate_angle(ey_kite,va_proj)         # Sideslip angle
     return aoa, sideslip
+
