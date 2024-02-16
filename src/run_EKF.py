@@ -1,16 +1,16 @@
 
 import numpy as np
 import pandas as pd
-from config import kite_model, kcu_model, tether_diameter, tether_material, year, month, day, \
-                     doIEKF, max_iterations, epsilon, opt_measurements, stdv_x, stdv_y, n_tether_elements, z0, kappa
+from config import kite_models, kcu_cylinders, tether_materials,kite_model, kcu_model, tether_diameter, tether_material, year, month, day, \
+                     doIEKF, max_iterations, epsilon, opt_measurements, stdv_x, stdv_y, n_tether_elements, z0
 from utils import calculate_vw_loglaw, calculate_euler_from_reference_frame, calculate_airflow_angles, ModelSpecs, SystemSpecs
-from utils import kite_models, kcu_cylinders, tether_materials, KiteModel, KCUModel, EKFInput, find_initial_state_vector, get_measurement_vector, tether_input
+from utils import  KiteModel, KCUModel, EKFInput, find_initial_state_vector, get_measurement_vector, tether_input
 from tether_model import TetherModel
 from kalman_filter import ExtendedKalmanFilter, DynamicModel, ObservationModel, observability_Lie_method
 import time
 
 def create_input_from_KP_csv(flight_data, system_specs, kite_sensor = 0, kcu_sensor = None):
-
+    """Create input classes and initial state vector from flight data"""
     n_intervals = len(flight_data)
     # Kite measurements
     kite_pos = np.array([flight_data['kite_'+str(kite_sensor)+'_rx'],flight_data['kite_'+str(kite_sensor)+'_ry'],flight_data['kite_'+str(kite_sensor)+'_rz']]).T
@@ -55,8 +55,10 @@ def create_input_from_KP_csv(flight_data, system_specs, kite_sensor = 0, kcu_sen
                                        np.mean(ground_winddir[0:3000])/180*np.pi, np.mean(ground_windspeed[0]), tether_force[0], 
                                        tether_length[i], n_tether_elements, kite, kcu,tether)
 
-    return ekf_input_list, x0, u0
+    return ekf_input_list, x0
+
 def create_kite(model_name):
+    """"Create kite model class from model name and model dictionary"""
     if model_name in kite_models:
         model_params = kite_models[model_name]
         return KiteModel(model_name, model_params["mass"], model_params["area"], model_params["distance_kcu_kite"],
@@ -65,13 +67,15 @@ def create_kite(model_name):
         raise ValueError("Invalid kite model")
     
 def create_kcu(model_name):
+    """"Create KCU model class from model name and model dictionary"""
     if model_name in kcu_cylinders:
         model_params = kcu_cylinders[model_name]
         return KCUModel(model_params["length"], model_params["diameter"], model_params["mass"])
     else:
         raise ValueError("Invalid KCU model")
+        
 def create_tether(material_name,diameter):
-
+    """"Create tether model class from material name and diameter"""
     if material_name in tether_materials:
         material_params = tether_materials[material_name]
         return TetherModel(material_name,diameter,material_params["density"],material_params["cd"],material_params["Youngs_modulus"])
@@ -79,7 +83,15 @@ def create_tether(material_name,diameter):
         raise ValueError("Invalid tether material")
 
 def run_EKF(ekf_input_list, model_specs, system_specs,x0):
-
+    """Run the Extended Kalman Filter
+    Args:
+        ekf_input_list: list of EKFInput classes
+        model_specs: ModelSpecs class
+        system_specs: SystemSpecs class
+        x0: initial state vector
+    Returns:
+        df: DataFrame with the results
+    """
     kite = create_kite(system_specs.kite_model)
     kcu = create_kcu(system_specs.kcu_model)
     tether = create_tether(system_specs.tether_material,system_specs.tether_diameter)
@@ -208,7 +220,7 @@ if __name__ == "__main__":
     model_specs = ModelSpecs(timestep, n_tether_elements, opt_measurements=opt_measurements, correct_height=False)
     system_specs = SystemSpecs(kite_model, kcu_model, tether_material, tether_diameter, stdv_x, stdv_y)
     # Create input classes
-    ekf_input_list,x0, u0 = create_input_from_KP_csv(flight_data, system_specs, kite_sensor = 0, kcu_sensor = 1)
+    ekf_input_list,x0 = create_input_from_KP_csv(flight_data, system_specs, kite_sensor = 0, kcu_sensor = 1)
 
     # Check observability matrix
     # check_obs = False

@@ -3,8 +3,6 @@ import casadi as ca
 from config import kite_models,kcu_cylinders, tether_materials, kappa, z0, rho, g, n_tether_elements
 from scipy.interpolate import splrep, splev
 #%% Class definitions
-
-
 class KiteModel:
     def __init__(self, model_name, mass, area, distance_kcu_kite, total_length_bridle_lines, diameter_bridle_lines, KCU):
         self.model_name = model_name
@@ -237,6 +235,8 @@ def calculate_euler_from_reference_frame(dcm):
     ey_kite = dcm[:,1]      # Kite y axis perpendicular to va and tether
     ez_kite = dcm[:,2]      # Kite z axis pointing in the direction of the tension
     pitch = 90-calculate_angle(ex_kite, [0,0,1])          # Pitch angle
+    x_se = project_onto_plane([0,0,1], ez_kite)
+    # yaw = calculate_angle_2vec(x_se, ex_kite)
     yaw = np.arctan2(ex_kite[1],ex_kite[0])*180/np.pi   # Yaw angle       
     roll = 90-calculate_angle(ey_kite, [0,0,1])            # Roll angle
 
