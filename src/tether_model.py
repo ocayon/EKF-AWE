@@ -1,15 +1,9 @@
 import numpy as np
 from config import g, rho, z0
-from utils import project_onto_plane, calculate_angle_2vec
 from scipy.optimize import least_squares
 from config import tether_materials
+from utils import project_onto_plane, calculate_angle_2vec
 
-def create_tether(material_name,diameter):
-    if material_name in tether_materials:
-        material_params = tether_materials[material_name]
-        return TetherModel(material_name,diameter,material_params["density"],material_params["cd"],material_params["Youngs_modulus"])
-    else:
-        raise ValueError("Invalid tether material")
 
 class TetherModel:
     def __init__(self,material,diameter,density,cd,Youngs_modulus,elastic=True):
@@ -238,7 +232,10 @@ class TetherModel:
             return positions, stretched_tether_length, dcm_b2w, dcm_t2w, dcm_fa2w, \
                 dcm_tau2w, aerodynamic_force, va,tensions[-1,:], dcm_t2w[:,1],cd_kcu, CL,CD,CS
         else:
-            return (positions[-1, :] - r_kite) 
+            if len(x) == 2:
+                return (positions[-1, :2] - r_kite[:2])
+            else:   
+                return (positions[-1, :] - r_kite) 
         
     def solve_tether_shape(self, n_tether_elements, r_kite, v_kite, vw, kite, kcu, tension_ground = None, tether_length = None,
                             a_kite = None, a_kcu = None, v_kcu = None):
@@ -257,6 +254,7 @@ class TetherModel:
         self.opt_guess = opt_res.x
         res = self.calculate_tether_shape(self.opt_guess, *args, return_values=True)
         self.positions = res[0]
+        self.kite_pos = self.positions[-1, :]
         self.stretched_tether_length = res[1]
         self.dcm_b2w = res[2]
         self.Ft_kite = np.array(res[8]) # Tether force at the kite
