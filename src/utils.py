@@ -164,18 +164,19 @@ def calculate_angle(vector_a, vector_b, deg=True):
     else:
         return angle_rad
 
-def calculate_angle_2vec(vector_a, vector_b):
+def calculate_angle_2vec(vector_a, vector_b, reference_vector=None):
     dot_product = np.dot(vector_a, vector_b)
     magnitude_a = np.linalg.norm(vector_a)
     magnitude_b = np.linalg.norm(vector_b)
 
     cos_theta = dot_product / (magnitude_a * magnitude_b)
-    angle_rad = np.arccos(cos_theta)
+    angle_rad = np.arccos(np.clip(cos_theta, -1.0, 1.0))
 
     # Determine the sign of the angle
-    cross_product = np.cross(vector_a, vector_b)
-    if cross_product[2] < 0:
-        angle_rad = -angle_rad
+    if reference_vector is not None:
+        reference_cross = np.cross(reference_vector, vector_a)
+        if np.dot(reference_cross, vector_b) < 0:
+            angle_rad = -angle_rad
 
     return angle_rad
 
@@ -236,9 +237,9 @@ def calculate_euler_from_reference_frame(dcm):
     ez_kite = dcm[:,2]      # Kite z axis pointing in the direction of the tension
     pitch = 90-calculate_angle(ex_kite, [0,0,1])          # Pitch angle
     x_se = project_onto_plane([0,0,1], ez_kite)
-    # yaw = calculate_angle_2vec(x_se, ex_kite)
-    yaw = np.arctan2(ex_kite[1],ex_kite[0])*180/np.pi   # Yaw angle       
-    roll = 90-calculate_angle(ey_kite, [0,0,1])            # Roll angle
+    yaw = calculate_angle_2vec(x_se, ex_kite, reference_vector=ez_kite)*180/np.pi# Yaw angle
+    # yaw = np.arctan2(ex_kite[1],ex_kite[0])*180/np.pi   # Yaw angle       
+    roll = calculate_angle(ey_kite, [0,0,1])            # Roll angle
 
     return roll, pitch, yaw
 

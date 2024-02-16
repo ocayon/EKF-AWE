@@ -210,8 +210,8 @@ class TetherModel:
         if return_values:
             va = vwj-vj  # All y-axes are defined perpendicular to apparent wind velocity.
 
-            ez_bridle = tensions[-1, :]/np.linalg.norm(tensions[-1, :])
-            ey_bridle = np.cross(ez_bridle, -vj)/np.linalg.norm(np.cross(ez_bridle, -vj))
+            ez_bridle = -tensions[-1, :]/np.linalg.norm(tensions[-1, :])
+            ey_bridle = np.cross(ez_bridle, vj)/np.linalg.norm(np.cross(ez_bridle, vj))
             ex_bridle = np.cross(ey_bridle, ez_bridle)
             dcm_b2w = np.vstack(([ex_bridle], [ey_bridle], [ez_bridle])).T
 
