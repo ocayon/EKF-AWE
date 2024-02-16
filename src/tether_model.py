@@ -6,6 +6,7 @@ from utils import project_onto_plane, calculate_angle_2vec
 
 
 class TetherModel:
+    """ Tether model class"""
     def __init__(self,material,diameter,density,cd,Youngs_modulus,elastic=True):
         self.material = material
         self.diameter = diameter
@@ -19,7 +20,14 @@ class TetherModel:
     
     def calculate_tether_shape(self,x, n_tether_elements, r_kite, v_kite, vw, kite, kcu, tension_ground = None, tether_length = None,
                                a_kite = None, a_kcu = None, v_kcu = None, return_values=False):
-        
+        """ Calculate the shape of the tether given the current state of the kite and the wind.
+        Possible inputs:
+        - kite x and y position, tether length and ground tether tension
+        - kite x,y and z position, tether length 
+        - kite x,y and z position, ground tether tension
+        Optional inputs:
+        - kcu acceleration and velocity
+        """
         # Currently neglecting radial velocity of kite.
         if tension_ground is not None and tether_length is not None:
             beta_n, phi_n = x
