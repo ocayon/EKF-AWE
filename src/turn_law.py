@@ -403,7 +403,7 @@ plt.show()
 # radius[yaw_rate<0] = -radius[yaw_rate<0]
 radius[yaw_rate > 0] = -radius[yaw_rate > 0]
 # %%
-cycles_plotted = np.arange(5, cycle_count-5, step=1)
+cycles_plotted = np.arange(0, cycle_count-5, step=1)
 mask = np.any(
     [flight_data['cycle'] == cycle for cycle in cycles_plotted], axis=0)
 mask = mask & pow
@@ -588,7 +588,6 @@ print(f"R-squared: {r_squared}")
 
 norm_va = np.linalg.norm(va,axis = 1)
 norm_v = np.linalg.norm(v_kite,axis = 1)
-angle_vw = angles/180*np.pi
 beta = elevation/180*np.pi
 yaw = (meas_yaw-90)/180*np.pi
 plt.figure()
@@ -615,7 +614,7 @@ yaw = (meas_yaw-90)/180*np.pi
 plt.figure()
 plt.plot(flight_data['time'], x[0]*norm_va**2*us/(norm_va*x[3]), label = 'Steering')
 plt.plot(flight_data['time'], x[2]*norm_v**2/(radius)/(x[3]*norm_va), label = 'Ficticious forces')
-plt.plot(flight_data['time'], x[1]*np.cos(beta)*np.sin(yaw)/(x[3]*norm_va), label = 'Weight')
+plt.plot(flight_data['time'], 9.81*x[2]*np.cos(beta)*np.sin(yaw)/(x[3]*norm_va), label = 'Weight')
 plt.plot(flight_data['time'], x[4]*norm_va**2/(x[3]*norm_va), label = 'Assymetry Kite')
 plt.plot(flight_data['time'], y3, label = 'Fitted Yaw rate')
 # plt.plot(flight_data['time'], (x[4]*norm_va**2+x[1]*np.cos(beta) *
