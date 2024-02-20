@@ -204,18 +204,39 @@ def rank_observability_matrix(A,C):
     rank_O = np.linalg.matrix_rank(O)
     return rank_O
 
-def R_EG_Body(Roll,Pitch,Yaw):#!!In radians!!
-    
-    #Rotational matrix for Roll
-    R_Roll=np.array([[1, 0, 0],[0,np.cos(Roll),np.sin(Roll)],[0,-np.sin(Roll),np.cos(Roll)]])
-    
-    #Rotational matrix for Pitch
-    R_Pitch=np.array([[np.cos(Pitch), 0, np.sin(Pitch)],[0,1,0],[-np.sin(Pitch), 0, np.cos(Pitch)]])
+def Rx(theta):
+  return np.array([[ 1, 0           , 0           ],
+                   [ 0, np.cos(theta),-np.sin(theta)],
+                   [ 0, np.sin(theta), np.cos(theta)]])
+  
+def Ry(theta):
+  return np.array([[ np.cos(theta), 0, np.sin(theta)],
+                   [ 0           , 1, 0           ],
+                   [-np.sin(theta), 0, np.cos(theta)]])
+  
+def Rz(theta):
+  return np.array([[ np.cos(theta), -np.sin(theta), 0 ],
+                   [ np.sin(theta), np.cos(theta) , 0 ],
+                   [ 0           , 0            , 1 ]])
 
-    #Rotational matrix for Roll
-    R_Yaw= np.array([[np.cos(Yaw),-np.sin(Yaw),0],[np.sin(Yaw),np.cos(Yaw),0],[0,0,1]])
+def R_EG_Body(roll, pitch, yaw):  # !!In radians!!
     
-    #Total Rotational Matrix
+    # Rotation matrix from earth fixed to body reference frame (ENU)
+    # Roll 0 flying parallel to ground (yaxis parallel to ground)
+    # Pitch 0 x-axis parallel to ground
+    # Yaw 0 in east direction
+    
+        
+    # Rotational matrix for Roll
+    R_Roll = Rx(roll)
+
+    # Rotational matrix for Pitch
+    R_Pitch = Ry(pitch)
+
+    # Rotational matrix for Yaw
+    R_Yaw = Rz(yaw)
+
+    # Total Rotational Matrix
     return R_Roll.dot(R_Pitch.dot(R_Yaw))
 
 
@@ -232,14 +253,12 @@ def calculate_vw_loglaw(uf, z0, z, wdir, kappa = 0.4,vz = 0):
     return vw
 
 def calculate_euler_from_reference_frame(dcm):
-    ex_kite = dcm[:,0]      # Kite x axis 
-    ey_kite = dcm[:,1]      # Kite y axis perpendicular to va and tether
-    ez_kite = dcm[:,2]      # Kite z axis pointing in the direction of the tension
-    pitch = 90-calculate_angle(ex_kite, [0,0,1])          # Pitch angle
-    x_se = project_onto_plane([0,0,1], ez_kite)
-    yaw = calculate_angle_2vec(x_se, ex_kite, reference_vector=ez_kite)*180/np.pi# Yaw angle
-    # yaw = np.arctan2(ex_kite[1],ex_kite[0])*180/np.pi   # Yaw angle       
-    roll = calculate_angle(ey_kite, [0,0,1])            # Roll angle
+    
+    # Calculate the roll, pitch and yaw angles from a direction cosine matrix, in NED coordinates   
+    Teb = dcm
+    pitch = np.arcsin(Teb[2,0])*180/np.pi
+    roll = np.arctan(Teb[2,1]/Teb[2,2])*180/np.pi
+    yaw = -np.arctan2(Teb[1,0],Teb[0,0])*180/np.pi
 
     return roll, pitch, yaw
 
@@ -249,7 +268,7 @@ def calculate_airflow_angles(dcm, v_kite, vw):
     ez_kite = dcm[:,2]      # Kite z axis pointing in the direction of the tension
     va = vw-v_kite
     va_proj = project_onto_plane(va, ey_kite)           # Projected apparent wind velocity onto kite y axis
-    aoa = 90-calculate_angle(ez_kite,va_proj)             # Angle of attack
+    aoa = calculate_angle(ez_kite,va_proj)-90             # Angle of attack
     va_proj = project_onto_plane(va, ez_kite)           # Projected apparent wind velocity onto kite z axis
     sideslip = 90-calculate_angle(ey_kite,va_proj)         # Sideslip angle
     return aoa, sideslip
