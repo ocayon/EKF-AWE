@@ -4,12 +4,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
-from config import kappa, z0, kite_model, year, month, day
-from utils import  R_EG_Body, calculate_angle, project_onto_plane
+from config import kappa, z0
+from utils import  calculate_angle, project_onto_plane
 import seaborn as sns
-from scipy.optimize import least_squares
+from postprocessing import calculate_reference_frame_euler
 
 
 def find_turn_law(flight_data):
@@ -356,21 +355,6 @@ def plot_wind_speed(results, flight_data, lidar_heights, IMU_0 = False, IMU_1=Fa
         plt.tight_layout()
         plt.savefig('wind_speed.png', dpi=300)
 
-def calculate_reference_frame_euler(roll, pitch, yaw):
-
-        ######################### DO IT WELL #########################################
-        # Calculate tether orientation based on euler angles
-        Transform_Matrix=R_EG_Body(roll/180*np.pi,pitch/180*np.pi,(yaw)/180*np.pi)
-        #    Transform_Matrix=R_EG_Body(kite_roll[i]/180*np.pi,kite_pitch[i]/180*np.pi,kite_yaw_modified[i])
-        Transform_Matrix=Transform_Matrix.T
-        #X_vector
-        ex_kite=Transform_Matrix.dot(np.array([-1,0,0]))
-        #Y_vector
-        ey_kite=Transform_Matrix.dot(np.array([0,-1,0]))
-        #Z_vector
-        ez_kite=Transform_Matrix.dot(np.array([0,0,1]))
-
-        return ex_kite, ey_kite, ez_kite
 
 
 def correct_aoa_ss_measurements(results,flight_data):
@@ -481,7 +465,6 @@ def plot_aero_coeff_vs_aoa_ss(results,flight_data,cycles_plotted, IMU_0 = False,
     axs[4].set_xlabel('time')
     axs[0].grid()
     axs[1].grid()
-    axs[2].grid()
     axs[3].grid()
     axs[4].grid()
     axs[0].legend()
@@ -548,7 +531,7 @@ def plot_aero_coeff_vs_up_us(results,flight_data,cycles_plotted, IMU_0 = False, 
         plt.savefig('aero_coeff_vs_up_us.png', dpi=300)
 
     
-def determine_turn_straight(row, threshold_us = 0.3):
+def determine_turn_straight(row, threshold_us = 0.4):
     
     if (abs(row['us']) >threshold_us):
         return 'turn'
@@ -636,7 +619,7 @@ def plot_prob_coeff_vs_aoa_ss(results,coeff,mask,aoa_method):
     plot_probability_density(aoa[mask],coeff[mask],fig,axs[0],xlabel='aoa')
     plot_probability_density(ss[mask],coeff[mask],fig,axs[1],'ss','')
 
-def plot_time_series(flight_data, y, ylabel, ax, color='blue', label=None,plot_phase=False):
+def plot_time_series(flight_data, y, ax, color='blue',  ylabel = None, label=None,plot_phase=False):
     t = flight_data.time
     ax.plot(t, y, color=color, label=label)
     ax.set_ylabel(ylabel)
@@ -707,3 +690,75 @@ def plot_wind_profile(flight_data, results,savefig=False):
     if savefig:
         plt.tight_layout()
         plt.savefig('wind_profile.png', dpi=300)
+
+def plot_kite_reference_frame(results, flight_data, imus):
+    ## Create 3d plot of kite reference frame
+    from mpl_toolkits.mplot3d import Axes3D
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.set_xlabel('X_N')
+    ax.set_ylabel('Y_E')
+    ax.set_zlabel('Z_U')
+    spacing = 20
+    for i in np.arange(0,len(flight_data), spacing):
+        len_arrow = 30
+        # Calculate EKF tether orientation based on euler angles and plot it
+        ex, ey, ez = calculate_reference_frame_euler( results.roll.iloc[i], 
+                                                     results.pitch.iloc[i], 
+                                                     results.yaw.iloc[i], 
+                                                     bodyFrame='NED')
+        ax.quiver(results['x'].iloc[i], results['y'].iloc[i], results['z'].iloc[i], ex[0],  \
+                    ex[1], ex[2],
+                color='r', length=len_arrow)
+        ax.quiver(results['x'].iloc[i], results['y'].iloc[i], results['z'].iloc[i], ey[0],  \
+                    ey[1], ey[2],
+                color='r', length=len_arrow)
+        ax.quiver(results['x'].iloc[i], results['y'].iloc[i], results['z'].iloc[i], ez[0],  \
+                    ez[1], ez[2],
+                color='r', length=len_arrow)
+        # Calculate IMU tether orientation based on euler angles and plot it
+        for imu in imus:
+            ex, ey, ez = calculate_reference_frame_euler(flight_data['kite_'+str(imu)+'_roll'].iloc[i], 
+                                                        flight_data['kite_'+str(imu)+'_pitch'].iloc[i], 
+                                                        flight_data['kite_'+str(imu)+'_yaw'].iloc[i])    
+            ax.quiver(flight_data['kite_'+str(imu)+'_rx'].iloc[i], 
+                        flight_data['kite_'+str(imu)+'_ry'].iloc[i], 
+                        flight_data['kite_'+str(imu)+'_rz'].iloc[i], 
+                        ex[0],
+                        ex[1],
+                        ex[2],
+                        color='b', length=len_arrow)
+            ax.quiver(flight_data['kite_'+str(imu)+'_rx'].iloc[i],
+                        flight_data['kite_'+str(imu)+'_ry'].iloc[i], 
+                        flight_data['kite_'+str(imu)+'_rz'].iloc[i], 
+                        ey[0], 
+                        ey[1], 
+                        ey[2],
+                        color='b', length=len_arrow)
+            ax.quiver(flight_data['kite_'+str(imu)+'_rx'].iloc[i],
+                        flight_data['kite_'+str(imu)+'_ry'].iloc[i], 
+                        flight_data['kite_'+str(imu)+'_rz'].iloc[i], 
+                        ez[0], 
+                        ez[1], 
+                        ez[2],
+                        color='b', length=len_arrow)
+
+    ax.plot(results.x, results.y, results.z,color='grey')
+    ax.scatter(results['x'].iloc[0:spacing:-1], results['y'].iloc[0:spacing:-1], results['z'].iloc[0:spacing:-1],color='r')
+    ax.legend()
+    ax.quiver(0,0,0, 
+                0, 
+                0, 
+                1,
+                color='black', length=len_arrow)
+    ax.quiver(0,0,0, 
+                0, 
+                1, 
+                0,
+                color='black', length=len_arrow)
+    ax.quiver(0,0,0, 
+                1, 
+                0, 
+                0,
+                color='black', length=len_arrow)
+    ax.set_box_aspect([1,1,1])
