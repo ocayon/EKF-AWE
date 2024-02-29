@@ -1,7 +1,6 @@
 import numpy as np
 from config import g, rho, z0
 from scipy.optimize import least_squares
-from config import tether_materials
 from utils import project_onto_plane, calculate_angle_2vec
 
 

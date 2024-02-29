@@ -1,6 +1,6 @@
 import numpy as np
 import casadi as ca
-from config import kite_models,kcu_cylinders, tether_materials, kappa, z0, rho, g, n_tether_elements
+from config import kappa, z0
 from scipy.interpolate import splrep, splev
 from dataclasses import dataclass
 #%% Class definitions
@@ -115,13 +115,38 @@ class ModelSpecs:
 
 class SystemSpecs:
     # Class to store the system specifications
-    def __init__(self, kite_model, kcu_model, tether_material, tether_diameter, stdv_dynamic_model, stdv_measurements):
+    def __init__(self, kite_model, kcu_model, tether_material, tether_diameter, meas_stdv, model_stdv, opt_measurements):
         self.kite_model = kite_model
         self.kcu_model = kcu_model
         self.tether_material = tether_material
         self.tether_diameter = tether_diameter
-        self.stdv_dynamic_model = stdv_dynamic_model
-        self.stdv_measurements = stdv_measurements
+
+
+        self.stdv_dynamic_model = np.array([model_stdv['x'], model_stdv['x'], model_stdv['x'], 
+                   model_stdv['v'], model_stdv['v'], model_stdv['v'], 
+                   model_stdv['uf'], model_stdv['wdir'], 
+                   model_stdv['CL'], model_stdv['CD'], model_stdv['CS'],
+                   model_stdv['bias_lt'], model_stdv['bias_aoa']])
+        stdv_y = []
+        for _ in range(3):
+            stdv_y.append(meas_stdv['x'])
+        for _ in range(3):
+            stdv_y.append(meas_stdv['v'])
+        for key in opt_measurements:
+            if key == 'kite_acc':   
+                for _ in range(3):
+                    stdv_y.append(meas_stdv['a'])
+            elif key == 'ground_wvel':
+                stdv_y.append(meas_stdv['uf'])
+
+            elif key == 'apparent_windspeed':
+                stdv_y.append(meas_stdv['va'])
+            elif key == 'tether_length':
+                stdv_y.append(meas_stdv['tether_length'])
+            elif key == 'aoa':
+                stdv_y.append(meas_stdv['aoa'])
+        stdv_y = np.array(stdv_y)
+        self.stdv_measurements = stdv_y
 
 
 

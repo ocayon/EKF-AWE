@@ -1,8 +1,9 @@
 
 import numpy as np
 import pandas as pd
-from config import kite_models, kcu_cylinders, tether_materials,kite_model, kcu_model, tether_diameter, tether_material, year, month, day, \
-                     doIEKF, max_iterations, epsilon, opt_measurements, stdv_x, stdv_y, n_tether_elements, z0, kappa
+from config import kite_model, kcu_model, tether_diameter, tether_material, year, month, day, \
+                     doIEKF, max_iterations, epsilon, opt_measurements, meas_stdv,model_stdv, n_tether_elements, z0, kappa
+from model_definitions import kite_models, kcu_cylinders, tether_materials
 from utils import calculate_vw_loglaw, calculate_euler_from_reference_frame, calculate_airflow_angles, ModelSpecs, SystemSpecs
 from utils import  KiteModel, KCUModel, EKFInput, find_initial_state_vector, get_measurement_vector, tether_input,EKFOutput
 from tether_model import TetherModel
@@ -267,12 +268,11 @@ if __name__ == "__main__":
     file_path = Path('../processed_data/flight_data') / kite_model / file_name
     flight_data = pd.read_csv(file_path)
     flight_data = flight_data.reset_index()
-    flight_data = flight_data.iloc[:8000]
 
     timestep = flight_data['time'].iloc[1] - flight_data['time'].iloc[0]
 
     model_specs = ModelSpecs(timestep, n_tether_elements, opt_measurements=opt_measurements, correct_height=False)
-    system_specs = SystemSpecs(kite_model, kcu_model, tether_material, tether_diameter, stdv_x, stdv_y)
+    system_specs = SystemSpecs(kite_model, kcu_model, tether_material, tether_diameter, meas_stdv, model_stdv, opt_measurements)
     # Create input classes
     ekf_input_list,x0 = create_input_from_KP_csv(flight_data, system_specs, kite_sensor = 0, kcu_sensor = 1)
 
