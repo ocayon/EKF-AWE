@@ -567,32 +567,33 @@ def plot_probability_density(x,y,fig,axs,xlabel=None,ylabel=None):
     axs.grid()
     axs.legend()
 
-def plot_CL_CD_aoa(results,mask,aoa_method):
+def plot_CL_CD_aoa(results,flight_data,mask,aoa_method):
 
     if aoa_method == 'IMU_0':
         aoa = results['aoa_IMU_0']
     elif aoa_method == 'IMU_1':
         aoa = results['aoa_IMU_1']
-    elif aoa_method == 'EKF_tether':
-        aoa = results['aoa_EKF_tether']
+    elif aoa_method == 'EKF':
+        aoa = results['aoa_EKF']
     else:
-        aoa = results['aoa']
+        aoa = flight_data['kite_angle_of_attack']
+    
 
     fig, axs = plt.subplots(2,1, figsize=(10, 10), sharex=True)
     fig.suptitle('CL and CD vs aoa')
     plot_probability_density(aoa[mask],results['CL'][mask],fig,axs[0],ylabel='CL')
     plot_probability_density(aoa[mask],results['CD'][mask],fig,axs[1],'aoa','CD')
 
-def plot_CL_CD_ss(results,mask,ss_method):
+def plot_CL_CD_ss(results,flight_data,mask,ss_method):
 
     if ss_method == 'IMU_0':
         ss = results['ss_IMU_0']
     elif ss_method == 'IMU_1':
         ss = results['ss_IMU_1']
-    elif ss_method == 'EKF_tether':
-        ss = results['ss_EKF_tether']
+    elif ss_method == 'EKF=':
+        ss = results['ss_EKF=']
     else:
-        ss = np.zeros(len(results))
+        ss = flight_data['kite_sideslip_angle']
 
     fig, axs = plt.subplots(2,1, figsize=(10, 10), sharex=True)
     fig.suptitle('CL and CD vs ss')
@@ -706,7 +707,7 @@ def plot_kite_reference_frame(results, flight_data, imus):
         ex, ey, ez = calculate_reference_frame_euler( results.roll.iloc[i], 
                                                      results.pitch.iloc[i], 
                                                      results.yaw.iloc[i], 
-                                                     bodyFrame='NED')
+                                                     bodyFrame='ENU')
         ax.quiver(results['x'].iloc[i], results['y'].iloc[i], results['z'].iloc[i], ex[0],  \
                     ex[1], ex[2],
                 color='r', length=len_arrow)
