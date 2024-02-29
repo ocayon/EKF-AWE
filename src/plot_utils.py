@@ -80,8 +80,8 @@ def postprocess_results(results,flight_data, kite, IMU_0=False, IMU_1=False, EKF
     :return: results with aoa and ss va radius omega and slack
     """
     # Calculate apparent speed based on EKF results
-    wvel = np.array(results['uf']/kappa*np.log(results['z']/z0))
-    vw = np.vstack((wvel*np.cos(results['wdir']),wvel*np.sin(results['wdir']),np.zeros(len(results)))).T
+    wvel = results['wind_velocity']
+    vw = np.vstack((wvel*np.cos(results['wind_direction']),wvel*np.sin(results['wind_direction']),np.zeros(len(results)))).T
     r_kite = np.vstack((np.array(results['x']),np.array(results['y']),np.array(results['z']))).T
     v_kite = np.vstack((np.array(results['vx']),np.array(results['vy']),np.array(results['vz']))).T
     # Calculate a_kite with diff of v_kite
@@ -315,10 +315,10 @@ def plot_wind_speed(results, flight_data, lidar_heights, IMU_0 = False, IMU_1=Fa
         axs[1].plot(flight_data['time'], np.degrees(vw_dir)%360, alpha = 0.5)
         axs[2].plot(flight_data['time'], flight_data['vwz_EKF'], label='EKF_tether', alpha = 0.5)
     if EKF:
-        wvel = np.array(results['uf']/kappa*np.log(results['z']/z0))
-        vw = np.vstack((wvel*np.cos(results['wdir']),wvel*np.sin(results['wdir']),np.zeros(len(results)))).T
+        wvel = results['wind_velocity']
+        vw = np.vstack((wvel*np.cos(results['wind_direction']),wvel*np.sin(results['wind_direction']),np.zeros(len(results)))).T
         axs[0].plot(flight_data['time'], np.linalg.norm(vw,axis=1), label='EKF', alpha = 0.8)
-        axs[1].plot(flight_data['time'], np.degrees(results['wdir'])%360, alpha = 0.8)
+        axs[1].plot(flight_data['time'], np.degrees(results['wind_direction'])%360, alpha = 0.8)
         axs[2].plot(flight_data['time'], np.zeros(len(results)), label='EKF', alpha = 0.5)
     
 
@@ -574,7 +574,7 @@ def plot_CL_CD_aoa(results,flight_data,mask,aoa_method):
     elif aoa_method == 'IMU_1':
         aoa = results['aoa_IMU_1']
     elif aoa_method == 'EKF':
-        aoa = results['aoa_EKF']
+        aoa = results['aoa']
     else:
         aoa = flight_data['kite_angle_of_attack']
     
@@ -675,9 +675,9 @@ def plot_wind_profile(flight_data, results,savefig=False):
     axs[0].fill_betweenx(lidar_heights, min_vel, max_vel, color=palette[0], alpha=0.3, label='Lidar')
     axs[1].fill_betweenx(lidar_heights, min_dir, max_dir, color=palette[0], alpha=0.3, label='Lidar')
 
-    wvelEKF = np.array(results['uf']/kappa*np.log(results['z']/z0))
+    wvelEKF = results['wind_velocity']
     axs[0].scatter( wvelEKF, results['z'], color=palette[1], label='EKF', alpha = 0.1)
-    axs[1].scatter(np.degrees(results['wdir'])%360, results['z'], color=palette[1], label='EKF', alpha = 0.1)
+    axs[1].scatter(np.degrees(results['wind_direction'])%360, results['z'], color=palette[1], label='EKF', alpha = 0.1)
 
     axs[0].legend()
     axs[0].set_xlabel('Wind speed (m/s)')

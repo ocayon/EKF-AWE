@@ -319,3 +319,52 @@ def calculate_airflow_angles(dcm, v_kite, vw):
     sideslip = 90-calculate_angle(ey_kite,va_proj)         # Sideslip angle
     return aoa, sideslip
 
+def create_input_from_KP_csv(flight_data, system_specs, kite_sensor = 0, kcu_sensor = None):
+    """Create input classes and initial state vector from flight data"""
+    from config import n_tether_elements
+    from run_EKF import create_kite, create_kcu,create_tether
+    n_intervals = len(flight_data)
+    # Kite measurements
+    kite_pos = np.array([flight_data['kite_'+str(kite_sensor)+'_rx'],flight_data['kite_'+str(kite_sensor)+'_ry'],flight_data['kite_'+str(kite_sensor)+'_rz']]).T
+    kite_vel = np.array([flight_data['kite_'+str(kite_sensor)+'_vx'],flight_data['kite_'+str(kite_sensor)+'_vy'],flight_data['kite_'+str(kite_sensor)+'_vz']]).T
+    kite_acc = np.array([flight_data['kite_'+str(kite_sensor)+'_ax'],flight_data['kite_'+str(kite_sensor)+'_ay'],flight_data['kite_'+str(kite_sensor)+'_az']]).T
+    # KCU measurements
+    if kcu_sensor is not None:
+        kcu_vel = np.array([flight_data['kite_'+str(kcu_sensor)+'_vx'],flight_data['kite_'+str(kcu_sensor)+'_vy'],flight_data['kite_'+str(kcu_sensor)+'_vz']]).T
+        kcu_acc = np.array([flight_data['kite_'+str(kcu_sensor)+'_ax'],flight_data['kite_'+str(kcu_sensor)+'_ay'],flight_data['kite_'+str(kcu_sensor)+'_az']]).T
+    else:
+        kcu_vel = np.zeros((n_intervals,3))
+        kcu_acc = np.zeros((n_intervals,3))
+    # Tether measurements
+    tether_force = np.array(flight_data['ground_tether_force'])
+    tether_length = np.array(flight_data['ground_tether_length'])
+      
+    # Airflow measurements
+    ground_windspeed = np.array(flight_data['ground_wind_velocity'])
+    ground_winddir = np.array(flight_data['ground_wind_direction'])
+    apparent_windspeed = np.array(flight_data['kite_apparent_windspeed'])
+    kite_aoa = np.array(flight_data['kite_angle_of_attack'])
+    
+    timestep = flight_data['time'].iloc[1]-flight_data['time'].iloc[0]
+    ekf_input_list = []
+    for i in range(len(flight_data)):
+        ekf_input_list.append(EKFInput(kite_pos = kite_pos[i], 
+                                    kite_vel = kite_vel[i], 
+                                    kite_acc = kite_acc[i], 
+                                    tether_force = tether_force[i],
+                                    apparent_windspeed = apparent_windspeed[i], 
+                                    tether_length = tether_length[i],
+                                    kite_aoa = kite_aoa[i], 
+                                    kcu_vel = kcu_vel[i], 
+                                    kcu_acc = kcu_acc[i]))
+                
+
+    kite = create_kite(system_specs.kite_model)
+    kcu = create_kcu(system_specs.kcu_model)
+    tether = create_tether(system_specs.tether_material,system_specs.tether_diameter)
+
+    x0, u0 = find_initial_state_vector(kite_pos[0], kite_vel[0], kite_acc[0], 
+                                       np.mean(ground_winddir[0:3000])/180*np.pi, np.mean(ground_windspeed[0]), tether_force[0], 
+                                       tether_length[i], n_tether_elements, kite, kcu,tether)
+
+    return ekf_input_list, x0

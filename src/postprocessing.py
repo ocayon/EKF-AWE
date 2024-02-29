@@ -96,8 +96,8 @@ def postprocess_results(results,flight_data, kite, imus = [0], remove_IMU_offset
 
 
     # Calculate apparent speed based on EKF results
-    wvel = np.array(results['uf']/kappa*np.log(results['z']/z0))
-    vw = np.vstack((wvel*np.cos(results['wdir']),wvel*np.sin(results['wdir']),np.zeros(len(results)))).T
+    wvel = results['wind_velocity']
+    vw = np.vstack((wvel*np.cos(results['wind_direction']),wvel*np.sin(results['wind_direction']),np.zeros(len(results)))).T
     r_kite = np.vstack((np.array(results['x']),np.array(results['y']),np.array(results['z']))).T
     v_kite = np.vstack((np.array(results['vx']),np.array(results['vy']),np.array(results['vz']))).T
     # Calculate a_kite with diff of v_kite
@@ -158,9 +158,9 @@ def postprocess_results(results,flight_data, kite, imus = [0], remove_IMU_offset
                                                             flight_data['kite_'+str(imu)+'_yaw'].iloc[i])  
             # Calculate wind velocity based on KCU orientation and wind speed and direction
             va_proj = project_onto_plane(va_kite[i], ey)           # Projected apparent wind velocity onto kite y axis
-            results['aoa_IMU_'+str(imu)].iloc[i] = calculate_angle(ez,va_proj)-90            # Angle of attack
+            results.loc[i,'aoa_IMU_'+str(imu)] = calculate_angle(ez,va_proj)-90            # Angle of attack
             va_proj = project_onto_plane(va_kite[i], ez)           # Projected apparent wind velocity onto kite z axis
-            results['ss_IMU_'+str(imu)].iloc[i] = 90-calculate_angle(ey,va_proj)        # Sideslip angle
+            results.loc[i,'ss_IMU_'+str(imu)] = 90-calculate_angle(ey,va_proj)        # Sideslip angle
             
         at = np.dot(a_kite[i],np.array(v_kite[i])/np.linalg.norm(v_kite[i]))*np.array(v_kite[i])/np.linalg.norm(v_kite[i])
         omega_kite = np.cross(a_kite[i]-at,v_kite[i])/(np.linalg.norm(v_kite[i])**2)

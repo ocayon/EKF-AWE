@@ -1,12 +1,14 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from config import kappa, z0, kite_model, year, month, day
+from config import kappa, z0, kite_model
 from run_EKF import create_kite
 import seaborn as sns
 import plot_utils as pu
 from postprocessing import calculate_wind_speed_airborne_sensors, postprocess_results
-
+year = '2019'
+month = '10'
+day = '08'
 plt.close('all')
 path = '../results/'+kite_model+'/'
 file_name = kite_model+'_'+year+'-'+month+'-'+day
@@ -54,11 +56,11 @@ pu.plot_aero_coeff_vs_aoa_ss(results, flight_data, cycles_plotted,IMU_0=True,sav
 pu.plot_aero_coeff_vs_up_us(results, flight_data, cycles_plotted,IMU_0=True,savefig=False) # Plot aero coeff vs up_used
 #%%
 ################## Density plots ##################
-# flight_data = flight_data.iloc[12000:-12000]
-# results = results.iloc[12000:-12000]
+# flight_data = flight_data.iloc[1000::]
+# results = results.iloc[1000::]
 mask = (flight_data['turn_straight'] == 'straight')&(flight_data['powered'] == 'powered')
-pu.plot_CL_CD_aoa(results,flight_data, mask, 'Meas') # Plot CL vs CD for different aoa
-pu.plot_CL_CD_ss(results,flight_data, mask, 'Meas')    # Plot CL vs CD for different aoa_ss
+pu.plot_CL_CD_aoa(results,flight_data, mask, 'EKF') # Plot CL vs CD for different aoa
+pu.plot_CL_CD_ss(results,flight_data, mask, 'IMU_0')    # Plot CL vs CD for different aoa_ss
 # pu.plot_prob_coeff_vs_aoa_ss(results, results.CL**3/results.CD**2, mask, 'IMU_0') # Plot CL^3/CD^2 vs aoa_ss
 # pu.plot_prob_coeff_vs_aoa_ss(results, results.CL/results.CD, mask, 'IMU_0') # Plot CL/CD vs aoa_ss
 
