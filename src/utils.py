@@ -2,6 +2,7 @@ import numpy as np
 import casadi as ca
 from config import kite_models,kcu_cylinders, tether_materials, kappa, z0, rho, g, n_tether_elements
 from scipy.interpolate import splrep, splev
+from dataclasses import dataclass
 #%% Class definitions
 class KiteModel:
     def __init__(self, model_name, mass, area, distance_kcu_kite, total_length_bridle_lines, diameter_bridle_lines, KCU):
@@ -37,18 +38,38 @@ class KCUModel:
 
         self.At = np.pi*(self.diameter/2)**2  # Calculate area of the KCU
         self.Ap = self.diameter*self.length  # Calculate area of the KCU
-        
+
+@dataclass
 class EKFInput:
-    def __init__(self, kite_pos,kite_vel,kite_acc,tether_force,apparent_windspeed = None, tether_length = None,kite_aoa = None, kcu_vel = None, kcu_acc = None):
-        self.kite_pos = kite_pos
-        self.kite_vel = kite_vel
-        self.kite_acc = kite_acc
-        self.apparent_windspeed = apparent_windspeed
-        self.tether_length = tether_length
-        self.tether_force = tether_force
-        self.kite_aoa = kite_aoa
-        self.kcu_acc = kcu_acc
-        self.kcu_vel = kcu_vel
+    kite_pos: np.array      # Kite position in ENU coordinates
+    kite_vel: np.array      # Kite velocity in ENU coordinates
+    kite_acc: np.array      # Kite acceleration in ENU coordinates
+    tether_force: float     # Ground tether force
+    apparent_windspeed: float = None # Apparent windspeed
+    tether_length: float = None     # Tether length
+    kite_aoa: np.array = None      # Kite angle of attack
+    kcu_vel: np.array = None    # KCU velocity in ENU coordinates
+    kcu_acc: np.array = None    # KCU acceleration in ENU coordinates
+
+@dataclass
+class EKFOutput:
+    kite_pos: np.array    # Kite position in ENU coordinates
+    kite_vel: np.array      # Kite velocity in ENU coordinates
+    wind_velocity: float   # Wind velocity
+    wind_direction: float # Wind direction
+    roll: float           # Roll angle
+    pitch: float         # Pitch angle
+    yaw: float          # Yaw angle
+    tether_length: float # Tether length
+    tether_force: np.array # Tether force vector at the kite
+    kite_aoa: float    # Kite angle of attack
+    kite_sideslip: float # Kite sideslip angle
+    CL : float          # Lift coefficient
+    CD : float          # Drag coefficient
+    CS : float          # Side force coefficient
+
+    
+
 
 def get_measurement_vector(input_class, opt_measurements):
     z = np.array([])  # Initialize an empty NumPy array
