@@ -5,7 +5,7 @@ from config import kite_model, kcu_model, tether_diameter, tether_material, \
                      doIEKF, max_iterations, epsilon, opt_measurements, meas_stdv,model_stdv, n_tether_elements, z0, kappa
 from model_definitions import kite_models, kcu_cylinders, tether_materials
 from utils import calculate_vw_loglaw, calculate_euler_from_reference_frame, calculate_airflow_angles, ModelSpecs, SystemSpecs
-from utils import  KiteModel, KCUModel, EKFInput, find_initial_state_vector, get_measurement_vector, tether_input,EKFOutput
+from utils import  KiteModel, KCUModel, EKFInput, find_initial_state_vector, get_measurement_vector, tether_input,EKFOutput, create_input_from_KP_csv
 from tether_model import TetherModel
 from kalman_filter import ExtendedKalmanFilter, DynamicModel, ObservationModel, observability_Lie_method
 import time
@@ -35,8 +35,12 @@ def store_results(XX_k1_k1, Ft, euler_angles, airflow_angles, tether_length, k):
 
 def convert_ekf_output_to_df(ekf_output_list):
     """Convert list of EKFOutput instances to DataFrame"""
-    kite_pos = []  
-    kite_vel = []
+    x =[]
+    y = []
+    z = []
+    vx = []
+    vy = []
+    vz = []
     wind_velocity = []
     wind_direction = []
     tether_force = []
@@ -50,8 +54,12 @@ def convert_ekf_output_to_df(ekf_output_list):
     CD = []
     CS = []
     for i in range(len(ekf_output_list)):
-        kite_pos.append(ekf_output_list[i].kite_pos)
-        kite_vel.append(ekf_output_list[i].kite_vel)
+        x.append(ekf_output_list[i].kite_pos[0])
+        y.append(ekf_output_list[i].kite_pos[1])
+        z.append(ekf_output_list[i].kite_pos[2])
+        vx.append(ekf_output_list[i].kite_vel[0])
+        vy.append(ekf_output_list[i].kite_vel[1])
+        vz.append(ekf_output_list[i].kite_vel[2])
         wind_velocity.append(ekf_output_list[i].wind_velocity)
         wind_direction.append(ekf_output_list[i].wind_direction)
         tether_force.append(ekf_output_list[i].tether_force)
@@ -64,59 +72,13 @@ def convert_ekf_output_to_df(ekf_output_list):
         CL.append(ekf_output_list[i].CL)
         CD.append(ekf_output_list[i].CD)
         CS.append(ekf_output_list[i].CS)
-    ekf_output_df = pd.DataFrame({'kite_pos': kite_pos, 'kite_vel': kite_vel, 'wind_velocity': wind_velocity, 'wind_direction': wind_direction,
+    ekf_output_df = pd.DataFrame({'x': x, 'y': y, 'z': z, 'vx': vx, 'vy': vy, 'vz': vz, 
+                                  'wind_velocity': wind_velocity, 'wind_direction': wind_direction,
                                 'tether_force': tether_force, 'roll': roll, 'pitch': pitch, 'yaw': yaw, 'aoa': aoa, 'ss': ss, 'tether_length': tether_length,
                                 'CL': CL, 'CD': CD, 'CS': CS})
 
     return ekf_output_df
 
-def create_input_from_KP_csv(flight_data, system_specs, kite_sensor = 0, kcu_sensor = None):
-    """Create input classes and initial state vector from flight data"""
-    n_intervals = len(flight_data)
-    # Kite measurements
-    kite_pos = np.array([flight_data['kite_'+str(kite_sensor)+'_rx'],flight_data['kite_'+str(kite_sensor)+'_ry'],flight_data['kite_'+str(kite_sensor)+'_rz']]).T
-    kite_vel = np.array([flight_data['kite_'+str(kite_sensor)+'_vx'],flight_data['kite_'+str(kite_sensor)+'_vy'],flight_data['kite_'+str(kite_sensor)+'_vz']]).T
-    kite_acc = np.array([flight_data['kite_'+str(kite_sensor)+'_ax'],flight_data['kite_'+str(kite_sensor)+'_ay'],flight_data['kite_'+str(kite_sensor)+'_az']]).T
-    # KCU measurements
-    if kcu_sensor is not None:
-        kcu_vel = np.array([flight_data['kite_'+str(kcu_sensor)+'_vx'],flight_data['kite_'+str(kcu_sensor)+'_vy'],flight_data['kite_'+str(kcu_sensor)+'_vz']]).T
-        kcu_acc = np.array([flight_data['kite_'+str(kcu_sensor)+'_ax'],flight_data['kite_'+str(kcu_sensor)+'_ay'],flight_data['kite_'+str(kcu_sensor)+'_az']]).T
-    else:
-        kcu_vel = np.zeros((n_intervals,3))
-        kcu_acc = np.zeros((n_intervals,3))
-    # Tether measurements
-    tether_force = np.array(flight_data['ground_tether_force'])
-    tether_length = np.array(flight_data['ground_tether_length'])
-      
-    # Airflow measurements
-    ground_windspeed = np.array(flight_data['ground_wind_velocity'])
-    ground_winddir = np.array(flight_data['ground_wind_direction'])
-    apparent_windspeed = np.array(flight_data['kite_apparent_windspeed'])
-    kite_aoa = np.array(flight_data['kite_angle_of_attack'])
-    
-    timestep = flight_data['time'].iloc[1]-flight_data['time'].iloc[0]
-    ekf_input_list = []
-    for i in range(len(flight_data)):
-        ekf_input_list.append(EKFInput(kite_pos = kite_pos[i], 
-                                    kite_vel = kite_vel[i], 
-                                    kite_acc = kite_acc[i], 
-                                    tether_force = tether_force[i],
-                                    apparent_windspeed = apparent_windspeed[i], 
-                                    tether_length = tether_length[i],
-                                    kite_aoa = kite_aoa[i], 
-                                    kcu_vel = kcu_vel[i], 
-                                    kcu_acc = kcu_acc[i]))
-                
-
-    kite = create_kite(system_specs.kite_model)
-    kcu = create_kcu(system_specs.kcu_model)
-    tether = create_tether(system_specs.tether_material,system_specs.tether_diameter)
-
-    x0, u0 = find_initial_state_vector(kite_pos[0], kite_vel[0], kite_acc[0], 
-                                       np.mean(ground_winddir[0:3000])/180*np.pi, np.mean(ground_windspeed[0]), tether_force[0], 
-                                       tether_length[i], n_tether_elements, kite, kcu,tether)
-
-    return ekf_input_list, x0
 
 def create_kite(model_name):
     """"Create kite model class from model name and model dictionary"""
@@ -257,7 +219,7 @@ def run_EKF(ekf_input_list, model_specs, system_specs,x0):
             print(f"Real time: {mins} minutes.  Elapsed time: {elapsed_time:.2f} seconds")
         
     # Store results
-    ekf_output_list = store_results(XX_k1_k1, Ft, euler_angles, airflow_angles, tether_length, k)   # List of instances of EKFOutput
+    ekf_output_list = store_results(XX_k1_k1, Ft, euler_angles, airflow_angles, tether_length, k+1)   # List of instances of EKFOutput
 
     return ekf_output_list
 
@@ -271,8 +233,8 @@ if __name__ == "__main__":
     kcu_model = 'KP1'                   # KCU model name
     tether_diameter = 0.01            # Tether diameter [m]
     # File path
-    file_name = f"{kite_model}_{year}-{month}-{day}.csv"
-    file_path = Path('../processed_data/flight_data') / kite_model / file_name
+    file_name = f"{kite_model}_{year}-{month}-{day}"
+    file_path = Path('../processed_data/flight_data') / kite_model / (file_name + '.csv')
     flight_data = pd.read_csv(file_path)
     flight_data = flight_data.reset_index()
 
