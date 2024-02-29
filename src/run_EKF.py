@@ -2,12 +2,72 @@
 import numpy as np
 import pandas as pd
 from config import kite_models, kcu_cylinders, tether_materials,kite_model, kcu_model, tether_diameter, tether_material, year, month, day, \
-                     doIEKF, max_iterations, epsilon, opt_measurements, stdv_x, stdv_y, n_tether_elements, z0
+                     doIEKF, max_iterations, epsilon, opt_measurements, stdv_x, stdv_y, n_tether_elements, z0, kappa
 from utils import calculate_vw_loglaw, calculate_euler_from_reference_frame, calculate_airflow_angles, ModelSpecs, SystemSpecs
-from utils import  KiteModel, KCUModel, EKFInput, find_initial_state_vector, get_measurement_vector, tether_input
+from utils import  KiteModel, KCUModel, EKFInput, find_initial_state_vector, get_measurement_vector, tether_input,EKFOutput
 from tether_model import TetherModel
 from kalman_filter import ExtendedKalmanFilter, DynamicModel, ObservationModel, observability_Lie_method
 import time
+from pathlib import Path
+
+def store_results(XX_k1_k1, Ft, euler_angles, airflow_angles, tether_length, k):
+    """Store results in a list of instances of the class EKFOutput"""
+    ekf_output = []
+    for i in range(k):
+        wind_vel  = XX_k1_k1[6,i]/kappa*np.log(XX_k1_k1[2,i]/z0)
+        ekf_output.append(EKFOutput(kite_pos = XX_k1_k1[0:3,i],
+                                    kite_vel = XX_k1_k1[3:6,i],
+                                    wind_velocity = wind_vel,
+                                    wind_direction = XX_k1_k1[7,i],
+                                    tether_force=Ft[i],
+                                    roll = euler_angles[i][0],
+                                    pitch = euler_angles[i][1],
+                                    yaw = euler_angles[i][2],
+                                    kite_aoa = airflow_angles[i][0],
+                                    kite_sideslip = airflow_angles[i][1],
+                                    tether_length = tether_length[i],
+                                    CL = XX_k1_k1[8,i],
+                                    CD = XX_k1_k1[9,i],
+                                    CS = XX_k1_k1[10,i]))
+                                
+    return ekf_output
+
+def convert_ekf_output_to_df(ekf_output_list):
+    """Convert list of EKFOutput instances to DataFrame"""
+    kite_pos = []  
+    kite_vel = []
+    wind_velocity = []
+    wind_direction = []
+    tether_force = []
+    roll = []
+    pitch = []
+    yaw = []
+    aoa = []
+    ss = []
+    tether_length = []
+    CL = []
+    CD = []
+    CS = []
+    for i in range(len(ekf_output_list)):
+        kite_pos.append(ekf_output_list[i].kite_pos)
+        kite_vel.append(ekf_output_list[i].kite_vel)
+        wind_velocity.append(ekf_output_list[i].wind_velocity)
+        wind_direction.append(ekf_output_list[i].wind_direction)
+        tether_force.append(ekf_output_list[i].tether_force)
+        roll.append(ekf_output_list[i].roll)
+        pitch.append(ekf_output_list[i].pitch)
+        yaw.append(ekf_output_list[i].yaw)
+        aoa.append(ekf_output_list[i].kite_aoa)
+        ss.append(ekf_output_list[i].kite_sideslip)
+        tether_length.append(ekf_output_list[i].tether_length)
+        CL.append(ekf_output_list[i].CL)
+        CD.append(ekf_output_list[i].CD)
+        CS.append(ekf_output_list[i].CS)
+    ekf_output_df = pd.DataFrame({'kite_pos': kite_pos, 'kite_vel': kite_vel, 'wind_velocity': wind_velocity, 'wind_direction': wind_direction,
+                                'tether_force': tether_force, 'roll': roll, 'pitch': pitch, 'yaw': yaw, 'aoa': aoa, 'ss': ss, 'tether_length': tether_length,
+                                'CL': CL, 'CD': CD, 'CS': CS})
+
+    return ekf_output_df
 
 def create_input_from_KP_csv(flight_data, system_specs, kite_sensor = 0, kcu_sensor = None):
     """Create input classes and initial state vector from flight data"""
@@ -120,8 +180,6 @@ def run_EKF(ekf_input_list, model_specs, system_specs,x0):
     # allocate space to store traces and other Kalman filter params
     XX_k1_k1    = np.zeros([n, N])
     err_meas    = np.zeros([nm, N])
-    z_k1_k1    = np.zeros([nm, N-1])
-    PP_k1_k1    = np.zeros([n, N])
     STD_x_cor   = np.zeros([n, N])
     STD_z       = np.zeros([nm, N])
     ZZ_pred     = np.zeros([nm, N])
@@ -198,22 +256,18 @@ def run_EKF(ekf_input_list, model_specs, system_specs,x0):
             print(f"Real time: {mins} minutes.  Elapsed time: {elapsed_time:.2f} seconds")
         
     # Store results
-    ti = 0
-    k +=1
-    results = np.vstack((XX_k1_k1[:,ti:k],np.array(Ft)[ti:k,:].T,np.array(euler_angles)[ti:k,:].T,np.array(airflow_angles)[ti:k,:].T,np.array(tether_length)[ti:k].T))
-    column_names = ['x','y','z','vx','vy','vz','uf','wdir','CL', 'CD', 'CS', 'bias_lt','bias_aoa','Ftx','Fty','Ftz','roll', 'pitch', 'yaw', 'aoa','ss','tether_len']
-    df = pd.DataFrame(data=results.T, columns=column_names)
+    ekf_output_list = store_results(XX_k1_k1, Ft, euler_angles, airflow_angles, tether_length, k)   # List of instances of EKFOutput
 
-    return df
+    return ekf_output_list
 
 #%% Read and process data 
 if __name__ == "__main__":
     # File path
-    file_name = kite_model+'_'+year+'-'+month+'-'+day
-    file_path = '../processed_data/flight_data/'+kite_model+'/'+ file_name+'.csv'
+    file_name = f"{kite_model}_{year}-{month}-{day}.csv"
+    file_path = Path('../processed_data/flight_data') / kite_model / file_name
     flight_data = pd.read_csv(file_path)
     flight_data = flight_data.reset_index()
-    flight_data = flight_data.iloc[:18000]
+    flight_data = flight_data.iloc[:8000]
 
     timestep = flight_data['time'].iloc[1] - flight_data['time'].iloc[0]
 
@@ -228,16 +282,17 @@ if __name__ == "__main__":
     #     observability_Lie_method(dyn_model.fx,obs_model.hx,dyn_model.x, dyn_model.u, ekf_input.x0,ekf_input.u0)
 
     #%% Main loop
-    ekf_output = run_EKF(ekf_input_list, model_specs, system_specs,x0)
+    ekf_output_list = run_EKF(ekf_input_list, model_specs, system_specs,x0)
 
+    #%% Store results
     save_results = True
     if save_results == True:
-        #%% Save results
+        ekf_output_df = convert_ekf_output_to_df(ekf_output_list)
         addition = ''
         path = '../results/'+kite_model+'/'
         # Save the DataFrame to a CSV file
         csv_filename = file_name+'_res_GPS'+addition+'.csv'
-        ekf_output.to_csv(path+csv_filename, index=False)
+        ekf_output_df.to_csv(path+csv_filename, index=False)
 
         # Save the DataFrame to a CSV file
         csv_filename = file_name+'_fd.csv'
