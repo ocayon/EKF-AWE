@@ -1,7 +1,7 @@
 
 import numpy as np
 import pandas as pd
-from config import kite_model, kcu_model, tether_diameter, tether_material, year, month, day, \
+from config import kite_model, kcu_model, tether_diameter, tether_material, \
                      doIEKF, max_iterations, epsilon, opt_measurements, meas_stdv,model_stdv, n_tether_elements, z0, kappa
 from model_definitions import kite_models, kcu_cylinders, tether_materials
 from utils import calculate_vw_loglaw, calculate_euler_from_reference_frame, calculate_airflow_angles, ModelSpecs, SystemSpecs
@@ -263,6 +263,13 @@ def run_EKF(ekf_input_list, model_specs, system_specs,x0):
 
 #%% Read and process data 
 if __name__ == "__main__":
+    #%% Choose flight data
+    year = '2019'
+    month = '10'
+    day = '08'
+    kite_model = 'v3'                   # Kite model name, if Costum, change the kite parameters next
+    kcu_model = 'KP1'                   # KCU model name
+    tether_diameter = 0.01            # Tether diameter [m]
     # File path
     file_name = f"{kite_model}_{year}-{month}-{day}.csv"
     file_path = Path('../processed_data/flight_data') / kite_model / file_name

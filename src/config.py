@@ -5,17 +5,11 @@
 #%% Import libraries
 import numpy as np
 
-#%% Choose flight data
-
-year = '2023'
-month = '11'
-day = '27'
-
 #%% Define system parameters
 # Define system parameters
-kite_model = 'v9'                   # Kite model name, if Costum, change the kite parameters next
-kcu_model = 'KP2'                   # KCU model name
-tether_diameter = 0.014            # Tether diameter [m]
+kite_model = 'v3'                   # Kite model name, if Costum, change the kite parameters next
+kcu_model = 'KP1'                   # KCU model name
+tether_diameter = 0.01            # Tether diameter [m]
 tether_material = 'Dyneema-SK78'    # Tether material
 
 #%% Define atmospheric parameters
