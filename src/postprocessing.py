@@ -69,7 +69,7 @@ def remove_offsets_IMU_data(results, flight_data, sensor=0):
 
 
 
-def postprocess_results(results,flight_data, kite, imus = [0], remove_IMU_offsets=True, correct_IMU_deformation = False, remove_vane_offsets=False):
+def postprocess_results(results,flight_data, kite, imus = [0], remove_IMU_offsets=True, correct_IMU_deformation = False, remove_vane_offsets=False, estimate_kite_angle=False):
     """
     Calculate angle of attack and sideslip based on kite and KCU IMU data
     :param results: results from the simulation
@@ -133,7 +133,7 @@ def postprocess_results(results,flight_data, kite, imus = [0], remove_IMU_offset
         pitch_IMU_0 = np.array(flight_data['kite_0_pitch'])
         offset_dep = np.mean(pitch_EKF[mask_dep]-pitch_IMU_0[mask_dep])
         offset_turn = np.mean(pitch_EKF[mask_turn]-pitch_IMU_0[mask_turn])
-        offset_pitch = offset_dep*np.array(flight_data['up'])-offset_turn*np.array(abs(flight_data['us']))
+        offset_pitch = offset_dep*np.array(flight_data['up'])#-offset_turn*np.array(abs(flight_data['us']))
         flight_data['offset_pitch'] = offset_pitch
         print('Offset pitch depower: ', offset_dep, 'Offset pitch turn: ', offset_turn)   
         flight_data['kite_0_pitch'] = flight_data['kite_0_pitch']+offset_pitch
@@ -187,6 +187,12 @@ def postprocess_results(results,flight_data, kite, imus = [0], remove_IMU_offset
         
     if remove_vane_offsets:
         flight_data = correct_aoa_ss_measurements(results, flight_data)
+    
+    if estimate_kite_angle:
+        for imu in imus:
+            results['aoa_IMU_'+str(imu)] = results['aoa_IMU_'+str(imu)]-flight_data['offset_pitch']
+        results['aoa'] = results['aoa']-flight_data['offset_pitch']
+        flight_data['kite_angle_of_attack'] = flight_data['kite_angle_of_attack']-flight_data['offset_pitch']
     
     return results, flight_data
 
@@ -263,7 +269,7 @@ def determine_turn_straight(row):
     
 def determine_powered_depowered(row):
     
-    if (row['up']>0.25):
+    if (row['up']>0.6):
         return 'depowered'
     else:
         return 'powered'

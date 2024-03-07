@@ -32,14 +32,14 @@ imus = [0]
 
 #%%
 results, flight_data = postprocess_results(results,flight_data, kite, imus = [0], remove_IMU_offsets=True, 
-                                           correct_IMU_deformation = True,remove_vane_offsets=True)
+                                           correct_IMU_deformation = True,remove_vane_offsets=True,estimate_kite_angle=True)
 #%%
 flight_data = calculate_wind_speed_airborne_sensors(results,flight_data, imus = [0])
 # Postprocess done
 
 #%%Plot results wind speed
 
-pu.plot_wind_speed(results.iloc[6000:-6000],flight_data.iloc[6000:-6000], plot_lidar_heights,IMU_0=True, IMU_1=False, savefig=False) # PLot calculated wind speed against lidar
+pu.plot_wind_speed(results.iloc[6000:-6000],flight_data.iloc[6000:-6000], plot_lidar_heights,IMU_0=False, IMU_1=False, savefig=False) # PLot calculated wind speed against lidar
 
 #%%
 # pu.plot_wind_profile(flight_data.iloc[6000:-6000], results.iloc[6000:-6000], savefig=False) # Plot wind profile
@@ -60,9 +60,10 @@ pu.plot_aero_coeff_vs_up_us(results, flight_data, cycles_plotted,IMU_0=True,save
 # results = results.iloc[1000::]
 mask = (flight_data['turn_straight'] == 'straight')&(flight_data['powered'] == 'powered')
 pu.plot_CL_CD_aoa(results,flight_data, mask, 'EKF') # Plot CL vs CD for different aoa
-pu.plot_CL_CD_ss(results,flight_data, mask, 'IMU_0')    # Plot CL vs CD for different aoa_ss
-# pu.plot_prob_coeff_vs_aoa_ss(results, results.CL**3/results.CD**2, mask, 'IMU_0') # Plot CL^3/CD^2 vs aoa_ss
-# pu.plot_prob_coeff_vs_aoa_ss(results, results.CL/results.CD, mask, 'IMU_0') # Plot CL/CD vs aoa_ss
+pu.plot_CL_CD_up(results,flight_data, mask, 'EKF') # Plot CL vs CD for different aoa
+pu.plot_CL_CD_ss(results,flight_data, mask, 'meas')    # Plot CL vs CD for different aoa_ss
+pu.plot_prob_coeff_vs_aoa_ss(results, results.CL**3/results.CD**2, mask, 'EKF') # Plot CL^3/CD^2 vs aoa_ss
+pu.plot_prob_coeff_vs_aoa_ss(results, results.CL/results.CD, mask, 'EKF') # Plot CL/CD vs aoa_ss
 
 
 #%% Time series
