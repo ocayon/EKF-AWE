@@ -578,11 +578,21 @@ def plot_CL_CD_aoa(results,flight_data,mask,aoa_method):
     else:
         aoa = flight_data['kite_angle_of_attack']
     
-
+    
     fig, axs = plt.subplots(2,1, figsize=(10, 10), sharex=True)
     fig.suptitle('CL and CD vs aoa')
     plot_probability_density(aoa[mask],results['CL'][mask],fig,axs[0],ylabel='CL')
     plot_probability_density(aoa[mask],results['CD'][mask],fig,axs[1],'aoa','CD')
+    
+def plot_CL_CD_up(results,flight_data,mask,aoa_method):
+
+    up = flight_data['up']
+    
+    
+    fig, axs = plt.subplots(2,1, figsize=(10, 10), sharex=True)
+    fig.suptitle('CL and CD vs aoa')
+    plot_probability_density(up[mask],results['CL'][mask],fig,axs[0],ylabel='CL')
+    plot_probability_density(up[mask],results['CD'][mask],fig,axs[1],'aoa','CD')
 
 def plot_CL_CD_ss(results,flight_data,mask,ss_method):
 
@@ -590,8 +600,8 @@ def plot_CL_CD_ss(results,flight_data,mask,ss_method):
         ss = results['ss_IMU_0']
     elif ss_method == 'IMU_1':
         ss = results['ss_IMU_1']
-    elif ss_method == 'EKF=':
-        ss = results['ss_EKF=']
+    elif ss_method == 'EKF':
+        ss = results['ss']
     else:
         ss = flight_data['kite_sideslip_angle']
 
@@ -608,13 +618,13 @@ def plot_prob_coeff_vs_aoa_ss(results,coeff,mask,aoa_method):
     elif aoa_method == 'IMU_1':
         aoa = results['aoa_IMU_1']
         ss = results['ss_IMU_1']
-    elif aoa_method == 'EKF_tether':
-        aoa = results['aoa_EKF_tether']
-        ss = results['ss_EKF_tether']
+    elif aoa_method == 'EKF':
+        aoa = results['aoa']
+        ss = results['ss']
     else:
         aoa = results['aoa']
         ss = np.zeros(len(results))
-
+    
     fig, axs = plt.subplots(1,2, figsize=(10, 6))
     fig.suptitle('Probability Density vs aoa and ss')
     plot_probability_density(aoa[mask],coeff[mask],fig,axs[0],xlabel='aoa')
