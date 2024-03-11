@@ -3,6 +3,7 @@ import casadi as ca
 from config import kappa, z0
 from scipy.interpolate import splrep, splev
 from dataclasses import dataclass
+import pandas as pd
 #%% Class definitions
 class KiteModel:
     def __init__(self, model_name, mass, area, distance_kcu_kite, total_length_bridle_lines, diameter_bridle_lines, KCU):
@@ -309,7 +310,6 @@ def calculate_euler_from_reference_frame(dcm):
     return roll, pitch, yaw
 
 def calculate_airflow_angles(dcm, v_kite, vw):
-    ex_kite = dcm[:,0]      # Kite x axis
     ey_kite = dcm[:,1]      # Kite y axis perpendicular to v and tether
     ez_kite = dcm[:,2]      # Kite z axis pointing in the direction of the tension
     va = vw-v_kite
@@ -368,3 +368,49 @@ def create_input_from_KP_csv(flight_data, system_specs, kite_sensor = 0, kcu_sen
                                        tether_length[i], n_tether_elements, kite, kcu,tether)
 
     return ekf_input_list, x0
+
+def convert_ekf_output_to_df(ekf_output_list):
+    """Convert list of EKFOutput instances to DataFrame"""
+    x =[]
+    y = []
+    z = []
+    vx = []
+    vy = []
+    vz = []
+    wind_velocity = []
+    wind_direction = []
+    tether_force = []
+    roll = []
+    pitch = []
+    yaw = []
+    aoa = []
+    ss = []
+    tether_length = []
+    CL = []
+    CD = []
+    CS = []
+    for i in range(len(ekf_output_list)):
+        x.append(ekf_output_list[i].kite_pos[0])
+        y.append(ekf_output_list[i].kite_pos[1])
+        z.append(ekf_output_list[i].kite_pos[2])
+        vx.append(ekf_output_list[i].kite_vel[0])
+        vy.append(ekf_output_list[i].kite_vel[1])
+        vz.append(ekf_output_list[i].kite_vel[2])
+        wind_velocity.append(ekf_output_list[i].wind_velocity)
+        wind_direction.append(ekf_output_list[i].wind_direction)
+        tether_force.append(ekf_output_list[i].tether_force)
+        roll.append(ekf_output_list[i].roll)
+        pitch.append(ekf_output_list[i].pitch)
+        yaw.append(ekf_output_list[i].yaw)
+        aoa.append(ekf_output_list[i].kite_aoa)
+        ss.append(ekf_output_list[i].kite_sideslip)
+        tether_length.append(ekf_output_list[i].tether_length)
+        CL.append(ekf_output_list[i].CL)
+        CD.append(ekf_output_list[i].CD)
+        CS.append(ekf_output_list[i].CS)
+    ekf_output_df = pd.DataFrame({'x': x, 'y': y, 'z': z, 'vx': vx, 'vy': vy, 'vz': vz, 
+                                  'wind_velocity': wind_velocity, 'wind_direction': wind_direction,
+                                'tether_force': tether_force, 'roll': roll, 'pitch': pitch, 'yaw': yaw, 'aoa': aoa, 'ss': ss, 'tether_length': tether_length,
+                                'CL': CL, 'CD': CD, 'CS': CS})
+
+    return ekf_output_df

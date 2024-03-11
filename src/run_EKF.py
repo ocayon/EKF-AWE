@@ -5,79 +5,36 @@ from config import kite_model, kcu_model, tether_diameter, tether_material, \
                      doIEKF, max_iterations, epsilon, opt_measurements, meas_stdv,model_stdv, n_tether_elements, z0, kappa
 from model_definitions import kite_models, kcu_cylinders, tether_materials
 from utils import calculate_vw_loglaw, calculate_euler_from_reference_frame, calculate_airflow_angles, ModelSpecs, SystemSpecs
-from utils import  KiteModel, KCUModel, EKFInput, find_initial_state_vector, get_measurement_vector, tether_input,EKFOutput, create_input_from_KP_csv
+from utils import  KiteModel, KCUModel, EKFInput, convert_ekf_output_to_df, get_measurement_vector, tether_input,EKFOutput, create_input_from_KP_csv
 from tether_model import TetherModel
 from kalman_filter import ExtendedKalmanFilter, DynamicModel, ObservationModel, observability_Lie_method
 import time
 from pathlib import Path
 
-def store_results(XX_k1_k1, Ft, euler_angles, airflow_angles, tether_length, k):
+def create_ekf_output(ekf, tether):
     """Store results in a list of instances of the class EKFOutput"""
-    ekf_output = []
-    for i in range(k):
-        wind_vel  = XX_k1_k1[6,i]/kappa*np.log(XX_k1_k1[2,i]/z0)
-        ekf_output.append(EKFOutput(kite_pos = XX_k1_k1[0:3,i],
-                                    kite_vel = XX_k1_k1[3:6,i],
-                                    wind_velocity = wind_vel,
-                                    wind_direction = XX_k1_k1[7,i],
-                                    tether_force=Ft[i],
-                                    roll = euler_angles[i][0],
-                                    pitch = euler_angles[i][1],
-                                    yaw = euler_angles[i][2],
-                                    kite_aoa = airflow_angles[i][0],
-                                    kite_sideslip = airflow_angles[i][1],
-                                    tether_length = tether_length[i],
-                                    CL = XX_k1_k1[8,i],
-                                    CD = XX_k1_k1[9,i],
-                                    CS = XX_k1_k1[10,i]))
-                                
+    # Store tether force and tether model results
+    euler_angles = calculate_euler_from_reference_frame(tether.dcm_b2w)
+    airflow_angles = calculate_airflow_angles(tether.dcm_b2w, ekf.x_k1_k1[3:6], calculate_vw_loglaw(ekf.x_k1_k1[6], z0, ekf.x_k1_k1[2], ekf.x_k1_k1[7]))
+    x = ekf.x_k1_k1
+
+    wind_vel  = x[6]/kappa*np.log(x[2]/z0)
+    ekf_output = EKFOutput(kite_pos = x[0:3],
+                                kite_vel = x[3:6],
+                                wind_velocity = wind_vel,
+                                wind_direction = x[7],
+                                tether_force=tether.Ft_kite,
+                                roll = euler_angles[0],
+                                pitch = euler_angles[1],
+                                yaw = euler_angles[2],
+                                kite_aoa = airflow_angles[0],
+                                kite_sideslip = airflow_angles[1],
+                                tether_length = tether.stretched_tether_length,
+                                CL = x[8],
+                                CD = x[9],
+                                CS = x[10])
+                            
     return ekf_output
-
-def convert_ekf_output_to_df(ekf_output_list):
-    """Convert list of EKFOutput instances to DataFrame"""
-    x =[]
-    y = []
-    z = []
-    vx = []
-    vy = []
-    vz = []
-    wind_velocity = []
-    wind_direction = []
-    tether_force = []
-    roll = []
-    pitch = []
-    yaw = []
-    aoa = []
-    ss = []
-    tether_length = []
-    CL = []
-    CD = []
-    CS = []
-    for i in range(len(ekf_output_list)):
-        x.append(ekf_output_list[i].kite_pos[0])
-        y.append(ekf_output_list[i].kite_pos[1])
-        z.append(ekf_output_list[i].kite_pos[2])
-        vx.append(ekf_output_list[i].kite_vel[0])
-        vy.append(ekf_output_list[i].kite_vel[1])
-        vz.append(ekf_output_list[i].kite_vel[2])
-        wind_velocity.append(ekf_output_list[i].wind_velocity)
-        wind_direction.append(ekf_output_list[i].wind_direction)
-        tether_force.append(ekf_output_list[i].tether_force)
-        roll.append(ekf_output_list[i].roll)
-        pitch.append(ekf_output_list[i].pitch)
-        yaw.append(ekf_output_list[i].yaw)
-        aoa.append(ekf_output_list[i].kite_aoa)
-        ss.append(ekf_output_list[i].kite_sideslip)
-        tether_length.append(ekf_output_list[i].tether_length)
-        CL.append(ekf_output_list[i].CL)
-        CD.append(ekf_output_list[i].CD)
-        CS.append(ekf_output_list[i].CS)
-    ekf_output_df = pd.DataFrame({'x': x, 'y': y, 'z': z, 'vx': vx, 'vy': vy, 'vz': vz, 
-                                  'wind_velocity': wind_velocity, 'wind_direction': wind_direction,
-                                'tether_force': tether_force, 'roll': roll, 'pitch': pitch, 'yaw': yaw, 'aoa': aoa, 'ss': ss, 'tether_length': tether_length,
-                                'CL': CL, 'CD': CD, 'CS': CS})
-
-    return ekf_output_df
 
 
 def create_kite(model_name):
@@ -105,6 +62,61 @@ def create_tether(material_name,diameter):
     else:
         raise ValueError("Invalid tether material")
 
+def initialize_ekf(ekf_input, model_specs, system_specs):
+    """Initialize the Extended Kalman Filter"""
+    kite = create_kite(system_specs.kite_model)
+    kcu = create_kcu(system_specs.kcu_model)
+    tether = create_tether(system_specs.tether_material,system_specs.tether_diameter)
+    # Create dynamic model and observation model
+    dyn_model = DynamicModel(kite,model_specs.ts)
+    obs_model = ObservationModel(dyn_model.x,dyn_model.u,model_specs.opt_measurements,kite)
+    # Initialize EKF
+    ekf = ExtendedKalmanFilter(system_specs.stdv_dynamic_model, system_specs.stdv_measurements, model_specs.ts,dyn_model,obs_model, model_specs.doIEKF, model_specs.epsilon, model_specs.max_iterations)
+    return ekf, dyn_model,kite, kcu, tether
+
+def update_tether(x,ekf_input, model_specs, tether, kite, kcu):
+    kite_acc, fti, lti, kcu_acc, kcu_vel = tether_input(ekf_input,model_specs)
+    tether.solve_tether_shape(n_tether_elements, x[0:3], x[3:6], calculate_vw_loglaw(x[6], z0, x[2], x[7]), kite, kcu, tension_ground = fti, tether_length = lti,
+                                a_kite = kite_acc, a_kcu = kcu_acc, v_kcu = kcu_vel)
+    return tether
+
+def update_ekf(ekf, dyn_model, u, z):
+    ############################################################
+    # Propagate state with dynamic model
+    ############################################################
+    
+    x_k1_k = dyn_model.propagate(ekf.x_k1_k1,u)
+
+    ############################################################
+    # Update state with Kalmann filter
+    ############################################################
+    ekf.initialize(x_k1_k,u,z)
+    # Predict next step
+    ekf.predict()
+    # Update next step
+    ekf.update()
+    return ekf
+
+def update_state_ekf_tether(ekf, tether, kite, kcu, dyn_model, ekf_input, model_specs):
+    """Update the state of the Extended Kalman Filter and the tether model"""
+
+
+    zi = get_measurement_vector(ekf_input,model_specs.opt_measurements)
+    if model_specs.correct_height:
+        zi[2] = tether.kite_pos[2]
+    ############################################################
+    # Update EKF
+    ############################################################
+    ekf = update_ekf(ekf, dyn_model, tether.Ft_kite, zi)
+    ############################################################
+    # Calculate Input for next step with quasi-static tether model
+    ############################################################
+    tether = update_tether(ekf.x_k1_k1,ekf_input, model_specs, tether, kite, kcu)
+
+    ekf_output = create_ekf_output(ekf, tether)
+
+    return ekf, tether, ekf_output
+
 def run_EKF(ekf_input_list, model_specs, system_specs,x0):
     """Run the Extended Kalman Filter
     Args:
@@ -115,101 +127,32 @@ def run_EKF(ekf_input_list, model_specs, system_specs,x0):
     Returns:
         df: DataFrame with the results
     """
-    kite = create_kite(system_specs.kite_model)
-    kcu = create_kcu(system_specs.kcu_model)
-    tether = create_tether(system_specs.tether_material,system_specs.tether_diameter)
-   
-    # Create dynamic model and observation model
-    dyn_model = DynamicModel(kite,model_specs.ts)
-    obs_model = ObservationModel(dyn_model.x,dyn_model.u,model_specs.opt_measurements,kite)
-
     # Initialize EKF
-    ekf = ExtendedKalmanFilter(system_specs.stdv_dynamic_model, system_specs.stdv_measurements, model_specs.ts,dyn_model,obs_model, model_specs.doIEKF, model_specs.epsilon, model_specs.max_iterations)
-    ekf_input = ekf_input_list[0]
+    ekf, dyn_model,kite, kcu, tether = initialize_ekf(ekf_input_list[0], model_specs, system_specs)
+
     # Initial measurement vector
-    meas0 = get_measurement_vector(ekf_input,model_specs.opt_measurements)
-    kite_acc, fti, lti, kcu_acc, kcu_vel = tether_input(ekf_input,model_specs)
-    tether.solve_tether_shape(n_tether_elements, x0[0:3], x0[3:6], calculate_vw_loglaw(x0[6], z0, x0[2], x0[7]), kite, kcu, tension_ground = fti, tether_length = lti,
-                                a_kite = kite_acc, a_kcu = kcu_acc, v_kcu = kcu_vel)
-    
+    tether = update_tether(x0, ekf_input_list[0], model_specs, tether, kite, kcu)
     if model_specs.correct_height:
         x0[2] = tether.kite_pos[2]
+
     # Define results matrices
     n_intervals = len(ekf_input_list)
-    N = n_intervals
-    n = len(x0)
-    nm = len(meas0)
-    
-    # allocate space to store traces and other Kalman filter params
-    XX_k1_k1    = np.zeros([n, N])
-    err_meas    = np.zeros([nm, N])
-    STD_x_cor   = np.zeros([n, N])
-    STD_z       = np.zeros([nm, N])
-    ZZ_pred     = np.zeros([nm, N])
 
-    
-    # arrays for tether model and other results
-    euler_angles = []
-    airflow_angles = []
-    tether_length = []
-    Ft = []             # Tether force
+    ekf_output_list = []    # List of instances of EKFOutput
 
-    # Store Initial values
-    XX_k1_k1[:,0]   = x0
-    ZZ_pred[:,0]    = z0
-    
     # Initial conditions
-    x_k1_k1 = x0
-    u = tether.Ft_kite
+    ekf.x_k1_k1 = x0
      
     start_time = time.time()
     mins = -1
     
     for k in range(n_intervals):
         ekf_input = ekf_input_list[k]
-        zi = get_measurement_vector(ekf_input,model_specs.opt_measurements)
-        if model_specs.correct_height:
-            zi[2] = tether.kite_pos[2]
-        ############################################################
-        # Propagate state with dynamic model
-        ############################################################
-        x_k1_k = dyn_model.propagate(x_k1_k1,u)
-
-        ############################################################
-        # Update state with Kalmann filter
-        ############################################################
-        ekf.initialize(x_k1_k,u,zi)
-        # Predict next step
-        ekf.predict()
-        # Update next step
-        ekf.update()
-        x_k1_k1 = ekf.x_k1_k1
         
-        ############################################################
-        # Calculate Input for next step with quasi-static tether model
-        ############################################################
-        r_kite = x_k1_k1[:3]
-        v_kite = x_k1_k1[3:6]
-        vw = calculate_vw_loglaw(x_k1_k1[6], z0, x_k1_k1[2], x_k1_k1[7])
-        
-        kite_acc, fti, lti, kcu_acc, kcu_vel = tether_input(ekf_input,model_specs)
-        tether.solve_tether_shape(n_tether_elements, r_kite, v_kite, vw, kite, kcu, tension_ground = fti, tether_length = lti,
-                                a_kite = kite_acc, a_kcu = kcu_acc, v_kcu = kcu_vel)
-        u = tether.Ft_kite
-        ############################################################
+        ## Update step
+        ekf, tether, ekf_ouput = update_state_ekf_tether(ekf, tether, kite, kcu, dyn_model, ekf_input, model_specs)
         # Store results
-        ############################################################
-        XX_k1_k1[:,k] = np.array(x_k1_k1).reshape(-1)
-        STD_x_cor[:,k] = ekf.std_x_cor
-        STD_z[:,k] = ekf.std_z
-        ZZ_pred [:,k] = ekf.z_k1_k
-        err_meas[:,k] = ekf.z_k1_k - zi
-
-        # Store tether force and tether model results
-        Ft.append(u)
-        euler_angles.append(calculate_euler_from_reference_frame(tether.dcm_b2w))
-        tether_length.append(tether.stretched_tether_length)
-        airflow_angles.append(calculate_airflow_angles(tether.dcm_b2w, v_kite, vw))
+        ekf_output_list.append(ekf_ouput)
 
         # Print progress
         if k%600==0:
@@ -218,9 +161,6 @@ def run_EKF(ekf_input_list, model_specs, system_specs,x0):
             mins +=1
             print(f"Real time: {mins} minutes.  Elapsed time: {elapsed_time:.2f} seconds")
         
-    # Store results
-    ekf_output_list = store_results(XX_k1_k1, Ft, euler_angles, airflow_angles, tether_length, k+1)   # List of instances of EKFOutput
-
     return ekf_output_list
 
 #%% Read and process data 
