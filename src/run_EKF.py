@@ -42,7 +42,7 @@ def create_kite(model_name):
     if model_name in kite_models:
         model_params = kite_models[model_name]
         return KiteModel(model_name, model_params["mass"], model_params["area"], model_params["distance_kcu_kite"],
-                     model_params["total_length_bridle_lines"], model_params["diameter_bridle_lines"],model_params['KCU'])
+                     model_params["total_length_bridle_lines"], model_params["diameter_bridle_lines"],model_params['KCU'], model_params["span"])
     else:
         raise ValueError("Invalid kite model")
     
