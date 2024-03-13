@@ -25,30 +25,69 @@ def find_turn_law(flight_data):
     # opt_res = least_squares(get_tether_end_position, list(calculate_polar_coordinates(np.array(kite_pos))), args=args,
     #                         kwargs={'find_force': False}, verbose=0)
 
-def calculate_yaw_rate(x, us, va, beta, yaw,v_kite,radius,forces):
-    norm_va = np.linalg.norm(va, axis=1)
-    norm_v = np.linalg.norm(v_kite, axis=1)
-    yaw_rate = x[0]*norm_va**2*(us)
+# def calculate_yaw_rate(x, us, va, beta, yaw,v_kite,radius,forces):
+#     norm_va = va
+#     norm_v = v_kite
+#     yaw_rate = x[0]*norm_va**2*(us)
     
-    if 'weight' in forces:
-        yaw_rate += -9.81*x[2]*np.cos(beta)*np.sin(yaw)
-    if 'centripetal' in forces:  
-        yaw_rate += x[2]*norm_v**2/radius
+#     if 'weight' in forces:
+#         yaw_rate += -x[1]*np.cos(beta)*np.sin(yaw)
+#     if 'centripetal' in forces:  
+#         yaw_rate += x[2]*norm_v**2/radius
     
-    # if 'sideslip' in forces:
-    #     yaw_rate += x[4]*(np.cos(beta)*np.cos(azimuth)*np.sin(yaw))*norm_va
-    if 'tether' in forces:
-        yaw_rate += x[4]*norm_va**2
-    if 'centripetal' in forces:  
-        yaw_rate = yaw_rate/(x[3]*norm_va)
-    else:
-        yaw_rate = yaw_rate/(x[3]*norm_va+x[2]*norm_v)
+#     # if 'sideslip' in forces:
+#     #     yaw_rate += x[4]*(np.cos(beta)*np.cos(azimuth)*np.sin(yaw))*norm_va
+#     if 'tether' in forces:
+#         yaw_rate += x[4]*norm_va**2
+#     if 'centripetal' in forces:  
+#         yaw_rate = yaw_rate/(x[3]*norm_va)
+#     else:
+#         yaw_rate = yaw_rate/(x[3]*norm_va+x[2]*norm_v)
 
+
+#     return yaw_rate
+
+def calculate_yaw_rate(x, kite, us, va, beta, yaw,v,radius,forces):
+
+    rho = 1.225
+    area = kite.area
+    mass = kite.mass
+    gravity_constant = -9.81
+    B = kite.span
+    
+    Cn_d = x[0]
+    Cn_us = x[1]
+    d_k = x[2]
+    Cn_ass = x[3]
+    
+    k_d = rho*area*B**2*Cn_d/12
+    k_us = 0.5*rho*area*Cn_us
+    k_c = d_k*mass
+    k_g = k_c*gravity_constant
+
+
+    yaw_rate = k_us*us*(va**2)
+    if 'weight' in forces:
+        yaw_rate += k_g*np.sin(yaw)*np.cos(beta)
+    if 'tether' in forces:
+        yaw_rate += (va**2)*Cn_ass
+    if 'centripetal' in forces:  
+        yaw_rate += k_c*v**2/radius
+    
+
+    if 'centripetal' in forces:  
+        yaw_rate = yaw_rate/(k_d*va)
+    else:
+        yaw_rate = yaw_rate/(k_d*va+k_c*v)
+
+    if 'simple' in forces:
+        yaw_rate = k_us*us*(va**2)/(k_d*va)
+    # yaw_rate = (-k_g*np.sin(yaw)*np.cos(beta)+k_us*us*(va**2)+k_c*v**2/radius+(va**2)*Cn_ass)/(k_d*va)
 
     return yaw_rate
 
-def obj_yaw_rate(x, us_data, va_data, beta,yaw,v_kite,radius,forces, observed_yaw_rates):
-    estimated_yaw_rates = calculate_yaw_rate(x, us_data, va_data, beta, yaw,v_kite,radius,forces)
+def obj_yaw_rate(x,kite,us_data, va_data, beta,yaw,v_kite,radius,forces, observed_yaw_rates):
+    estimated_yaw_rates = calculate_yaw_rate(x,kite,us_data, va_data, beta, yaw,v_kite,radius,forces)
     return np.sum((observed_yaw_rates - estimated_yaw_rates) ** 2)
 
 
@@ -355,8 +394,111 @@ def plot_wind_speed(results, flight_data, lidar_heights, IMU_0 = False, IMU_1=Fa
         plt.tight_layout()
         plt.savefig('wind_speed.png', dpi=300)
 
+def plot_wind_speed_height_bins(results, flight_data, lidar_heights, savefig = False):
+    """
+    Plot wind speed based on kite and KCU IMU data
+    :param flight_data: flight data
+    :return: wind speed plot
+    """
+    palette = sns.color_palette("tab10")
+    fig, axs = plt.subplots(3, 1, figsize=(8, 10), sharex=True)
 
+    wvel = results['wind_velocity']
+    wdir = np.degrees(results['wind_direction'])%360
+    i0 = 0
+    wvel100 = []
+    wdir100 = []
+    wvel150 = []
+    wdir150 = []
+    wvel200 = []
+    wdir200 = []
+    wvel250 = []
+    wdir250 = []
+    t_lidar = []
+    i_change = []
+    for column in flight_data.columns:
+        if 'Wind Speed (m/s)' in column:
+            break
+    for i in range(len(flight_data)-1):
+        if flight_data[column].iloc[i] != flight_data[column].iloc[i+1]:
+            wvel = results['wind_velocity'].iloc[i0:i]
+            wdir = np.degrees(results['wind_direction'].iloc[i0:i])%360
+            wvel100.append(np.mean(wvel[results.z<100]))
+            wdir100.append(np.mean(wdir[results.z<100]))
+            wvel150.append(np.mean(wvel[(results.z<150)&(results.z>100)]))
+            wdir150.append(np.mean(wdir[(results.z<150)&(results.z>100)]))
+            wvel200.append(np.mean(wvel[(results.z>150)&(results.z<200)]))
+            wdir200.append(np.mean(wdir[(results.z>150)&(results.z<200)]))
+            wvel250.append(np.mean(wvel[results.z>200]))
+            wdir250.append(np.mean(wdir[results.z>200]))
+            t_lidar.append(flight_data['time'].iloc[i0])
+            i_change.append(i0)
+            i0 = i+1
+            
 
+    i = 0
+    for column in flight_data.columns:
+        if 'Wind Speed (m/s)' in column:
+            height = ''.join(filter(str.isdigit, column))
+            vw_max_col = height + 'm Wind Speed max (m/s)'
+            vw_min_col = height + 'm Wind Speed min (m/s)'
+            label = 'Lidar ' + height +'m height'
+            height = int(height)
+            print(height)
+            col_save = column            
+            if height in lidar_heights:
+                selected_values = [flight_data.iloc[j][column] for j in i_change] 
+                # axs[0].fill_between(flight_data['time'], flight_data[vw_min_col], flight_data[vw_max_col], color=palette[i], alpha=0.3)
+                axs[0].plot(t_lidar, selected_values,color=palette[i], label=label)
+
+                i +=1
+    i = 0
+    for column in flight_data.columns:      
+        if 'Wind Direction' in column:
+            height = ''.join(filter(str.isdigit, column))
+            label = 'Lidar ' + height +'m height'
+            height = int(height)
+            if height in lidar_heights:
+                selected_values = [flight_data.iloc[j][column] for j in i_change] 
+                # axs[0].fill_between(flight_data['time'], flight_data[vw_min_col], flight_data[vw_max_col], color=palette[i], alpha=0.3)
+                axs[1].plot(t_lidar, 360-90-np.array(selected_values),color=palette[i], label=label)
+                i +=1
+    i = 0
+    for column in flight_data.columns:
+        if 'Z-wind (m/s)' in column:
+            height = ''.join(filter(str.isdigit, column))
+            label = 'Lidar ' + height +'m height'
+            height = int(height)
+            if height in lidar_heights:
+                axs[2].plot(flight_data['time'], flight_data[column],color=palette[i], label=label)
+                i +=1
+
+    
+            
+    axs[0].plot(t_lidar, wvel100, label='EKF 100m bin', color = palette[0],linestyle='--')
+    axs[0].plot(t_lidar, wvel150, label='EKF 150m bin', color = palette[1],linestyle='--')
+    axs[0].plot(t_lidar, wvel200, label='EKF 200m bin', color = palette[2],linestyle='--')
+    axs[0].plot(t_lidar, wvel250, label='EKF 250m bin', color = palette[3],linestyle='--')
+    axs[1].plot(t_lidar, wdir100, label='100m', color = palette[0],linestyle='--')
+    axs[1].plot(t_lidar, wdir150, label='150m', color = palette[1],linestyle='--')
+    axs[1].plot(t_lidar, wdir200, label='200m', color = palette[2],linestyle='--')
+    axs[1].plot(t_lidar, wdir250, label='250m', color = palette[3],linestyle='--')
+    
+    # axs[0].set_ylim([0,20])
+    axs[0].legend()
+    axs[0].set_ylabel('Wind speed (m/s)')
+    axs[0].set_xlabel('Time (s)')
+    axs[0].grid()
+    axs[1].legend()
+    axs[1].set_ylabel('Wind direction (rad)')
+    axs[1].set_xlabel('Time (s)')
+    axs[1].grid()
+    axs[2].legend()
+    axs[2].set_ylabel('Wind speed (m/s)')
+    axs[2].grid()
+    if savefig:
+        plt.tight_layout()
+        plt.savefig('wind_speed_bins.png', dpi=300)
 def correct_aoa_ss_measurements(results,flight_data):
 
     # Correct angle of attack and sideslip angle based on EKF mean angle of attack

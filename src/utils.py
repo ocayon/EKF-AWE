@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import pandas as pd
 #%% Class definitions
 class KiteModel:
-    def __init__(self, model_name, mass, area, distance_kcu_kite, total_length_bridle_lines, diameter_bridle_lines, KCU):
+    def __init__(self, model_name, mass, area, distance_kcu_kite, total_length_bridle_lines, diameter_bridle_lines, KCU, span):
         self.model_name = model_name
         self.mass = mass
         self.area = area
@@ -14,6 +14,7 @@ class KiteModel:
         self.total_length_bridle_lines = total_length_bridle_lines
         self.diameter_bridle_lines = diameter_bridle_lines
         self.KCU = KCU
+        self.span = span
 class KCUModel:
     # Exracted from Applied fluid dynamics handbook
     ldt_data = np.array([0,0.5,1.0,1.5,2.0,3.0,4.0,5.0])  # L/D values
