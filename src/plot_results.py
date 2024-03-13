@@ -6,9 +6,9 @@ from run_EKF import create_kite
 import seaborn as sns
 import plot_utils as pu
 from postprocessing import calculate_wind_speed_airborne_sensors, postprocess_results
-year = '2019'
-month = '10'
-day = '08'
+year = '2024'
+month = '02'
+day = '16'
 plt.close('all')
 path = '../results/'+kite_model+'/'
 file_name = kite_model+'_'+year+'-'+month+'-'+day
@@ -16,13 +16,6 @@ date = year+'-'+month+'-'+day
 
 results = pd.read_csv(path+file_name+'_res_GPS.csv')
 flight_data = pd.read_csv(path+file_name+'_fd.csv')
-
-offset_df = pd.read_csv('../processed_data/IMU_offset.csv')
-
-for i in range(len(offset_df)):
-    if offset_df['date'].iloc[i] == date:
-        offset = offset_df.iloc[i]
-        break
 
 plot_lidar_heights= [100,160,200,250]
 
@@ -40,9 +33,11 @@ flight_data = calculate_wind_speed_airborne_sensors(results,flight_data, imus = 
 #%%Plot results wind speed
 
 pu.plot_wind_speed(results.iloc[6000:-6000],flight_data.iloc[6000:-6000], plot_lidar_heights,IMU_0=False, IMU_1=False, savefig=False) # PLot calculated wind speed against lidar
+#%%
+pu.plot_wind_speed_height_bins(results.iloc[6000:-6000],flight_data.iloc[6000:-6000], plot_lidar_heights, savefig=True) # Plot calculated wind speed against lidar
 
 #%%
-# pu.plot_wind_profile(flight_data.iloc[6000:-6000], results.iloc[6000:-6000], savefig=False) # Plot wind profile
+pu.plot_wind_profile(flight_data.iloc[6000:-6000], results.iloc[6000:-6000], savefig=False) # Plot wind profile
 
 
 
