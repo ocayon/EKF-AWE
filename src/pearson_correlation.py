@@ -1,14 +1,16 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from config import kappa, z0, kite_model, year, month, day
-from utils import get_tether_end_position,  R_EG_Body, calculate_angle,project_onto_plane, create_kite
+from config import kappa, z0, kite_model
+from utils import   R_EG_Body, calculate_angle,project_onto_plane, create_kite
 import seaborn as sns
 
 #%%
 plt.close('all')
 
-
+year = '2024'
+month = '02'
+day = '16'
 path = '../results/'+kite_model+'/'
 file_name = kite_model+'_'+year+'-'+month+'-'+day
 date = year+'-'+month+'-'+day
@@ -188,24 +190,42 @@ turn_left = turn  & (azimuth>0)
 straight_right = straight  & (azimuth_rate<0)
 straight_left = straight  & (azimuth_rate>0)
 #%% Create mask for plotting
-
-mask= pow
+mech_power = np.array(flight_data['ground_tether_force']*flight_data['ground_tether_reelout_speed'])
+wvel = results['wind_velocity']
+measured_Ft = flight_data['ground_tether_force']
+roll = results['roll']
+x = results['x']
+y = results['y']
+z = results['z']
+vx = results['vx']
+vy = results['vy']
+vz = results['vz']
+azimuth = np.arctan2(y,x)
+elevation = np.arctan2(z,np.sqrt(x**2+y**2))
+wdir = results['wind_direction']
+vw = np.vstack((wvel*np.cos(wdir),wvel*np.sin(wdir),np.zeros(len(wvel)))).T
+v_kite = np.vstack((np.array(vx),np.array(vy),np.array(vz))).T
+va = vw-v_kite
+va_mod = np.linalg.norm(va,axis = 1)
+mask= [True]*len(flight_data)
 pearson_data = pd.DataFrame({   'measured_Ft':measured_Ft[mask],
                                 'wvel_EKF': wvel[mask],
-                                'slack':slack[mask],
                                 'v_kite':np.linalg.norm(v_kite[mask],axis = 1),
                                 'va':va_mod[mask],
-                                'height':z[mask],
-                                'pitch':pitch[mask],
-                                'roll':meas_roll[mask],
-                                'yaw':meas_yaw[mask],
+                                'mech_power': mech_power[mask],
+                                'up': flight_data['up'].iloc[mask],
+                                # 'height':z[mask],
+                                # 'pitch':pitch[mask],
+                                # 'roll':meas_roll[mask],
+                                # 'yaw':meas_yaw[mask],
                                 'azimuth':azimuth[mask]-wdir[mask],
                                 'elevation':elevation[mask], 
-                                'CL':CL_EKF[mask],
-                                'CD':CD_EKF[mask],
-                                'CL3/CD2':CL_EKF[mask]**3/CD_EKF[mask]**2,
-                                'aoa':aoa[mask],
-                                'sideslip':sideslipcalc[mask]
+                                'reelout_speed': flight_data['ground_tether_reelout_speed'].iloc[mask],
+                                # 'CL':CL_EKF[mask],
+                                # 'CD':CD_EKF[mask],
+                                # 'CL3/CD2':CL_EKF[mask]**3/CD_EKF[mask]**2,
+                                # 'aoa':aoa[mask],
+                                # 'sideslip':sideslipcalc[mask]
                                 })
 
 
@@ -217,4 +237,4 @@ plt.figure(figsize=(10, 8))
 sns.heatmap(correlation_matrix, annot=True, fmt=".2f", cmap='coolwarm')
 plt.title('Heatmap of Pearson Correlation Coefficient')
 plt.show()
-plt.savefig('pearson.png', dpi=300) 
+# plt.savefig('pearson.png', dpi=300) 
