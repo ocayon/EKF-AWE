@@ -19,15 +19,59 @@ def calculate_mse(measured, calculated):
 
 def calculate_rmse(measured, calculated):
     return np.sqrt(calculate_mse(measured, calculated))
+
+def calculate_yaw_rate(x, kite, us, va, beta, yaw,v,radius,forces):
+
+    rho = 1.225
+    area = kite.area
+    mass = kite.mass
+    gravity_constant = -9.81
+    B = kite.span
+    
+    Cn_d = x[0]
+    Cn_us = x[1]
+    d_k = x[2]
+    Cn_ass = x[3]
+    
+    k_d = rho*area*B**2*Cn_d/12
+    k_us = 0.5*rho*area*Cn_us
+    k_c = d_k*mass
+    k_g = k_c*gravity_constant
+
+
+    yaw_rate = k_us*us*(va**2)
+    if 'weight' in forces:
+        yaw_rate += k_g*np.sin(yaw)*np.cos(beta)
+    if 'tether' in forces:
+        yaw_rate += (va**2)*Cn_ass
+    if 'centripetal' in forces:  
+        yaw_rate += k_c*v**2/radius
+    
+
+    if 'centripetal' in forces:  
+        yaw_rate = yaw_rate/(k_d*va)
+    else:
+        yaw_rate = yaw_rate/(k_d*va+k_c*v)
+
+    if 'simple' in forces:
+        yaw_rate = k_us*us*(va**2)/(k_d*va)
+    # yaw_rate = (-k_g*np.sin(yaw)*np.cos(beta)+k_us*us*(va**2)+k_c*v**2/radius+(va**2)*Cn_ass)/(k_d*va)
+
+    return yaw_rate
+
+def obj_yaw_rate(x,kite,us_data, va_data, beta,yaw,v_kite,radius,forces, observed_yaw_rates):
+    estimated_yaw_rates = calculate_yaw_rate(x,kite,us_data, va_data, beta, yaw,v_kite,radius,forces)
+    return np.sum((observed_yaw_rates - estimated_yaw_rates) ** 2)
+
 # %%
 plt.close('all')
 
-year = '2019'
-month = '10'
-day = '08'
-kite_model = 'v3'                   # Kite model name, if Costum, change the kite parameters next
-kcu_model = 'KP1'                   # KCU model name
-tether_diameter = 0.01            # Tether diameter [m]
+year = '2024'
+month = '02'
+day = '16'
+kite_model = 'v9'                   # Kite model name, if Costum, change the kite parameters next
+kcu_model = 'KP2'                   # KCU model name
+tether_diameter = 0.014            # Tether diameter [m]
 
 
 path = '../results/'+kite_model+'/'
@@ -39,7 +83,7 @@ flight_data = pd.read_csv(path+file_name+'_fd.csv')
 
 kite = create_kite(kite_model)
 #%%
-results, flight_data = postprocess_results(results,flight_data, kite, imus = [0], remove_IMU_offsets=True, 
+results, flight_data = postprocess_results(results,flight_data, kite, imus = [0], remove_IMU_offsets=False, 
                                             correct_IMU_deformation = True,remove_vane_offsets=True,estimate_kite_angle=True)
 
 #%% Define relevant variables
@@ -64,8 +108,10 @@ elevation = np.arctan2(r_kite[:,2],np.sqrt(r_kite[:,0]**2+r_kite[:,1]**2))
 azimuth = np.arctan2(r_kite[:,1],r_kite[:,0])*180/np.pi
 us = flight_data['us']
 
-window_size = 20
-yaw_rate = flight_data['kite_1_yaw_rate']
+window_size = 30
+yaw_rate = np.diff(np.unwrap(flight_data['kite_0_yaw']/180*np.pi)) / 0.1
+yaw_rate = np.concatenate((yaw_rate, [0]))
+# yaw_rate = flight_data['kite_1_yaw_rate']
 yaw_rate = np.convolve(yaw_rate, np.ones(window_size)/window_size, mode='same')
 radius[yaw_rate > 0] = -radius[yaw_rate > 0]
 
@@ -79,9 +125,9 @@ mask = mask&(flight_data['powered'] == 'powered')
 pow = (flight_data['powered'] == 'powered')
 x0 = [0.1, 0, 0, 0, 0]
 # Perform the optimization
-result = minimize(pu.obj_yaw_rate, x0, args=(kite,us[mask], va_kite[mask], elevation[mask], (yaw[mask]), v_kite[mask], radius[mask], forces, yaw_rate[mask]))
+result = minimize(obj_yaw_rate, x0, args=(kite,us[mask], va_kite[mask], elevation[mask], (yaw[mask]), v_kite[mask], radius[mask], forces, yaw_rate[mask]))
 optimal_x = result.x
-y = pu.calculate_yaw_rate(optimal_x,kite,us, va_kite, elevation , yaw, v_kite, radius, forces)
+y = calculate_yaw_rate(optimal_x,kite,us, va_kite, elevation , yaw, v_kite, radius, forces)
 
 
 
@@ -96,7 +142,7 @@ plt.plot(flight_data['time'],yaw_rate, label = 'Only aerodynamic')
 
 # Calculate accuracy metrics for each method
 mae = calculate_mae(yaw_rate[pow], y[pow])*180/np.pi
-mse = calculate_mse(yaw_rate[pow], y[pow])
+mse = calculate_mse(yaw_rate[mask], y[mask])
 rmse = calculate_rmse(yaw_rate[pow], y[pow])*180/np.pi
 # print(f"MAE: {mae}")
 print(f"MSE: {mse}")
@@ -146,7 +192,7 @@ for span in span_array:
     kite.span = span
     kite.area = span**2/AR
     ratios.append(kite.mass/kite.area)
-    yr_span.append(pu.calculate_yaw_rate(optimal_x,kite,us, va, beta , yaw, v, r, forces))
+    yr_span.append(calculate_yaw_rate(optimal_x,kite,us, va, beta , yaw, v, r, forces))
 
 #%%
 plt.figure()
@@ -170,8 +216,8 @@ yr_span1 = []
 for mass in mass_array:
     kite.mass = mass
     ratios.append(kite.mass/kite.area)
-    yr_span.append(pu.calculate_yaw_rate(optimal_x,kite,us, va, beta , yaw, v, r, forces))
-    yr_span1.append(pu.calculate_yaw_rate(optimal_x,kite,us, va, beta , -yaw, v, r, forces))
+    yr_span.append(calculate_yaw_rate(optimal_x,kite,us, va, beta , yaw, v, r, forces))
+    yr_span1.append(calculate_yaw_rate(optimal_x,kite,us, va, beta , -yaw, v, r, forces))
 #%%
 plt.figure()
 plt.plot(ratios, yr_span)
@@ -194,8 +240,8 @@ yr_span1 = []
 for AR in AR_array:
     kite.area = kite.span**2/AR
     ratios.append(kite.mass/kite.area)
-    yr_span.append(pu.calculate_yaw_rate(optimal_x,kite,us, va, beta , yaw, v, r, forces))
-    yr_span1.append(pu.calculate_yaw_rate(optimal_x,kite,us, va, beta , -yaw, v, r, forces))
+    yr_span.append(calculate_yaw_rate(optimal_x,kite,us, va, beta , yaw, v, r, forces))
+    yr_span1.append(calculate_yaw_rate(optimal_x,kite,us, va, beta , -yaw, v, r, forces))
 #%%
 plt.figure()
 plt.plot(AR_array, yr_span)

@@ -47,49 +47,6 @@ def find_turn_law(flight_data):
 
 #     return yaw_rate
 
-def calculate_yaw_rate(x, kite, us, va, beta, yaw,v,radius,forces):
-
-    rho = 1.225
-    area = kite.area
-    mass = kite.mass
-    gravity_constant = -9.81
-    B = kite.span
-    
-    Cn_d = x[0]
-    Cn_us = x[1]
-    d_k = x[2]
-    Cn_ass = x[3]
-    
-    k_d = rho*area*B**2*Cn_d/12
-    k_us = 0.5*rho*area*Cn_us
-    k_c = d_k*mass
-    k_g = k_c*gravity_constant
-
-
-    yaw_rate = k_us*us*(va**2)
-    if 'weight' in forces:
-        yaw_rate += k_g*np.sin(yaw)*np.cos(beta)
-    if 'tether' in forces:
-        yaw_rate += (va**2)*Cn_ass
-    if 'centripetal' in forces:  
-        yaw_rate += k_c*v**2/radius
-    
-
-    if 'centripetal' in forces:  
-        yaw_rate = yaw_rate/(k_d*va)
-    else:
-        yaw_rate = yaw_rate/(k_d*va+k_c*v)
-
-    if 'simple' in forces:
-        yaw_rate = k_us*us*(va**2)/(k_d*va)
-    # yaw_rate = (-k_g*np.sin(yaw)*np.cos(beta)+k_us*us*(va**2)+k_c*v**2/radius+(va**2)*Cn_ass)/(k_d*va)
-
-    return yaw_rate
-
-def obj_yaw_rate(x,kite,us_data, va_data, beta,yaw,v_kite,radius,forces, observed_yaw_rates):
-    estimated_yaw_rates = calculate_yaw_rate(x,kite,us_data, va_data, beta, yaw,v_kite,radius,forces)
-    return np.sum((observed_yaw_rates - estimated_yaw_rates) ** 2)
-
 
 def remove_offsets_IMU_data(flight_data, offset):
     """
