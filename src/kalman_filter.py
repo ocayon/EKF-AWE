@@ -101,7 +101,8 @@ class DynamicModel:
     def __init__(self,kite,tether,kcu,ts):
         
 
-        self.r = ca.SX.sym('x',3)    # Kite position
+        self.r = ca.SX.sym('r',3)    # Kite position
+        self.r_tether_model = ca.SX.sym('r_tether_model',3) # Tether attachment point
         self.v = ca.SX.sym('v',3)    # Kite velocity
         self.uf = ca.SX.sym('uf')    # Ground wind velocity
         self.wdir = ca.SX.sym('wdir')# Ground wind direction
@@ -123,23 +124,53 @@ class DynamicModel:
         self.intg = ca.integrator('intg', 'cvodes', dae, 0,ts)    # Define integrator
 
     def get_state(self,kite,tether,kcu):    
-        
-        # Currently neglecting radial velocity of kite.
-        v_reelout = self.relout_speed
-        tension_ground = self.tether_force
-        
-        r_kite = self.r
-        v_kite = self.v
-        uf = self.uf
-        wdir = self.wdir
-        a_kite = self.acc
-        CL = self.CL
-        CD = self.CD
-        CS = self.CS
-        tether_length = self.tehter_length
-        elevation_0 = self.elevation_0
-        azimuth_0 = self.azimuth_0
 
+        return ca.vertcat(self.r,self.v,self.uf,self.wdir,self.CL,self.CD,self.CS,self.tether_length, self.elevation_0, self.azimuth_0, self.sol_least_squares)
+    
+    def get_input(self):
+        return ca.vertcat(self.reloout_speed,self.Ft)
+
+    def get_fx(self,kite):
+        wvel = self.uf/kappa*ca.log(self.r[2]/z0)
+        vw = ca.vertcat(wvel*ca.cos(self.wdir),wvel*ca.sin(self.wdir),0)
+        self.va = vw - self.v 
+
+        dir_D = self.va/ca.norm_2(self.va)
+        dir_L = self.Ft/ca.norm_2(self.Ft) - ca.dot(self.Ft/ca.norm_2(self.Ft),dir_D)*dir_D
+        dir_S = ca.cross(dir_L,dir_D) 
+
+        L = self.CL*0.5*rho*kite.area*ca.norm_2(self.va)**2*dir_L
+        D = self.CD*0.5*rho*kite.area*ca.norm_2(self.va)**2*dir_D
+        S = self.CS*0.5*rho*kite.area*ca.norm_2(self.va)**2*dir_S
+
+        Fg = ca.vertcat(0, 0, -kite.mass*g)
+        rp = self.v
+        vp = (-self.Ft+L+D+S+Fg)/kite.mass
+        
+        return ca.vertcat(rp,vp,0,0,0,0,0,0,0,0)
+    
+    def get_fx_jac(self):
+        return ca.jacobian(self.fx,self.x)
+
+    def get_fx_jac_fun(self):
+        return ca.Function('calc_Fx', [self.x,self.u],[self.get_fx_jac()])
+    
+    def propagate(self,x,u, kite, tether, kcu):
+        
+        r_kite = x[0:3]
+        v_kite = x[3:6]
+        uf = x[6]
+        wdir = x[7]
+        CL = x[8]
+        CD = x[9]
+        CS = x[10]
+        tether_length = x[11]
+        elevation_0 = x[12]
+        azimuth_0 = x[13]
+        sol_least_squares = x[14:]
+        tension_ground = u[0]
+        reelout_speed = u[1]
+        a_kite = u[2:5]
 
         l_unstrained = tether_length/tether.n_elements
         m_s = np.pi*self.diameter**2/4 * l_unstrained * self.density
@@ -148,21 +179,22 @@ class DynamicModel:
         if kite.KCU == True:
             n_elements += 1
         
-        wvel = uf/kappa*ca.log(self.r[2]/z0)
+        wvel = uf/kappa*np.log(r_kite[2]/z0)
 
-        vtau_kite = project_onto_plane(v_kite,r_kite/ca.norm_2(r_kite)) # Velocity projected onto the tangent plane
-        omega_tether = ca.cross(r_kite,vtau_kite)/(ca.norm_2(r_kite)**2) # Tether angular velocity, with respect to the tether attachment point
+
+        vtau_kite = project_onto_plane(v_kite,r_kite/np.linalg.norm(r_kite)) # Velocity projected onto the tangent plane
+        omega_tether = np.cross(r_kite,vtau_kite)/(np.linalg.norm(r_kite)**2) # Tether angular velocity, with respect to the tether attachment point
 
         if a_kite is not None:
             # Find instantaneuous center of rotation and omega of the kite
-            at = ca.dot(a_kite,v_kite/ca.norm_2(v_kite))*v_kite/ca.norm_2(v_kite) # Tangential acceleration
-            if ca.norm_2(a_kite)<1e-3:
+            at = np.dot(a_kite,np.array(v_kite)/np.linalg.norm(v_kite))*np.array(v_kite)/np.linalg.norm(v_kite) # Tangential acceleration
+            if np.linalg.norm(a_kite)<1e-3:
                 omega_kite = omega_tether # If the kite is not accelerating, the ICR is at infinity, and the kite is rotating at the same rate as the tether
             else:
-                omega_kite = ca.cross(a_kite-at,v_kite)/(ca.norm_2(v_kite)**2) # Angular velocity of the kite
+                omega_kite = np.cross(a_kite-at,v_kite)/(np.linalg.norm(v_kite)**2) # Angular velocity of the kite
 
-            ICR = ca.cross(v_kite,omega_kite)/(ca.norm_2(omega_kite)**2) # Instantaneous center of rotation     
-            alpha = ca.cross(at,ICR)/ca.norm_2(ICR)**2 # Angular acceleration of the kite
+            ICR = np.cross(v_kite,omega_kite)/(np.linalg.norm(omega_kite)**2) # Instantaneous center of rotation     
+            alpha = np.cross(at,ICR)/np.linalg.norm(ICR)**2 # Angular acceleration of the kite
 
         tensions = np.zeros((n_elements, 3))
         tensions[0, 0] = np.cos(elevation_0)*np.cos(azimuth_0)*tension_ground
@@ -194,7 +226,7 @@ class DynamicModel:
             aj = np.cross(omega_tether, vj)
             accelerations[j+1, :] = aj
             delta_p = positions[j+1, :] - positions[j, :]
-            ej = delta_p/ca.norm_2(delta_p)  # Axial direction of tether element
+            ej = delta_p/np.linalg.norm(delta_p)  # Axial direction of tether element
             vwj = wvel*np.log(positions[j+1,2]/z0)/np.log(r_kite[2]/z0)*wdir # Wind
             
             if last_element:
@@ -212,7 +244,7 @@ class DynamicModel:
                     aj = a_kcu
                     accelerations[j+1, :] = aj
 
-                ej = (r_kite-np.array(positions[j+1, :]))/ca.norm_2(r_kite-np.array(positions[j+1, :]))
+                ej = (r_kite-np.array(positions[j+1, :]))/np.linalg.norm(r_kite-np.array(positions[j+1, :]))
 
             # Determine flow at point mass j.
             vaj = vj - vwj  # Apparent wind velocity
@@ -221,11 +253,11 @@ class DynamicModel:
             # TODO: check whether to use vajn
             vajn = vaj - vajp  # Perpendicular to tether element
 
-            vaj_sq = ca.norm_2(vaj)*vaj
+            vaj_sq = np.linalg.norm(vaj)*vaj
 
             # Determina angle between  va and tether
             theta = calculate_angle_2vec(-vaj,ej)
-            # vaj_sq = ca.norm_2(vajn)*vajn
+            # vaj_sq = np.linalg.norm(vajn)*vajn
             CD_tether = self.cd*np.sin(theta)**3+self.cf
             # CL_tether = self.cd*np.sin(theta)**2*np.cos(theta)
             tether_drag_basis = rho*l_unstrained*self.diameter*CD_tether*vaj_sq
@@ -245,34 +277,34 @@ class DynamicModel:
                     
                 elif tether.n_elements == 1:
                     dj = -.25*tether_drag_basis
-                    dp= -.5*rho*ca.norm_2(vajp)*vajp*kcu.cdp*kcu.Ap  # Adding kcu drag perpendicular to kcu
-                    dt= -.5*rho*ca.norm_2(vajn)*vajn*kcu.cdt*kcu.At  # Adding kcu drag parallel to kcu
+                    dp= -.5*rho*np.linalg.norm(vajp)*vajp*kcu.cdp*kcu.Ap  # Adding kcu drag perpendicular to kcu
+                    dt= -.5*rho*np.linalg.norm(vajn)*vajn*kcu.cdt*kcu.At  # Adding kcu drag parallel to kcu
                     dj += dp+dt
-                    cd_kcu = (ca.norm_2(dp+dt))/(0.5*rho*kite.area*ca.norm_2(vaj)**2)
+                    cd_kcu = (np.linalg.norm(dp+dt))/(0.5*rho*kite.area*np.linalg.norm(vaj)**2)
                 elif kcu_element:
                     dj = -.25*tether_drag_basis
                     theta = np.pi/2-theta
                     cd_kcu = kcu.cdt*np.sin(theta)**3+self.cf
                     cl_kcu = kcu.cdt*np.sin(theta)**2*np.cos(theta)
-                    # D_turbine = 0.5*rho*ca.norm_2(vaj)**2*np.pi*0.2**2*1
-                    # dp= -.5*rho*ca.norm_2(vajp)*vajp*kcu.cdp*kcu.Ap  # Adding kcu drag perpendicular to kcu
-                    # dt= -.5*rho*ca.norm_2(vajn)*vajn*kcu.cdt*kcu.At  # Adding kcu drag parallel to kcu
+                    # D_turbine = 0.5*rho*np.linalg.norm(vaj)**2*np.pi*0.2**2*1
+                    # dp= -.5*rho*np.linalg.norm(vajp)*vajp*kcu.cdp*kcu.Ap  # Adding kcu drag perpendicular to kcu
+                    # dt= -.5*rho*np.linalg.norm(vajn)*vajn*kcu.cdt*kcu.At  # Adding kcu drag parallel to kcu
                     # th = -0.5*rho*vaj_sq*np.pi*0.2**2*0.4
                     # dj += dp+dt
                     # Approach described in Hoerner, taken from Paul Thedens dissertation
-                    dir_D = -vaj/ca.norm_2(vaj)
+                    dir_D = -vaj/np.linalg.norm(vaj)
                     dir_L = ej - np.dot(ej,dir_D)*dir_D
-                    L_kcu = 0.5*rho*ca.norm_2(vaj)**2*kcu.Ap*cl_kcu
-                    D_kcu = 0.5*rho*ca.norm_2(vaj)**2*cd_kcu*kcu.Ap
+                    L_kcu = 0.5*rho*np.linalg.norm(vaj)**2*kcu.Ap*cl_kcu
+                    D_kcu = 0.5*rho*np.linalg.norm(vaj)**2*cd_kcu*kcu.Ap
                     dj += L_kcu*dir_L + D_kcu*dir_D #+ D_turbine*dir_D
 
                 else:
-                    dir_D = -vaj/ca.norm_2(vaj)
+                    dir_D = -vaj/np.linalg.norm(vaj)
                     dir_L = ej - np.dot(ej,dir_D)*dir_D
                     cd_t = self.cd*np.sin(theta)**3+self.cf
                     cl_t = self.cd*np.sin(theta)**2*np.cos(theta)
-                    L_t = 0.5*rho*ca.norm_2(vaj)**2*l_unstrained*self.diameter*cl_t
-                    D_t = 0.5*rho*ca.norm_2(vaj)**2*l_unstrained*self.diameter*cd_t
+                    L_t = 0.5*rho*np.linalg.norm(vaj)**2*l_unstrained*self.diameter*cl_t
+                    D_t = 0.5*rho*np.linalg.norm(vaj)**2*l_unstrained*self.diameter*cd_t
                     dj = L_t*dir_L + D_t*dir_D
 
             if not kite.KCU:
@@ -301,48 +333,22 @@ class DynamicModel:
 
             # Derive position of next point mass from former tension
             if kcu_element:
-                positions[j+2, :] = positions[j+1, :] + tensions[j+1, :]/ca.norm_2(tensions[j+1, :]) * kite.distance_kcu_kite
+                positions[j+2, :] = positions[j+1, :] + tensions[j+1, :]/np.linalg.norm(tensions[j+1, :]) * kite.distance_kcu_kite
                 
             elif not last_element:
                 if self.elastic:
-                    l_s = (ca.norm_2(tensions[j+1, :])/self.EA+1)*l_unstrained
+                    l_s = (np.linalg.norm(tensions[j+1, :])/self.EA+1)*l_unstrained
                 else:
                     l_s = l_unstrained
                 stretched_tether_length += l_s
-                positions[j+2, :] = positions[j+1, :] + tensions[j+1, :]/ca.norm_2(tensions[j+1, :]) * l_s
+                positions[j+2, :] = positions[j+1, :] + tensions[j+1, :]/np.linalg.norm(tensions[j+1, :]) * l_s
 
-        return ca.vertcat(self.r,self.v,self.uf,self.wdir,self.CL,self.CD,self.CS,self.bias_lt,self.bias_aoa)
-    
-    def get_input(self):
-        return ca.vertcat(self.reloout_speed,self.Ft)
+        x_int = np.array(self.intg(x0=x,p=u)['xf'].T)
+        x_least_squares = np.array( positions[-1, :] - r_kite )
 
-    def get_fx(self,kite):
-        wvel = self.uf/kappa*ca.log(self.r[2]/z0)
-        vw = ca.vertcat(wvel*ca.cos(self.wdir),wvel*ca.sin(self.wdir),0)
-        self.va = vw - self.v 
-
-        dir_D = self.va/ca.norm_2(self.va)
-        dir_L = self.Ft/ca.norm_2(self.Ft) - ca.dot(self.Ft/ca.norm_2(self.Ft),dir_D)*dir_D
-        dir_S = ca.cross(dir_L,dir_D) 
-
-        L = self.CL*0.5*rho*kite.area*ca.norm_2(self.va)**2*dir_L
-        D = self.CD*0.5*rho*kite.area*ca.norm_2(self.va)**2*dir_D
-        S = self.CS*0.5*rho*kite.area*ca.norm_2(self.va)**2*dir_S
-
-        Fg = ca.vertcat(0, 0, -kite.mass*g)
-        rp = self.v
-        vp = (-self.Ft+L+D+S+Fg)/kite.mass
-        return ca.vertcat(rp,vp,0,0,0,0,0,0,0)
-    
-    def get_fx_jac(self):
-        return ca.jacobian(self.fx,self.x)
-
-    def get_fx_jac_fun(self):
-        return ca.Function('calc_Fx', [self.x,self.u],[self.get_fx_jac()])
-    
-    def propagate(self,x,u):
-        return np.array(self.intg(x0=x,p=u)['xf'].T)
-
+        # Concatenate the results
+        x_next = np.concatenate((x_int,x_least_squares))
+        return x_next
 
 class ObservationModel:
 
