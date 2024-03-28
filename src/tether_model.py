@@ -6,7 +6,7 @@ from utils import project_onto_plane, calculate_angle_2vec
 
 class TetherModel:
     """ Tether model class"""
-    def __init__(self,material,diameter,density,cd,Youngs_modulus,elastic=True):
+    def __init__(self,material,diameter,density,cd,Youngs_modulus,n_elements,elastic=True):
         self.material = material
         self.diameter = diameter
         self.density = density
@@ -16,6 +16,7 @@ class TetherModel:
         self.area = np.pi*(self.diameter/2)**2
         self.EA = self.E*self.area
         self.elastic = elastic
+        self.n_elements = n_elements
     
     def calculate_tether_shape(self,x, n_tether_elements, r_kite, v_kite, vw, kite, kcu, tension_ground = None, tether_length = None,
                                a_kite = None, a_kcu = None, v_kcu = None, return_values=False):

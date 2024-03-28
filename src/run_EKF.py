@@ -54,11 +54,11 @@ def create_kcu(model_name):
     else:
         raise ValueError("Invalid KCU model")
         
-def create_tether(material_name,diameter):
+def create_tether(material_name,diameter,n_tether_elements):
     """"Create tether model class from material name and diameter"""
     if material_name in tether_materials:
         material_params = tether_materials[material_name]
-        return TetherModel(material_name,diameter,material_params["density"],material_params["cd"],material_params["Youngs_modulus"])
+        return TetherModel(material_name,diameter,material_params["density"],material_params["cd"],material_params["Youngs_modulus"],n_tether_elements)
     else:
         raise ValueError("Invalid tether material")
 
@@ -66,10 +66,10 @@ def initialize_ekf(ekf_input, model_specs, system_specs):
     """Initialize the Extended Kalman Filter"""
     kite = create_kite(system_specs.kite_model)
     kcu = create_kcu(system_specs.kcu_model)
-    tether = create_tether(system_specs.tether_material,system_specs.tether_diameter)
+    tether = create_tether(system_specs.tether_material,system_specs.tether_diameter,n_tether_elements)
     # Create dynamic model and observation model
-    dyn_model = DynamicModel(kite,model_specs.ts)
-    obs_model = ObservationModel(dyn_model.x,dyn_model.u,model_specs.opt_measurements,kite)
+    dyn_model = DynamicModel(kite,tether,kcu,model_specs.ts)
+    obs_model = ObservationModel(dyn_model.x,dyn_model.u,model_specs.opt_measurements,kite,tether,kcu)
     # Initialize EKF
     ekf = ExtendedKalmanFilter(system_specs.stdv_dynamic_model, system_specs.stdv_measurements, model_specs.ts,dyn_model,obs_model, model_specs.doIEKF, model_specs.epsilon, model_specs.max_iterations)
     return ekf, dyn_model,kite, kcu, tether
@@ -107,11 +107,9 @@ def update_state_ekf_tether(ekf, tether, kite, kcu, dyn_model, ekf_input, model_
     ############################################################
     # Update EKF
     ############################################################
-    ekf = update_ekf(ekf, dyn_model, tether.Ft_kite, zi)
-    ############################################################
-    # Calculate Input for next step with quasi-static tether model
-    ############################################################
-    tether = update_tether(ekf.x_k1_k1,ekf_input, model_specs, tether, kite, kcu)
+    u = np.concatenate((np.array([ekf_input.reelout_speed, ekf_input.tether_force]), ekf_input.kite_acc))
+    ekf = update_ekf(ekf, dyn_model, u, zi)
+
 
     ekf_output = create_ekf_output(ekf, tether)
 
