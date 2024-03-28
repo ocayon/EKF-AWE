@@ -174,6 +174,9 @@ def find_initial_state_vector(kite_pos, kite_vel, kite_acc, ground_winddir, grou
 #%% Function definitions
 
 def project_onto_plane(vector, plane_normal):
+    if type(vector) == ca.MX:
+        return vector - ca.dot(vector, plane_normal) * plane_normal
+    
     return vector - np.dot(vector, plane_normal) * plane_normal
 
 
@@ -213,6 +216,17 @@ def calculate_angle(vector_a, vector_b, deg=True):
         return angle_rad
 
 def calculate_angle_2vec(vector_a, vector_b, reference_vector=None):
+    
+    if type(vector_a) == ca.MX:
+        dot_product = ca.dot(vector_a, vector_b)
+        magnitude_a = ca.norm_2(vector_a)
+        magnitude_b = ca.norm_2(vector_b)
+        
+        cos_theta = dot_product / (magnitude_a * magnitude_b)
+        angle_rad = ca.arccos(cos_theta)
+        
+        return angle_rad
+    
     dot_product = np.dot(vector_a, vector_b)
     magnitude_a = np.linalg.norm(vector_a)
     magnitude_b = np.linalg.norm(vector_b)
@@ -228,15 +242,6 @@ def calculate_angle_2vec(vector_a, vector_b, reference_vector=None):
 
     return angle_rad
 
-def calculate_angle_2vec_sym(vector_a, vector_b):
-    dot_product = ca.dot(vector_a, vector_b)
-    magnitude_a = ca.norm_2(vector_a)
-    magnitude_b = ca.norm_2(vector_b)
-    
-    cos_theta = dot_product / (magnitude_a * magnitude_b)
-    angle_rad = ca.arccos(cos_theta)
-    
-    return angle_rad
 
 def rank_observability_matrix(A,C):
     # Construct the observability matrix O_numeric
