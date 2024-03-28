@@ -52,6 +52,9 @@ class EKFInput:
     kite_aoa: np.array = None      # Kite angle of attack
     kcu_vel: np.array = None    # KCU velocity in ENU coordinates
     kcu_acc: np.array = None    # KCU acceleration in ENU coordinates
+    reelout_speed: float = None  # Reelout speed
+    elevation: float = None      # Elevation angle
+    azimuth: float = None        # Azimuth angle
 
 @dataclass
 class EKFOutput:
@@ -87,6 +90,11 @@ def get_measurement_vector(input_class, opt_measurements):
         z = np.append(z, input_class.tether_length)
     if 'kite_aoa' in opt_measurements:
         z = np.append(z, input_class.kite_aoa)
+    
+    z = np.append(z,input_class.tether_length)
+    z = np.append(z,input_class.elevation)
+    z = np.append(z,input_class.azimuth)
+    z = np.append(z, np.zeros(3))  # Add zeros for the least-squares problem
 
     return z
 
@@ -128,7 +136,7 @@ class SystemSpecs:
                    model_stdv['v'], model_stdv['v'], model_stdv['v'], 
                    model_stdv['uf'], model_stdv['wdir'], 
                    model_stdv['CL'], model_stdv['CD'], model_stdv['CS'],
-                   model_stdv['bias_lt'], model_stdv['bias_aoa']])
+                   model_stdv['tether_length'], model_stdv['elevation'], model_stdv['azimuth']])  # Standard deviations for the dynamic model
         stdv_y = []
         for _ in range(3):
             stdv_y.append(meas_stdv['x'])
@@ -147,16 +155,21 @@ class SystemSpecs:
                 stdv_y.append(meas_stdv['tether_length'])
             elif key == 'aoa':
                 stdv_y.append(meas_stdv['aoa'])
+        stdv_y.append(meas_stdv['tether_length'])
+        stdv_y.append(meas_stdv['elevation'])
+        stdv_y.append(meas_stdv['azimuth'])
+        for _ in range(3):
+            stdv_y.append(meas_stdv['least_squares']) 
+        
         stdv_y = np.array(stdv_y)
         self.stdv_measurements = stdv_y
 
 
 
-def find_initial_state_vector(kite_pos, kite_vel, kite_acc, ground_winddir, ground_windspeed, tether_force, tether_length, n_tether_elements, kite, kcu,tether):
+def find_initial_state_vector(kite_pos, kite_vel, kite_acc, ground_winddir, ground_windspeed, tether_force, tether_length, n_tether_elements,
+                              elevation, azimuth, kite, kcu,tether):
 
     # Solve for the tether shape
-
-    
     uf = ground_windspeed*kappa/np.log(10/z0)
     wvel0 = uf/kappa*np.log(kite_pos[2]/z0)
     if np.isnan(wvel0):
@@ -166,7 +179,7 @@ def find_initial_state_vector(kite_pos, kite_vel, kite_acc, ground_winddir, grou
     tether.solve_tether_shape(n_tether_elements, kite_pos, kite_vel, vw, kite, kcu, tension_ground = tether_force, tether_length = tether_length,
                                 a_kite = kite_acc)
     x0 = np.vstack((kite_pos,kite_vel))
-    x0 = np.append(x0,[uf,ground_winddir,tether.CL,tether.CD,tether.CS,0,0])     # Initial state vector (Last two elements are bias, used if needed)
+    x0 = np.append(x0,[uf,ground_winddir,tether.CL,tether.CD,tether.CS,tether_length, elevation, azimuth])     # Initial state vector (Last two elements are bias, used if needed)
     u0 = tether.Ft_kite
 
     return x0, u0
@@ -174,7 +187,7 @@ def find_initial_state_vector(kite_pos, kite_vel, kite_acc, ground_winddir, grou
 #%% Function definitions
 
 def project_onto_plane(vector, plane_normal):
-    if type(vector) == ca.MX:
+    if type(vector) == ca.SX:
         return vector - ca.dot(vector, plane_normal) * plane_normal
     
     return vector - np.dot(vector, plane_normal) * plane_normal
@@ -217,7 +230,7 @@ def calculate_angle(vector_a, vector_b, deg=True):
 
 def calculate_angle_2vec(vector_a, vector_b, reference_vector=None):
     
-    if type(vector_a) == ca.MX:
+    if type(vector_a) == ca.SX:
         dot_product = ca.dot(vector_a, vector_b)
         magnitude_a = ca.norm_2(vector_a)
         magnitude_b = ca.norm_2(vector_b)
@@ -350,10 +363,15 @@ def create_input_from_KP_csv(flight_data, system_specs, kite_sensor = 0, kcu_sen
     ground_winddir = np.array(flight_data['ground_wind_direction'])
     apparent_windspeed = np.array(flight_data['kite_apparent_windspeed'])
     kite_aoa = np.array(flight_data['kite_angle_of_attack'])
+    relout_speed = np.array(flight_data['ground_tether_reelout_speed'])
+    kite_elevation = np.arcsin(kite_pos[:,2]/np.linalg.norm(kite_pos,axis=1))
+    kite_azimuth = np.arctan2(kite_pos[:,1],kite_pos[:,0])
+
     
     timestep = flight_data['time'].iloc[1]-flight_data['time'].iloc[0]
     ekf_input_list = []
     for i in range(len(flight_data)):
+        
         ekf_input_list.append(EKFInput(kite_pos = kite_pos[i], 
                                     kite_vel = kite_vel[i], 
                                     kite_acc = kite_acc[i], 
@@ -362,16 +380,18 @@ def create_input_from_KP_csv(flight_data, system_specs, kite_sensor = 0, kcu_sen
                                     tether_length = tether_length[i],
                                     kite_aoa = kite_aoa[i], 
                                     kcu_vel = kcu_vel[i], 
-                                    kcu_acc = kcu_acc[i]))
-                
+                                    kcu_acc = kcu_acc[i], 
+                                    reelout_speed = relout_speed[i], 
+                                    elevation = kite_elevation[i],
+                                    azimuth = kite_azimuth[i]))
 
     kite = create_kite(system_specs.kite_model)
     kcu = create_kcu(system_specs.kcu_model)
-    tether = create_tether(system_specs.tether_material,system_specs.tether_diameter)
+    tether = create_tether(system_specs.tether_material,system_specs.tether_diameter,n_tether_elements)
 
     x0, u0 = find_initial_state_vector(kite_pos[0], kite_vel[0], kite_acc[0], 
                                        np.mean(ground_winddir[0:3000])/180*np.pi, np.mean(ground_windspeed[0]), tether_force[0], 
-                                       tether_length[i], n_tether_elements, kite, kcu,tether)
+                                       tether_length[0], n_tether_elements, kite_elevation[0], kite_azimuth[0], kite, kcu,tether)
 
     return ekf_input_list, x0
 
