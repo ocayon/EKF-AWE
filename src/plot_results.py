@@ -23,21 +23,21 @@ kite = create_kite(kite_model)
 
 imus = [0]
 
-#%%
-# results, flight_data = postprocess_results(results,flight_data, kite, imus = [0], remove_IMU_offsets=True, 
-#                                            correct_IMU_deformation = True,remove_vane_offsets=True,estimate_kite_angle=True)
 # #%%
+# results, flight_data = postprocess_results(results,flight_data, kite, imus = [0], remove_IMU_offsets=False, 
+#                                             correct_IMU_deformation = False,remove_vane_offsets=False,estimate_kite_angle=False)
+# # #%%
 # flight_data = calculate_wind_speed_airborne_sensors(results,flight_data, imus = [0])
 # Postprocess done
 
 #%%Plot results wind speed
 
-pu.plot_wind_speed(results.iloc[6000:-6000],flight_data.iloc[6000:-6000], plot_lidar_heights,IMU_0=False, IMU_1=False, savefig=True) # PLot calculated wind speed against lidar
+pu.plot_wind_speed(results,flight_data, plot_lidar_heights,IMU_0=False, IMU_1=False, savefig=True) # PLot calculated wind speed against lidar
 #%%
-pu.plot_wind_speed_height_bins(results.iloc[6000:-6000],flight_data.iloc[6000:-6000], plot_lidar_heights, savefig=True) # Plot calculated wind speed against lidar
+pu.plot_wind_speed_height_bins(results,flight_data, plot_lidar_heights, savefig=True) # Plot calculated wind speed against lidar
 
 #%%
-pu.plot_wind_profile(flight_data.iloc[6000:-6000], results.iloc[6000:-6000], savefig=True) # Plot wind profile
+pu.plot_wind_profile(flight_data, results, savefig=True) # Plot wind profile
 
 
 
@@ -57,7 +57,7 @@ pu.plot_wind_profile(flight_data.iloc[6000:-6000], results.iloc[6000:-6000], sav
 # mask = np.any(
 #     [flight_data['cycle'] == cycle for cycle in cycles_plotted], axis=0)
 # mask = (flight_data['turn_straight'] == 'straight')&(flight_data['powered'] == 'powered')&mask&(results['CD']>0.03)
-# pu.plot_CL_CD_aoa(results,flight_data, mask, 'EKF') # Plot CL vs CD for different aoa
+# pu.plot_CL_CD_aoa(results,flight_data, mask, '') # Plot CL vs CD for different aoa
 # # pu.plot_CL_CD_up(results,flight_data, mask, 'EKF') # Plot CL vs CD for different aoa
 # pu.plot_CL_CD_ss(results,flight_data, mask, 'EKF')    # Plot CL vs CD for different aoa_ss
 # pu.plot_prob_coeff_vs_aoa_ss(results, results.CL**3/results.CD**2, mask, 'EKF') # Plot CL^3/CD^2 vs aoa_ss

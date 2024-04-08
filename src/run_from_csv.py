@@ -15,6 +15,7 @@ if __name__ == '__main__':
     file_path = Path('../processed_data/flight_data') / kite_model / (file_name + '.csv')
     flight_data = pd.read_csv(file_path)
     flight_data = flight_data.reset_index()
+    # flight_data = flight_data.iloc[:10000]
 
     timestep = flight_data['time'].iloc[1] - flight_data['time'].iloc[0]
 
