@@ -14,8 +14,8 @@ from pathlib import Path
 def create_ekf_output(ekf, tether):
     """Store results in a list of instances of the class EKFOutput"""
     # Store tether force and tether model results
-    euler_angles = calculate_euler_from_reference_frame(tether.dcm_b2w)
-    airflow_angles = calculate_airflow_angles(tether.dcm_b2w, ekf.x_k1_k1[3:6], calculate_vw_loglaw(ekf.x_k1_k1[6], z0, ekf.x_k1_k1[2], ekf.x_k1_k1[7]))
+    # euler_angles = calculate_euler_from_reference_frame(tether.dcm_b2w)
+    # airflow_angles = calculate_airflow_angles(tether.dcm_b2w, ekf.x_k1_k1[3:6], calculate_vw_loglaw(ekf.x_k1_k1[6], z0, ekf.x_k1_k1[2], ekf.x_k1_k1[7]))
     x = ekf.x_k1_k1
 
     wind_vel  = x[6]/kappa*np.log(x[2]/z0)
@@ -23,13 +23,13 @@ def create_ekf_output(ekf, tether):
                                 kite_vel = x[3:6],
                                 wind_velocity = wind_vel,
                                 wind_direction = x[7],
-                                tether_force=tether.Ft_kite,
-                                roll = euler_angles[0],
-                                pitch = euler_angles[1],
-                                yaw = euler_angles[2],
-                                kite_aoa = airflow_angles[0],
-                                kite_sideslip = airflow_angles[1],
-                                tether_length = tether.stretched_tether_length,
+                                tether_force=0,
+                                roll = 0,
+                                pitch = 0,
+                                yaw = 0,
+                                kite_aoa = 0,
+                                kite_sideslip = 0,
+                                tether_length = x[11],
                                 CL = x[8],
                                 CD = x[9],
                                 CS = x[10])
@@ -107,9 +107,10 @@ def update_state_ekf_tether(ekf, tether, kite, kcu, dyn_model, ekf_input, model_
     ############################################################
     # Update EKF
     ############################################################
-    u = np.concatenate((np.array([ekf_input.reelout_speed, ekf_input.tether_force]), ekf_input.kite_acc))
+    
+    u = np.concatenate((np.array([ekf_input.reelout_speed, ekf_input.tether_force]), ekf_input.kcu_acc, np.array([ekf.x_k1_k1[6], ekf.x_k1_k1[7]])))
     ekf = update_ekf(ekf, dyn_model, u, zi)
-
+    
 
     ekf_output = create_ekf_output(ekf, tether)
 
@@ -127,12 +128,13 @@ def run_EKF(ekf_input_list, model_specs, system_specs,x0):
     """
     # Initialize EKF
     ekf, dyn_model,kite, kcu, tether = initialize_ekf(ekf_input_list[0], model_specs, system_specs)
-
+    
     # Initial measurement vector
     tether = update_tether(x0, ekf_input_list[0], model_specs, tether, kite, kcu)
     if model_specs.correct_height:
         x0[2] = tether.kite_pos[2]
-
+        
+    print(x0)
     # Define results matrices
     n_intervals = len(ekf_input_list)
 
@@ -145,6 +147,7 @@ def run_EKF(ekf_input_list, model_specs, system_specs,x0):
     mins = -1
     
     for k in range(n_intervals):
+
         ekf_input = ekf_input_list[k]
         
         ## Update step

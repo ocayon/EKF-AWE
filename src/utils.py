@@ -113,7 +113,7 @@ def tether_input(input_class, model_specs):
 
     return input_class.kite_acc, input_class.tether_force, tether_length, kcu_acc, kcu_vel
 class ModelSpecs:
-    def __init__(self,timestep, n_tether_elements, opt_measurements = [], correct_height = False,  kcu_data = False, doIEKF = True, epsilon = 1e-6, max_iterations = 100):
+    def __init__(self,timestep, n_tether_elements, opt_measurements = [], correct_height = False,  kcu_data = False, doIEKF = True, epsilon = 1e-6, max_iterations = 200):
         self.ts = timestep
         self.n_tether_elements = n_tether_elements
         self.opt_measurements = opt_measurements
@@ -338,7 +338,7 @@ def calculate_airflow_angles(dcm, v_kite, vw):
     sideslip = 90-calculate_angle(ey_kite,va_proj)         # Sideslip angle
     return aoa, sideslip
 
-def create_input_from_KP_csv(flight_data, system_specs, kite_sensor = 0, kcu_sensor = None):
+def create_input_from_KP_csv(flight_data, system_specs, kite_sensor = 0, kcu_sensor = 1):
     """Create input classes and initial state vector from flight data"""
     from config import n_tether_elements
     from run_EKF import create_kite, create_kcu,create_tether
@@ -374,13 +374,13 @@ def create_input_from_KP_csv(flight_data, system_specs, kite_sensor = 0, kcu_sen
         
         ekf_input_list.append(EKFInput(kite_pos = kite_pos[i], 
                                     kite_vel = kite_vel[i], 
-                                    kite_acc = kite_acc[i], 
+                                    kite_acc = kite_acc[i],
+                                    kcu_acc = kcu_acc[i], 
                                     tether_force = tether_force[i],
                                     apparent_windspeed = apparent_windspeed[i], 
                                     tether_length = tether_length[i],
                                     kite_aoa = kite_aoa[i], 
                                     kcu_vel = kcu_vel[i], 
-                                    kcu_acc = kcu_acc[i], 
                                     reelout_speed = relout_speed[i], 
                                     elevation = kite_elevation[i],
                                     azimuth = kite_azimuth[i]))

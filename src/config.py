@@ -23,7 +23,7 @@ z0 = 0.1                            # Surface roughness [m]
 n_tether_elements = 5              # Number of tether elements
 # Kalman filter parameters
 doIEKF = True                       # Use the iterated extended Kalman filter
-max_iterations = 100                 # Maximum number of iterations for the IEKF
+max_iterations = 2000                 # Maximum number of iterations for the IEKF
 epsilon = 1e-6                      # Tolerance for the IEKF
 
 # Measurements
@@ -39,27 +39,27 @@ meas_stdv = {
     'uf': 0.1,                 # Friction velocity
     'va': 0.5,                 # Apparent velocity
     'wdir': (10/180 * np.pi),  # Wind direction
-    'tether_length': 0.1,
+    'tether_length': 1,
     'aoa':      4,     # Angle of attack
     'relout_speed': 0.01,       # Reelout speed
-    'least_squares': 1e-1,       # Least squares
-    'elevation': 1e-1,
-    'azimuth':1e-1
+    'least_squares': 1e-5,       # Least squares
+    'elevation': 0.2,
+    'azimuth':0.2
 }
 
 # Model standard deviations
 if kite_model=='v9':
     model_stdv = {
-        'x': 2.5,                  # Position
-        'v': 1,                  # Velocity       
-        'uf': 3e-3,               # Friction velocity
+        'x': 5,                  # Position
+        'v': 2,                  # Velocity       
+        'uf': 2e-3,               # Friction velocity
         'wdir': (0.1/180 * np.pi),   # Wind direction
-        'CL': 1e-3,                 # Lift coefficient
-        'CD': 1e-3,                 # Drag coefficient
-        'CS': 1e-3,                  # Side force coefficient
-        'elevation' : 1,    # Elevation angle
-        'azimuth' : 1 ,     # Azimuth angle
-        'tether_length' : 20, # Tether length
+        'CL': 1e-2,                 # Lift coefficient
+        'CD': 1e-2,                 # Drag coefficient
+        'CS': 1e-2,                  # Side force coefficient
+        'elevation' : 0.3,    # Elevation angle
+        'azimuth' : 0.3,     # Azimuth angle
+        'tether_length' : 0.1, # Tether length
     }
 
 elif kite_model == 'v3':
