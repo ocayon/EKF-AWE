@@ -1,13 +1,13 @@
 from run_EKF import run_EKF
-from config import kite_model, n_tether_elements, opt_measurements, kcu_model, tether_material, tether_diameter, meas_stdv, model_stdv
+from config import kite_model, n_tether_elements, opt_measurements, kcu_model, tether_material, tether_diameter, meas_stdv, model_stdv, doIEKF
 from pathlib import Path
 from utils import ModelSpecs, SystemSpecs, create_input_from_KP_csv, convert_ekf_output_to_df
 import pandas as pd
 
 if __name__ == '__main__':
     #%% Choose flight data
-    year = '2024'
-    month = '02'
+    year = '2023'
+    month = '11'
     day = '16'
 
     # File path
@@ -15,11 +15,11 @@ if __name__ == '__main__':
     file_path = Path('../processed_data/flight_data') / kite_model / (file_name + '.csv')
     flight_data = pd.read_csv(file_path)
     flight_data = flight_data.reset_index()
-    # flight_data = flight_data.iloc[:10000]
+    flight_data = flight_data.iloc[:36000]
 
     timestep = flight_data['time'].iloc[1] - flight_data['time'].iloc[0]
 
-    model_specs = ModelSpecs(timestep, n_tether_elements, opt_measurements=opt_measurements, correct_height=False)
+    model_specs = ModelSpecs(timestep, n_tether_elements, opt_measurements=opt_measurements, correct_height=False, doIEKF=doIEKF)
     system_specs = SystemSpecs(kite_model, kcu_model, tether_material, tether_diameter, meas_stdv, model_stdv, opt_measurements)
     # Create input classes
     ekf_input_list,x0 = create_input_from_KP_csv(flight_data, system_specs, kite_sensor = 0, kcu_sensor = 1)

@@ -6,10 +6,10 @@ from run_EKF import create_kite
 import seaborn as sns
 import plot_utils as pu
 from postprocessing import calculate_wind_speed_airborne_sensors, postprocess_results
-year = '2024'
-month = '02'
+year = '2023'
+month = '11'
 day = '16'
-plt.close('all')
+# plt.close('all')
 path = '../results/'+kite_model+'/'
 file_name = kite_model+'_'+year+'-'+month+'-'+day
 date = year+'-'+month+'-'+day
@@ -23,9 +23,9 @@ kite = create_kite(kite_model)
 
 imus = [0]
 
-# #%%
-# results, flight_data = postprocess_results(results,flight_data, kite, imus = [0], remove_IMU_offsets=False, 
-#                                             correct_IMU_deformation = False,remove_vane_offsets=False,estimate_kite_angle=False)
+#%%
+results, flight_data = postprocess_results(results,flight_data, kite, imus = [0], remove_IMU_offsets=False, 
+                                            correct_IMU_deformation = False,remove_vane_offsets=False,estimate_kite_angle=False)
 # # #%%
 # flight_data = calculate_wind_speed_airborne_sensors(results,flight_data, imus = [0])
 # Postprocess done
@@ -105,6 +105,54 @@ pu.plot_wind_profile(flight_data, results, savefig=True) # Plot wind profile
 # mask = range(3600,4000)
 # pu.plot_kite_reference_frame(results.iloc[mask], flight_data.iloc[mask], imus)
 
+#%%
+mechanic_power = []
+slack = []
+for cycle in range(0,int(max(np.array(flight_data['cycle'])))):
+    mask = flight_data['cycle'] == cycle
+    mask1 = mask&(flight_data['powered'] == 'powered')
+    mechanic_power.append(np.mean(flight_data['ground_tether_reelout_speed'][mask1]*flight_data['ground_tether_force'][mask1]))
+
+    r = np.sqrt(results.x**2+results.y**2+results.z**2)
+    mask= mask&(flight_data['powered'] == 'depowered')
+    slack.append(np.max(results['tether_length'][mask]-r[mask]+kite.distance_kcu_kite))
+
+x = np.arange(0,max(np.array(flight_data['cycle'])))
+y1 = mechanic_power
+y2 = slack
+# Create figure and first axis
+fig, ax1 = plt.subplots()
+
+# Plot the first dataset with the first y-axis
+ax1.plot(x, y1, 'g-', label='Mechanical power (W)')  # 'g-' for green solid line
+ax1.set_xlabel('X data')
+ax1.set_ylabel('Y1 data', color='g')  # Set the color of y-axis to match the plot
+ax1.tick_params('y', colors='g')
+
+# Create a second y-axis that shares the same x-axis
+ax2 = ax1.twinx()
+# Plot the second dataset with the second y-axis
+ax2.plot(x, y2, 'b-', label='Max. slack reelin')  # 'b-' for blue solid line
+ax2.set_ylabel('Y2 data', color='b')  # Set the color of y-axis to match the plot
+ax2.tick_params('y', colors='b')
+
+# Optional: add a legend
+ax1.legend(loc='upper left')
+ax2.legend(loc='upper right')
+
+plt.title('Double Y Axis Example')
+plt.show()
+#%%
+azimuth_escape =[]
+elevation_escape = []
+for i in range(len(flight_data)):
+    if flight_data['powered'].iloc[i] == 'depowered' and flight_data['powered'].iloc[i-1] == 'powered':
+        azimuth_escape.append(flight_data.kite_azimuth[i])
+        elevation_escape.append(flight_data.kite_elevation[i])
+
+plt.figure()
+# plt.plot(abs(np.array(azimuth_escape)))
+plt.plot(abs(np.array(elevation_escape)))
 #%%
 fs = 10
 signal = np.array(results['wind_velocity'])
