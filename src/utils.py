@@ -28,11 +28,12 @@ class KCUModel:
     spline_t = splrep(ldt_data, cdt_data, s=0)
     spline_p = splrep(ldp_data, cdp_data, s=0)
     
-    def __init__(self,length,diameter,mass):
+    def __init__(self,length,diameter,mass, data_available):
         
         self.length = length
         self.diameter = diameter
         self.mass = mass
+        self.data_available = data_available
 
         # Example: Interpolate Cd for tangential flow at a specific L/D
         self.cdt = splev(self.length/self.diameter, KCUModel.spline_t)
@@ -40,12 +41,17 @@ class KCUModel:
 
         self.At = np.pi*(self.diameter/2)**2  # Calculate area of the KCU
         self.Ap = self.diameter*self.length  # Calculate area of the KCU
+    
+    def calculate_cd(self,ld):
+        ##
+        self.cd_kcu = 0
 
 @dataclass
 class EKFInput:
     kite_pos: np.array      # Kite position in ENU coordinates
     kite_vel: np.array      # Kite velocity in ENU coordinates
     kite_acc: np.array      # Kite acceleration in ENU coordinates
+    ts: float              # Timestep (s)
     tether_force: float     # Ground tether force
     apparent_windspeed: float = None # Apparent windspeed
     tether_length: float = None     # Tether length
@@ -383,7 +389,8 @@ def create_input_from_KP_csv(flight_data, system_specs, kite_sensor = 0, kcu_sen
                                     kcu_vel = kcu_vel[i], 
                                     reelout_speed = relout_speed[i], 
                                     elevation = kite_elevation[i],
-                                    azimuth = kite_azimuth[i]))
+                                    azimuth = kite_azimuth[i], 
+                                    ts = timestep))
 
     kite = create_kite(system_specs.kite_model)
     kcu = create_kcu(system_specs.kcu_model)

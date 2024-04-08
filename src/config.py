@@ -53,7 +53,7 @@ if kite_model=='v9':
         'x': 5,                  # Position
         'v': 2,                  # Velocity       
         'uf': 2e-3,               # Friction velocity
-        'wdir': (0.1/180 * np.pi),   # Wind direction
+        'wdir': (0.2/180 * np.pi),   # Wind direction
         'CL': 1e-2,                 # Lift coefficient
         'CD': 1e-2,                 # Drag coefficient
         'CS': 1e-2,                  # Side force coefficient

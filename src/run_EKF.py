@@ -46,11 +46,11 @@ def create_kite(model_name):
     else:
         raise ValueError("Invalid kite model")
     
-def create_kcu(model_name):
+def create_kcu(model_name, data_available = False):
     """"Create KCU model class from model name and model dictionary"""
     if model_name in kcu_cylinders:
         model_params = kcu_cylinders[model_name]
-        return KCUModel(model_params["length"], model_params["diameter"], model_params["mass"])
+        return KCUModel(model_params["length"], model_params["diameter"], model_params["mass"], data_available)
     else:
         raise ValueError("Invalid KCU model")
         
@@ -65,13 +65,16 @@ def create_tether(material_name,diameter,n_tether_elements):
 def initialize_ekf(ekf_input, model_specs, system_specs):
     """Initialize the Extended Kalman Filter"""
     kite = create_kite(system_specs.kite_model)
-    kcu = create_kcu(system_specs.kcu_model)
+    if ekf_input.kcu_acc is not None:
+        kcu = create_kcu(system_specs.kcu_model, data_available=True)
+    else:
+        kcu = create_kcu(system_specs.kcu_model, data_available=False)
     tether = create_tether(system_specs.tether_material,system_specs.tether_diameter,n_tether_elements)
     # Create dynamic model and observation model
     dyn_model = DynamicModel(kite,tether,kcu,model_specs.ts)
     obs_model = ObservationModel(dyn_model.x,dyn_model.u,model_specs.opt_measurements,kite,tether,kcu)
     # Initialize EKF
-    ekf = ExtendedKalmanFilter(system_specs.stdv_dynamic_model, system_specs.stdv_measurements, model_specs.ts,dyn_model,obs_model, model_specs.doIEKF, model_specs.epsilon, model_specs.max_iterations)
+    ekf = ExtendedKalmanFilter(system_specs.stdv_dynamic_model, system_specs.stdv_measurements, model_specs.ts,dyn_model,obs_model, kite, tether, kcu, model_specs.doIEKF, model_specs.epsilon, model_specs.max_iterations)
     return ekf, dyn_model,kite, kcu, tether
 
 def update_tether(x,ekf_input, model_specs, tether, kite, kcu):
@@ -80,12 +83,12 @@ def update_tether(x,ekf_input, model_specs, tether, kite, kcu):
                                 a_kite = kite_acc, a_kcu = kcu_acc, v_kcu = kcu_vel)
     return tether
 
-def update_ekf(ekf, dyn_model, u, z):
+def update_ekf(ekf, dyn_model, u, z, kite, tether, kcu,ts):
     ############################################################
     # Propagate state with dynamic model
     ############################################################
     
-    x_k1_k = dyn_model.propagate(ekf.x_k1_k1,u)
+    x_k1_k = dyn_model.propagate(ekf.x_k1_k1,u, kite, tether, kcu, ts)
 
     ############################################################
     # Update state with Kalmann filter
@@ -107,9 +110,11 @@ def update_state_ekf_tether(ekf, tether, kite, kcu, dyn_model, ekf_input, model_
     ############################################################
     # Update EKF
     ############################################################
-    
-    u = np.concatenate((np.array([ekf_input.reelout_speed, ekf_input.tether_force]), ekf_input.kcu_acc, np.array([ekf.x_k1_k1[6], ekf.x_k1_k1[7]])))
-    ekf = update_ekf(ekf, dyn_model, u, zi)
+    if kcu.data_available:   
+        u = np.concatenate((np.array([ekf_input.reelout_speed, ekf_input.tether_force]), ekf_input.kcu_acc, ekf_input.kcu_vel))
+    else:
+        u = np.concatenate((np.array([ekf_input.reelout_speed, ekf_input.tether_force]), ekf_input.kite_acc))
+    ekf = update_ekf(ekf, dyn_model, u, zi, kite, tether, kcu,ekf_input.ts)
     
 
     ekf_output = create_ekf_output(ekf, tether)
