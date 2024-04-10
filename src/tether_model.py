@@ -366,11 +366,15 @@ class TetherModel:
 
             # Use force balance to infer tension on next element.
             fgj = np.array([0, 0, -point_mass*g])
-            next_tension = point_mass*aj + tensions[j, :] - fgj - dj  # a_kite gave better fit
+                
             if not last_element:
+                next_tension = point_mass*aj + tensions[j, :] - fgj - dj  # a_kite gave better fit    
                 tensions[j+1, :] = next_tension
                 non_conservative_forces[j, :] = dj
             else:
+                next_tension = tensions[j, :] - fgj - dj  # a_kite gave better fit
+                if a_kite is not None:
+                    next_tension += point_mass*aj
                 aerodynamic_force = next_tension
                 non_conservative_forces[j, :] = dj + aerodynamic_force
 

@@ -78,6 +78,8 @@ class EKFOutput:
     CL : float          # Lift coefficient
     CD : float          # Drag coefficient
     CS : float          # Side force coefficient
+    elevation_first_element : float # Elevation angle of the first tether element
+    azimuth_first_element : float # Azimuth angle of the first tether element
 
     
 

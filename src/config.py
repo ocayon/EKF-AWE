@@ -7,9 +7,9 @@ import numpy as np
 
 #%% Define system parameters
 # Define system parameters
-kite_model = 'v9'                   # Kite model name, if Costum, change the kite parameters next
-kcu_model = 'KP2'                   # KCU model name
-tether_diameter = 0.014            # Tether diameter [m]
+kite_model = 'v3'                   # Kite model name, if Costum, change the kite parameters next
+kcu_model = 'KP1'                   # KCU model name
+tether_diameter = 0.01            # Tether diameter [m]
 tether_material = 'Dyneema-SK78'    # Tether material
 
 #%% Define atmospheric parameters
@@ -50,8 +50,8 @@ meas_stdv = {
 # Model standard deviations
 if kite_model=='v9':
     model_stdv = {
-        'x': 5,                  # Position
-        'v': 2,                  # Velocity       
+        'x': 2.5,                  # Position
+        'v': 1,                  # Velocity       
         'uf': 2e-3,               # Friction velocity
         'wdir': (0.2/180 * np.pi),   # Wind direction
         'CL': 1e-2,                 # Lift coefficient
@@ -67,13 +67,14 @@ elif kite_model == 'v3':
     model_stdv = {
         'x': 2.5,                  # Position
         'v': 1,                  # Velocity       
-        'uf': 5e-4,               # Friction velocity
-        'wdir': (0.01/180 * np.pi),   # Wind direction
-        'CL': 1e-1,                 # Lift coefficient
-        'CD': 5e-3,                 # Drag coefficient
+        'uf': 2e-3,               # Friction velocity
+        'wdir': (0.2/180 * np.pi),   # Wind direction
+        'CL': 1e-2,                 # Lift coefficient
+        'CD': 1e-2,                 # Drag coefficient
         'CS': 1e-2,                  # Side force coefficient
-        'bias_lt': 1e-6,        # Bias in tether length
-        'bias_aoa': 1e-6        # Bias in angle of attack
+        'elevation' : 0.3,    # Elevation angle
+        'azimuth' : 0.3,     # Azimuth angle
+        'tether_length' : 0.1, # Tether length
     }
 
 

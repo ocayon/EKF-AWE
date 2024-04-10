@@ -11,28 +11,52 @@ from kalman_filter import ExtendedKalmanFilter, DynamicModel, ObservationModel, 
 import time
 from pathlib import Path
 
-def create_ekf_output(ekf, tether):
+def create_ekf_output(x, u, kite, tether,kcu):
     """Store results in a list of instances of the class EKFOutput"""
     # Store tether force and tether model results
-    # euler_angles = calculate_euler_from_reference_frame(tether.dcm_b2w)
-    # airflow_angles = calculate_airflow_angles(tether.dcm_b2w, ekf.x_k1_k1[3:6], calculate_vw_loglaw(ekf.x_k1_k1[6], z0, ekf.x_k1_k1[2], ekf.x_k1_k1[7]))
-    x = ekf.x_k1_k1
+    kite_pos = x[0:3]
+    kite_vel = x[3:6]
+    wind_vel = calculate_vw_loglaw(x[6], z0, x[2], x[7])
+    tension_ground = u[1]
+    tether_length = x[11]
+    elevation_0 = x[12]
+    azimuth_0 = x[13]
+
+    if kcu.data_available:
+        kcu_acc = u[2:5]
+        kcu_vel = u[5:8]
+        kite_acc = None
+    else:
+        kcu_acc = None
+        kcu_vel = None
+        kite_acc = u[2:5]
+
+    args = (n_tether_elements, kite_pos, kite_vel, wind_vel, kite, kcu, tension_ground )
+    opt_guess = [elevation_0, azimuth_0, tether_length]
+    res = tether.calculate_tether_shape(opt_guess, *args, a_kite = kite_acc, a_kcu = kcu_acc, v_kcu = kcu_vel, return_values=True)
+    dcm_b2w = res[2]
+    euler_angles = calculate_euler_from_reference_frame(dcm_b2w)
+    airflow_angles = calculate_airflow_angles(dcm_b2w, kite_vel, wind_vel)
+    
 
     wind_vel  = x[6]/kappa*np.log(x[2]/z0)
-    ekf_output = EKFOutput(kite_pos = x[0:3],
-                                kite_vel = x[3:6],
+    wind_dir = x[7]
+    ekf_output = EKFOutput(kite_pos = kite_pos,
+                                kite_vel = kite_vel,
                                 wind_velocity = wind_vel,
-                                wind_direction = x[7],
-                                tether_force=0,
-                                roll = 0,
-                                pitch = 0,
-                                yaw = 0,
-                                kite_aoa = 0,
-                                kite_sideslip = 0,
+                                wind_direction = wind_dir,
+                                tether_force= tension_ground,
+                                roll = euler_angles[0],
+                                pitch = euler_angles[1],
+                                yaw = euler_angles[2],
+                                kite_aoa = airflow_angles[0],
+                                kite_sideslip = airflow_angles[1],
                                 tether_length = x[11],
                                 CL = x[8],
                                 CD = x[9],
-                                CS = x[10])
+                                CS = x[10],
+                                elevation_first_element = x[12],
+                                azimuth_first_element = x[13])
                             
     return ekf_output
 
@@ -117,7 +141,7 @@ def update_state_ekf_tether(ekf, tether, kite, kcu, dyn_model, ekf_input, model_
     ekf = update_ekf(ekf, dyn_model, u, zi, kite, tether, kcu,ekf_input.ts)
     
 
-    ekf_output = create_ekf_output(ekf, tether)
+    ekf_output = create_ekf_output(ekf.x_k1_k1, u, kite, tether, kcu)
 
     return ekf, tether, ekf_output
 
@@ -183,7 +207,7 @@ if __name__ == "__main__":
     file_path = Path('../processed_data/flight_data') / kite_model / (file_name + '.csv')
     flight_data = pd.read_csv(file_path)
     flight_data = flight_data.reset_index()
-
+    flight_data = flight_data.iloc[:15000]
     timestep = flight_data['time'].iloc[1] - flight_data['time'].iloc[0]
 
     model_specs = ModelSpecs(timestep, n_tether_elements, opt_measurements=opt_measurements, correct_height=False)

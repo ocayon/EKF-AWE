@@ -6,8 +6,8 @@ import pandas as pd
 
 if __name__ == '__main__':
     #%% Choose flight data
-    year = '2023'
-    month = '11'
+    year = '2024'
+    month = '02'
     day = '16'
 
     # File path
@@ -15,7 +15,7 @@ if __name__ == '__main__':
     file_path = Path('../processed_data/flight_data') / kite_model / (file_name + '.csv')
     flight_data = pd.read_csv(file_path)
     flight_data = flight_data.reset_index()
-    flight_data = flight_data.iloc[:36000]
+    flight_data = flight_data.iloc[:42000]
 
     timestep = flight_data['time'].iloc[1] - flight_data['time'].iloc[0]
 
