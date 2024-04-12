@@ -37,6 +37,8 @@ def create_ekf_output(x, u, kite, tether,kcu):
     dcm_b2w = res[2]
     euler_angles = calculate_euler_from_reference_frame(dcm_b2w)
     airflow_angles = calculate_airflow_angles(dcm_b2w, kite_vel, wind_vel)
+    cd_kcu = res[-5]
+    cd_tether = res[-4]
     
 
     wind_vel  = x[6]/kappa*np.log(x[2]/z0)
@@ -56,7 +58,9 @@ def create_ekf_output(x, u, kite, tether,kcu):
                                 CD = x[9],
                                 CS = x[10],
                                 elevation_first_element = x[12],
-                                azimuth_first_element = x[13])
+                                azimuth_first_element = x[13], 
+                                cd_kcu = cd_kcu,
+                                cd_tether = cd_tether)
                             
     return ekf_output
 
@@ -113,7 +117,9 @@ def update_ekf(ekf, dyn_model, u, z, kite, tether, kcu,ts):
     ############################################################
     
     x_k1_k = dyn_model.propagate(ekf.x_k1_k1,u, kite, tether, kcu, ts)
-
+    
+    if np.isnan(x_k1_k).any():
+        x_k1_k = z
     ############################################################
     # Update state with Kalmann filter
     ############################################################
