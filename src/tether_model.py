@@ -255,7 +255,7 @@ class TetherModel:
         velocities = np.zeros((n_elements+1, 3))
         accelerations = np.zeros((n_elements+1, 3))
         non_conservative_forces = np.zeros((n_elements, 3))
-
+        drag_tether = 0
         stretched_tether_length = l_s  # Stretched
         for j in range(n_elements):  # Iterate over point masses.
             last_element = j == n_elements - 1
@@ -349,6 +349,8 @@ class TetherModel:
                     L_t = 0.5*rho*np.linalg.norm(vaj)**2*l_unstrained*self.diameter*cl_t
                     D_t = 0.5*rho*np.linalg.norm(vaj)**2*l_unstrained*self.diameter*cd_t
                     dj = L_t*dir_L + D_t*dir_D
+                    
+                    drag_tether += D_t
 
             if not kite.KCU:
                 if last_element:
@@ -421,8 +423,11 @@ class TetherModel:
             dir_S = np.cross(dir_L,dir_D)
             CS = np.dot(aerodynamic_force,dir_S)/(0.5*rho*kite.area*np.linalg.norm(va)**2)
 
+            cd_kcu = D_kcu/(0.5*rho*np.linalg.norm(vaj)**2*kite.area)
+            cd_tether = drag_tether/(0.5*rho*np.linalg.norm(vaj)**2*kite.area)
+
             return positions, stretched_tether_length, dcm_b2w, dcm_t2w, dcm_fa2w, \
-                dcm_tau2w, aerodynamic_force, va,tensions[-1,:], dcm_t2w[:,1],cd_kcu, CL,CD,CS
+                dcm_tau2w, aerodynamic_force, va,tensions[-1,:], dcm_t2w[:,1],cd_kcu,cd_tether, CL,CD,CS
         else:
             if len(x) == 2:
                 return (positions[-1, :2] - r_kite[:2])
