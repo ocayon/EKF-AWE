@@ -515,6 +515,8 @@ def plot_aero_coeff_vs_aoa_ss(results,flight_data,cycles_plotted, IMU_0 = False,
     mask_cycle = np.any([flight_data['cycle'] == cycle for cycle in cycles_plotted], axis=0)
     axs[0].plot(results[mask_cycle]['time'], results[mask_cycle]['CL'])
     axs[1].plot(results[mask_cycle]['time'], results[mask_cycle]['CD'])
+    axs[1].plot(results[mask_cycle]['time'], results[mask_cycle]['cd_kcu'])
+    axs[1].plot(results[mask_cycle]['time'], results[mask_cycle]['cd_tether'])
     axs[2].plot(results[mask_cycle]['time'], results[mask_cycle]['CS'])
     if EKF:
         axs[3].plot(results[mask_cycle]['time'], results[mask_cycle]['aoa'], label='aoa EKF')
@@ -666,7 +668,7 @@ def plot_probability_density(x,y,fig,axs,xlabel=None,ylabel=None):
     axs.grid()
     axs.legend()
 
-def plot_CL_CD_aoa(results,flight_data,mask,aoa_method):
+def plot_CL_CD_aoa(results,flight_data,mask,aoa_method,savefig = False):
 
     if aoa_method == 'IMU_0':
         aoa = results['aoa_IMU_0']
@@ -683,7 +685,11 @@ def plot_CL_CD_aoa(results,flight_data,mask,aoa_method):
     plot_probability_density(aoa[mask],results['CL'][mask],fig,axs[0],ylabel='CL')
     plot_probability_density(aoa[mask],results['CD'][mask],fig,axs[1],'aoa','CD')
     
-def plot_CL_CD_up(results,flight_data,mask,aoa_method):
+    if savefig == True:
+        plt.tight_layout()
+        plt.savefig('wind_profile.png', dpi=300)
+    
+def plot_CL_CD_up(results,flight_data,mask,aoa_method,savefig = False):
 
     up = flight_data['up']
     
@@ -691,7 +697,10 @@ def plot_CL_CD_up(results,flight_data,mask,aoa_method):
     fig, axs = plt.subplots(2,1, figsize=(10, 10), sharex=True)
     fig.suptitle('CL and CD vs aoa')
     plot_probability_density(up[mask],results['CL'][mask],fig,axs[0],ylabel='CL')
-    plot_probability_density(up[mask],results['CD'][mask],fig,axs[1],'aoa','CD')
+    plot_probability_density(up[mask],results['CD'][mask],fig,axs[1],'up','CD')
+    if savefig == True:
+        plt.tight_layout()
+        plt.savefig('wind_profile.png', dpi=300)
 
 def plot_CL_CD_ss(results,flight_data,mask,ss_method):
 

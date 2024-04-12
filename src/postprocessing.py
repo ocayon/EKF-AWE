@@ -80,8 +80,8 @@ def postprocess_results(results,flight_data, kite, imus = [0], remove_IMU_offset
     :return: results with aoa and ss va radius omega and slack
     """
     
-    min_depower = min(flight_data['kcu_actual_depower'].iloc[5000:-5000])
-    max_depower = max(flight_data['kcu_actual_depower'].iloc[5000:-5000])
+    min_depower = min(flight_data['kcu_actual_depower'])
+    max_depower = max(flight_data['kcu_actual_depower'])
     flight_data['us'] =  (flight_data['kcu_actual_steering'])/max(abs(flight_data['kcu_actual_steering'])) 
     flight_data['up'] = (flight_data['kcu_actual_depower']-min_depower)/(max_depower-min_depower)
     # Identify flight phases

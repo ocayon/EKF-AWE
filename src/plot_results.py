@@ -6,10 +6,10 @@ from run_EKF import create_kite
 import seaborn as sns
 import plot_utils as pu
 from postprocessing import calculate_wind_speed_airborne_sensors, postprocess_results
-year = '2019'
-month = '10'
-day = '08'
-kite_model = 'v3'                   # Kite model name, if Costum, change the kite parameters next
+year = '2024'
+month = '02'
+day = '16'
+kite_model = 'v9'                   # Kite model name, if Costum, change the kite parameters next
 
 plt.close('all')
 path = '../results/'+kite_model+'/'
@@ -18,6 +18,10 @@ date = year+'-'+month+'-'+day
 
 results = pd.read_csv(path+file_name+'_res_GPS.csv')
 flight_data = pd.read_csv(path+file_name+'_fd.csv')
+
+results = results.dropna()
+rows_to_keep = results.index
+flight_data = flight_data.loc[rows_to_keep]
 
 plot_lidar_heights= [100,160,200,250]
 
@@ -34,12 +38,12 @@ results, flight_data = postprocess_results(results,flight_data, kite, imus = [0]
 
 #%%Plot results wind speed
 
-pu.plot_wind_speed(results,flight_data, plot_lidar_heights,IMU_0=False, IMU_1=False, savefig=True) # PLot calculated wind speed against lidar
+pu.plot_wind_speed(results,flight_data, plot_lidar_heights,IMU_0=False, IMU_1=False, savefig=False) # PLot calculated wind speed against lidar
 #%%
-# pu.plot_wind_speed_height_bins(results,flight_data, plot_lidar_heights, savefig=True) # Plot calculated wind speed against lidar
+# pu.plot_wind_speed_height_bins(results,flight_data, plot_lidar_heights, savefig=False) # Plot calculated wind speed against lidar
 
 #%%
-# pu.plot_wind_profile(flight_data, results, savefig=True) # Plot wind profile
+# pu.plot_wind_profile(flight_data, results, savefig=False) # Plot wind profile
 
 
 
@@ -49,8 +53,8 @@ pu.plot_wind_speed(results,flight_data, plot_lidar_heights,IMU_0=False, IMU_1=Fa
 
 # ################## Time series ##################
 cycles_plotted = np.arange(0,70,1)
-pu.plot_aero_coeff_vs_aoa_ss(results, flight_data, cycles_plotted,IMU_0=True,savefig=False) # Plot aero coeff vs aoa_ss
-pu.plot_aero_coeff_vs_up_us(results, flight_data, cycles_plotted,IMU_0=True,savefig=False) # Plot aero coeff vs up_used
+pu.plot_aero_coeff_vs_aoa_ss(results, flight_data, cycles_plotted,IMU_0=False,savefig=False) # Plot aero coeff vs aoa_ss
+pu.plot_aero_coeff_vs_up_us(results, flight_data, cycles_plotted,IMU_0=False,savefig=False) # Plot aero coeff vs up_used
 #%%
 ################## Density plots ##################
 # flight_data = flight_data.iloc[1000::]
@@ -58,12 +62,12 @@ pu.plot_aero_coeff_vs_up_us(results, flight_data, cycles_plotted,IMU_0=True,save
 cycles_plotted = np.arange(0, 65, step=1)
 mask = np.any(
     [flight_data['cycle'] == cycle for cycle in cycles_plotted], axis=0)
-mask = (flight_data['powered'] == 'powered')&mask&(flight_data['turn_straight'] == 'straight')#&(results['CD']>0.03)
-pu.plot_CL_CD_aoa(results,flight_data, mask, 'EKF') # Plot CL vs CD for different aoa
-pu.plot_CL_CD_up(results,flight_data, mask, 'EKF') # Plot CL vs CD for different aoa
+mask = (flight_data['up'] < 0.04)&mask#&(flight_data['up'] < 0.04)&(flight_data['turn_straight'] == 'straight')#&(results['CD']>0.03)
+pu.plot_CL_CD_aoa(results,flight_data, mask, 'EKF',savefig=False) # Plot CL vs CD for different aoa
+# pu.plot_CL_CD_up(results,flight_data, mask, 'EKF',savefig=False) # Plot CL vs CD for different aoa
 # pu.plot_CL_CD_ss(results,flight_data, mask, 'EKF')    # Plot CL vs CD for different aoa_ss
 # pu.plot_prob_coeff_vs_aoa_ss(results, results.CL**3/results.CD**2, mask, 'EKF') # Plot CL^3/CD^2 vs aoa_ss
-# # pu.plot_prob_coeff_vs_aoa_ss(results, results.CL/results.CD, mask, 'EKF') # Plot CL/CD vs aoa_ss
+# pu.plot_prob_coeff_vs_aoa_ss(results, results.CL/(results.CD), mask, 'EKF') # Plot CL/CD vs aoa_ss
 
 
 #%% Time series
@@ -93,11 +97,12 @@ pu.plot_time_series(flight_data, flight_data['kite_0_rz'], ax, color='blue', lab
 pu.plot_time_series(flight_data,results['z'], ax, color='red', label='Estimated',plot_phase=False)
 ax.grid()
 ax.legend()
-# fig,ax = plt.subplots()
-# pu.plot_time_series(flight_data, flight_data['kite_0_pitch'], ax, color='blue', label='Measured',plot_phase=False)
-# pu.plot_time_series(flight_data,results['pitch'], ax, color='red', label='Estimated',plot_phase=False)
-# ax.grid()
-# ax.legend()
+#%%
+fig,ax = plt.subplots()
+pu.plot_time_series(flight_data, flight_data['kite_0_pitch'], ax, color='blue', label='Measured',plot_phase=False)
+pu.plot_time_series(flight_data,results['pitch'], ax, color='red', label='Estimated',plot_phase=False)
+ax.grid()
+ax.legend()
 
 # fig,ax = plt.subplots()
 # pu.plot_time_series(flight_data, flight_data['kite_0_roll'], ax, color='blue', label='Measured',plot_phase=False)
@@ -116,6 +121,13 @@ ax.legend()
 # mask = range(3600,4000)
 # pu.plot_kite_reference_frame(results.iloc[mask], flight_data.iloc[mask], imus)
 
+#%%
+
+r = np.sqrt(results.x**2+results.y**2+results.z**2)
+
+
+plt.figure()
+plt.plot(results['tether_length']-r+kite.distance_kcu_kite)
 #%%
 mechanic_power = []
 slack = []
