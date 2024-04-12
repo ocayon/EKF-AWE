@@ -207,7 +207,9 @@ class DynamicModel:
         # Define ODE system
         dae = {'x': self.x, 'p': self.u, 'ode': self.fx}                       # Define ODE system
         integrator = ca.integrator('intg', 'cvodes', dae, 0,ts)    # Define integrator
-        
+        if np.isnan(x).any():
+            print('EKF update returns Nan values, integration of current step ommited')
+            return x
         return np.array(integrator(x0=x,p=u)['xf'].T)
 
 class ObservationModel:
