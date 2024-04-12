@@ -7,9 +7,9 @@ import numpy as np
 
 #%% Define system parameters
 # Define system parameters
-kite_model = 'v3'                   # Kite model name, if Costum, change the kite parameters next
-kcu_model = 'KP1'                   # KCU model name
-tether_diameter = 0.01            # Tether diameter [m]
+kite_model = 'v9'                   # Kite model name, if Costum, change the kite parameters next
+kcu_model = 'KP2'                   # KCU model name
+tether_diameter = 0.014            # Tether diameter [m]
 tether_material = 'Dyneema-SK78'    # Tether material
 
 #%% Define atmospheric parameters
@@ -52,7 +52,7 @@ if kite_model=='v9':
     model_stdv = {
         'x': 2.5,                  # Position
         'v': 1,                  # Velocity       
-        'uf': 2e-3,               # Friction velocity
+        'uf': 5e-3,               # Friction velocity
         'wdir': (0.2/180 * np.pi),   # Wind direction
         'CL': 1e-2,                 # Lift coefficient
         'CD': 1e-2,                 # Drag coefficient
