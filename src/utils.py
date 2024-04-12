@@ -85,6 +85,12 @@ class EKFOutput:
 
     
 
+def get_input_vector(input_class,kcu):
+    if kcu.data_available:   
+        u = np.concatenate((np.array([input_class.reelout_speed, input_class.tether_force]), input_class.kcu_acc, input_class.kcu_vel))
+    else:
+        u = np.concatenate((np.array([input_class.reelout_speed, input_class.tether_force]), input_class.kite_acc))
+    return u
 
 def get_measurement_vector(input_class, opt_measurements):
     z = np.array([])  # Initialize an empty NumPy array
