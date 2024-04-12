@@ -5,7 +5,7 @@ from config import kite_model, kcu_model, tether_diameter, tether_material, \
                      doIEKF, max_iterations, epsilon, opt_measurements, meas_stdv,model_stdv, n_tether_elements, z0, kappa
 from model_definitions import kite_models, kcu_cylinders, tether_materials
 from utils import calculate_vw_loglaw, calculate_euler_from_reference_frame, calculate_airflow_angles, ModelSpecs, SystemSpecs
-from utils import  KiteModel, KCUModel, EKFInput, convert_ekf_output_to_df, get_measurement_vector, tether_input,EKFOutput, create_input_from_KP_csv
+from utils import  KiteModel, KCUModel, EKFInput, convert_ekf_output_to_df, get_measurement_vector, tether_input,EKFOutput, create_input_from_KP_csv, get_input_vector
 from tether_model import TetherModel
 from kalman_filter import ExtendedKalmanFilter, DynamicModel, ObservationModel, observability_Lie_method
 import time
@@ -116,10 +116,9 @@ def update_ekf(ekf, dyn_model, u, z, kite, tether, kcu,ts):
     # Propagate state with dynamic model
     ############################################################
     
-    x_k1_k = dyn_model.propagate(ekf.x_k1_k1,u, kite, tether, kcu, ts)
+    x_k1_k = ekf.x_k1_k 
     
-    if np.isnan(x_k1_k).any():
-        x_k1_k = z
+    
     ############################################################
     # Update state with Kalmann filter
     ############################################################
@@ -128,6 +127,7 @@ def update_ekf(ekf, dyn_model, u, z, kite, tether, kcu,ts):
     ekf.predict()
     # Update next step
     ekf.update()
+    
     return ekf
 
 def update_state_ekf_tether(ekf, tether, kite, kcu, dyn_model, ekf_input, model_specs):
@@ -140,13 +140,14 @@ def update_state_ekf_tether(ekf, tether, kite, kcu, dyn_model, ekf_input, model_
     ############################################################
     # Update EKF
     ############################################################
-    if kcu.data_available:   
-        u = np.concatenate((np.array([ekf_input.reelout_speed, ekf_input.tether_force]), ekf_input.kcu_acc, ekf_input.kcu_vel))
-    else:
-        u = np.concatenate((np.array([ekf_input.reelout_speed, ekf_input.tether_force]), ekf_input.kite_acc))
+    u = get_input_vector(ekf_input,kcu)
+
     ekf = update_ekf(ekf, dyn_model, u, zi, kite, tether, kcu,ekf_input.ts)
     
-
+    if np.isnan(ekf.x_k1_k1).any():
+        ekf.x_k1_k1 = ekf.x_k1_k
+        print('EKF update returns Nan values, integration of current step ommited')
+            
     ekf_output = create_ekf_output(ekf.x_k1_k1, u, kite, tether, kcu)
 
     return ekf, tether, ekf_output
@@ -181,11 +182,14 @@ def run_EKF(ekf_input_list, model_specs, system_specs,x0):
     start_time = time.time()
     mins = -1
     
-    for k in range(n_intervals):
+    for k in range(1,n_intervals):
+        # Prediction step
+        ekf_input = ekf_input_list[k-1]
+        u = get_input_vector(ekf_input,kcu)
+        ekf.x_k1_k = dyn_model.propagate(ekf.x_k1_k1,u, kite, tether, kcu, ekf_input.ts)
 
-        ekf_input = ekf_input_list[k]
-        
         ## Update step
+        ekf_input = ekf_input_list[k]
         ekf, tether, ekf_ouput = update_state_ekf_tether(ekf, tether, kite, kcu, dyn_model, ekf_input, model_specs)
         # Store results
         ekf_output_list.append(ekf_ouput)
