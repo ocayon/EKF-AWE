@@ -80,6 +80,8 @@ class EKFOutput:
     CS : float          # Side force coefficient
     elevation_first_element : float # Elevation angle of the first tether element
     azimuth_first_element : float # Azimuth angle of the first tether element
+    cd_tether : float = None# Drag coefficient of the tether
+    cd_kcu : float = None  # Drag coefficient of the KCU
 
     
 
@@ -374,8 +376,23 @@ def create_input_from_KP_csv(flight_data, system_specs, kite_sensor = 0, kcu_sen
     relout_speed = np.array(flight_data['ground_tether_reelout_speed'])
     kite_elevation = np.arcsin(kite_pos[:,2]/np.linalg.norm(kite_pos,axis=1))
     kite_azimuth = np.arctan2(kite_pos[:,1],kite_pos[:,0])
-
     
+    
+    init_wind_dir = np.mean(ground_winddir[0:3000])/180*np.pi
+    init_wind_vel = np.mean(ground_windspeed[0])
+    
+    if np.isnan(init_wind_dir):
+        for column in flight_data.columns:
+            if 'Wind Speed (m/s)' in column:
+                init_wind_vel = flight_data[column].iloc[1400]
+                break
+        for column in flight_data.columns:
+            if 'Wind Direction' in column:
+                init_wind_dir = np.deg2rad(360-90-flight_data[column].iloc[1400])
+                break
+                
+        
+        
     timestep = flight_data['time'].iloc[1]-flight_data['time'].iloc[0]
     ekf_input_list = []
     for i in range(len(flight_data)):
@@ -399,7 +416,7 @@ def create_input_from_KP_csv(flight_data, system_specs, kite_sensor = 0, kcu_sen
     tether = create_tether(system_specs.tether_material,system_specs.tether_diameter,n_tether_elements)
 
     x0, u0 = find_initial_state_vector(kite_pos[0], kite_vel[0], kite_acc[0], 
-                                       np.mean(ground_winddir[0:3000])/180*np.pi, np.mean(ground_windspeed[0]), tether_force[0], 
+                                       init_wind_dir, init_wind_vel, tether_force[0], 
                                        tether_length[0], n_tether_elements, kite_elevation[0], kite_azimuth[0], kite, kcu,tether)
 
     return ekf_input_list, x0
@@ -424,6 +441,8 @@ def convert_ekf_output_to_df(ekf_output_list):
     CL = []
     CD = []
     CS = []
+    cd_kcu = []
+    cd_tether =[]
     for i in range(len(ekf_output_list)):
         x.append(ekf_output_list[i].kite_pos[0])
         y.append(ekf_output_list[i].kite_pos[1])
@@ -443,9 +462,12 @@ def convert_ekf_output_to_df(ekf_output_list):
         CL.append(ekf_output_list[i].CL)
         CD.append(ekf_output_list[i].CD)
         CS.append(ekf_output_list[i].CS)
+        cd_kcu.append(ekf_output_list[i].cd_kcu)
+        cd_tether.append(ekf_output_list[i].cd_tether)
+        
     ekf_output_df = pd.DataFrame({'x': x, 'y': y, 'z': z, 'vx': vx, 'vy': vy, 'vz': vz, 
                                   'wind_velocity': wind_velocity, 'wind_direction': wind_direction,
                                 'tether_force': tether_force, 'roll': roll, 'pitch': pitch, 'yaw': yaw, 'aoa': aoa, 'ss': ss, 'tether_length': tether_length,
-                                'CL': CL, 'CD': CD, 'CS': CS})
+                                'CL': CL, 'CD': CD, 'CS': CS, 'cd_kcu': cd_kcu, 'cd_tether': cd_tether})
 
     return ekf_output_df
