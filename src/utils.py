@@ -82,6 +82,7 @@ class EKFOutput:
     azimuth_first_element : float # Azimuth angle of the first tether element
     cd_tether : float = None# Drag coefficient of the tether
     cd_kcu : float = None  # Drag coefficient of the KCU
+    z_wind: float = None    # Vertical wind speed
 
     
 
@@ -150,7 +151,7 @@ class SystemSpecs:
 
         self.stdv_dynamic_model = np.array([model_stdv['x'], model_stdv['x'], model_stdv['x'], 
                    model_stdv['v'], model_stdv['v'], model_stdv['v'], 
-                   model_stdv['uf'], model_stdv['wdir'], 
+                   model_stdv['uf'], model_stdv['wdir'], model_stdv['vwz'],
                    model_stdv['CL'], model_stdv['CD'], model_stdv['CS'],
                    model_stdv['tether_length'], model_stdv['elevation'], model_stdv['azimuth']])  # Standard deviations for the dynamic model
         stdv_y = []
@@ -195,7 +196,7 @@ def find_initial_state_vector(kite_pos, kite_vel, kite_acc, ground_winddir, grou
     tether.solve_tether_shape(n_tether_elements, kite_pos, kite_vel, vw, kite, kcu, tension_ground = tether_force, tether_length = tether_length,
                                 a_kite = kite_acc)
     x0 = np.vstack((kite_pos,kite_vel))
-    x0 = np.append(x0,[uf,ground_winddir,tether.CL,tether.CD,tether.CS,tether_length, elevation, azimuth])     # Initial state vector (Last two elements are bias, used if needed)
+    x0 = np.append(x0,[uf,ground_winddir,0,tether.CL,tether.CD,tether.CS,tether_length, elevation, azimuth])     # Initial state vector (Last two elements are bias, used if needed)
     u0 = tether.Ft_kite
 
     return x0, u0
@@ -449,6 +450,7 @@ def convert_ekf_output_to_df(ekf_output_list):
     CS = []
     cd_kcu = []
     cd_tether =[]
+    z_wind = []
     for i in range(len(ekf_output_list)):
         x.append(ekf_output_list[i].kite_pos[0])
         y.append(ekf_output_list[i].kite_pos[1])
@@ -470,10 +472,11 @@ def convert_ekf_output_to_df(ekf_output_list):
         CS.append(ekf_output_list[i].CS)
         cd_kcu.append(ekf_output_list[i].cd_kcu)
         cd_tether.append(ekf_output_list[i].cd_tether)
+        z_wind.append(ekf_output_list[i].z_wind)
         
     ekf_output_df = pd.DataFrame({'x': x, 'y': y, 'z': z, 'vx': vx, 'vy': vy, 'vz': vz, 
                                   'wind_velocity': wind_velocity, 'wind_direction': wind_direction,
                                 'tether_force': tether_force, 'roll': roll, 'pitch': pitch, 'yaw': yaw, 'aoa': aoa, 'ss': ss, 'tether_length': tether_length,
-                                'CL': CL, 'CD': CD, 'CS': CS, 'cd_kcu': cd_kcu, 'cd_tether': cd_tether})
+                                'CL': CL, 'CD': CD, 'CS': CS, 'cd_kcu': cd_kcu, 'cd_tether': cd_tether, 'z_wind':z_wind})
 
     return ekf_output_df

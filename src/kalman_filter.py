@@ -112,8 +112,6 @@ class DynamicModel:
         self.r = ca.SX.sym('r',3)    # Kite position
         self.r_tether_model = ca.SX.sym('r_tether_model',3) # Tether attachment point
         self.v = ca.SX.sym('v',3)    # Kite velocity
-        self.uf = ca.SX.sym('uf')    # Friction velocity
-        self.wdir = ca.SX.sym('wdir')# Ground wind direction
         self.CL = ca.SX.sym('CL')    # Lift coefficient
         self.CD = ca.SX.sym('CD')    # Drag coefficient
         self.CS = ca.SX.sym('CS')    # Side force coefficient
@@ -123,16 +121,11 @@ class DynamicModel:
         self.elevation_0 = ca.SX.sym('elevation_first_tether_element') # Elevation from ground to first tether element
         self.azimuth_0 = ca.SX.sym('azimuth_first_tether_element')   # Azimuth from ground to first tether element
         
-        
-        self.wvel = self.uf/kappa*ca.log(self.r[2]/z0)
-        self.vw = ca.vertcat(self.wvel*ca.cos(self.wdir),self.wvel*ca.sin(self.wdir),0)
+        self.get_wind_velocity()
         self.va = self.vw - self.v
         
         self.uf_u = ca.SX.sym('uf_u')    # Friction velocity for input (previous timestep)
         self.wdir_u = ca.SX.sym('wdir_u')   # Ground wind direction for input (previous timestep)
-        
-        
-        
 
         self.x = self.get_state(kite,tether,kcu)
         self.u = self.get_input(kcu)
@@ -140,7 +133,14 @@ class DynamicModel:
 
     def get_state(self,kite,tether,kcu):    
         
-        return ca.vertcat(self.r,self.v,self.uf,self.wdir,self.CL,self.CD,self.CS,self.tether_length, self.elevation_0, self.azimuth_0)
+        return ca.vertcat(self.r,self.v,self.uf,self.wdir,self.vwz,self.CL,self.CD,self.CS,self.tether_length, self.elevation_0, self.azimuth_0)
+    
+    def get_wind_velocity(self):
+        self.uf = ca.SX.sym('uf')    # Friction velocity
+        self.wdir = ca.SX.sym('wdir')# Ground wind direction
+        self.vwz = ca.SX.sym('vwz')  # Vertical wind velocity
+        self.wvel = self.uf/kappa*ca.log(self.r[2]/z0)
+        self.vw = ca.vertcat(self.wvel*ca.cos(self.wdir),self.wvel*ca.sin(self.wdir),self.vwz)
     
     def get_input(self,kcu):
         if kcu.data_available:
@@ -151,9 +151,9 @@ class DynamicModel:
     def get_fx(self,kite,tether,kcu):
         
         
-        elevation_0 = self.x[12]
-        azimuth_0 = self.x[13]
-        tether_length = self.x[11]
+        elevation_0 = self.x[13]
+        azimuth_0 = self.x[14]
+        tether_length = self.x[12]
         r_kite = self.x0[0:3]
         v_kite = self.x0[3:6]
         tension_ground = self.u[1]
@@ -169,7 +169,7 @@ class DynamicModel:
 
         wvel = self.x0[6]/kappa*np.log(self.x0[2]/z0)
         wdir = self.x0[7]
-        vw = np.array([wvel*np.cos(wdir),wvel*np.sin(wdir),0])
+        vw = np.array([wvel*np.cos(wdir),wvel*np.sin(wdir),self.x0[8]])
 
         r_thether_model, tension_last_element = tether.calculate_tether_shape_symbolic(elevation_0, azimuth_0, tether_length,
                                          tension_ground, r_kite, v_kite, vw, kite, kcu,tether,  
@@ -190,7 +190,7 @@ class DynamicModel:
         rp = self.v
         vp = (-tension_last_element+L+D+S+Fg)/kite.mass
 
-        return ca.vertcat(rp,vp,0,0,0,0,0,v_reelout,0,0)
+        return ca.vertcat(rp,vp,0,0,0,0,0,0,v_reelout,0,0)
     
     def get_fx_jac(self,kite,tether,kcu):
   
@@ -220,9 +220,9 @@ class ObservationModel:
     
     def get_hx(self,kite,tether,kcu):
         
-        elevation_0 = self.x[12]
-        azimuth_0 = self.x[13]
-        tether_length = self.x[11]
+        elevation_0 = self.x[13]
+        azimuth_0 = self.x[14]
+        tether_length = self.x[12]
         r_kite = self.x0[0:3]
         v_kite = self.x0[3:6]
         tension_ground = self.u[1]
@@ -238,7 +238,7 @@ class ObservationModel:
 
         wvel = self.x0[6]/kappa*np.log(self.x0[2]/z0)
         wdir = self.x0[7]
-        vw = np.array([wvel*np.cos(wdir),wvel*np.sin(wdir),0])
+        vw = np.array([wvel*np.cos(wdir),wvel*np.sin(wdir),self.x0[8]])
         
         r_thether_model, tension_last_element = tether.calculate_tether_shape_symbolic(elevation_0, azimuth_0, tether_length,
                                          tension_ground, r_kite, v_kite, vw, kite, kcu,tether,  
@@ -246,7 +246,7 @@ class ObservationModel:
 
         wvel = self.x[6]/kappa*np.log(self.x[2]/z0)
         wdir = self.x[7]
-        vw = np.array([wvel*np.cos(wdir),wvel*np.sin(wdir),0])
+        vw = np.array([wvel*np.cos(wdir),wvel*np.sin(wdir),self.x[8]])
         va = vw -self.x[0:3]
         
         h = ca.SX()
@@ -259,13 +259,11 @@ class ObservationModel:
                 h = ca.vertcat(h,self.x[6])
             elif key == 'apparent_windspeed':
                 h = ca.vertcat(h,ca.norm_2(va))
-            elif key == 'tether_length':
-                h = ca.vertcat(h,ca.norm_2(self.x[0:3])-kite.distance_kcu_kite-self.x[11])
             # elif key == 'aoa':
             #     h = ca.vertcat(h,aoa+self.x[12])
-        h = ca.vertcat(h,self.x[11])
         h = ca.vertcat(h,self.x[12])
         h = ca.vertcat(h,self.x[13])
+        h = ca.vertcat(h,self.x[14])
         h = ca.vertcat(h,(self.x[0:3]-r_thether_model)**2)
 
         return h
