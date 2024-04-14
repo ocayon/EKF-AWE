@@ -6,10 +6,10 @@ from run_EKF import create_kite
 import seaborn as sns
 import plot_utils as pu
 from postprocessing import calculate_wind_speed_airborne_sensors, postprocess_results
-year = '2024'
-month = '02'
-day = '16'
-kite_model = 'v9'                   # Kite model name, if Costum, change the kite parameters next
+year = '2019'
+month = '10'
+day = '08'
+kite_model = 'v3'                   # Kite model name, if Costum, change the kite parameters next
 
 plt.close('all')
 path = '../results/'+kite_model+'/'
@@ -19,7 +19,7 @@ date = year+'-'+month+'-'+day
 results = pd.read_csv(path+file_name+'_res_GPS.csv')
 flight_data = pd.read_csv(path+file_name+'_fd.csv')
 
-results = results.dropna()
+# results = results.dropna()
 rows_to_keep = results.index
 flight_data = flight_data.loc[rows_to_keep]
 
@@ -43,7 +43,7 @@ pu.plot_wind_speed(results,flight_data, plot_lidar_heights,IMU_0=False, IMU_1=Fa
 # pu.plot_wind_speed_height_bins(results,flight_data, plot_lidar_heights, savefig=False) # Plot calculated wind speed against lidar
 
 #%%
-# pu.plot_wind_profile(flight_data, results, savefig=False) # Plot wind profile
+pu.plot_wind_profile(flight_data, results, savefig=False) # Plot wind profile
 
 
 
@@ -62,7 +62,7 @@ pu.plot_aero_coeff_vs_up_us(results, flight_data, cycles_plotted,IMU_0=False,sav
 cycles_plotted = np.arange(0, 65, step=1)
 mask = np.any(
     [flight_data['cycle'] == cycle for cycle in cycles_plotted], axis=0)
-mask = (flight_data['up'] < 0.04)&mask#&(flight_data['up'] < 0.04)&(flight_data['turn_straight'] == 'straight')#&(results['CD']>0.03)
+mask = (flight_data['up'] < 0.2)&mask#&(flight_data['up'] < 0.04)&(flight_data['turn_straight'] == 'straight')#&(results['CD']>0.03)
 pu.plot_CL_CD_aoa(results,flight_data, mask, 'EKF',savefig=False) # Plot CL vs CD for different aoa
 # pu.plot_CL_CD_up(results,flight_data, mask, 'EKF',savefig=False) # Plot CL vs CD for different aoa
 # pu.plot_CL_CD_ss(results,flight_data, mask, 'EKF')    # Plot CL vs CD for different aoa_ss
@@ -226,3 +226,15 @@ slope = -5/3
 plt.plot(pos_fft_freq[subrange_mask], np.exp(intercept) * pos_fft_freq[subrange_mask] ** slope, 'g--', label=f'Fitted Slope: -5/3')
 plt.legend()
 plt.show()
+
+#%%
+fig, axs = plt.subplots(1, 2, figsize=(10, 10), sharex=True)
+mask = flight_data['turn_straight'] == 'straight'
+pu.plot_cl_curve(results['CL'], results['CD'], results['aoa'], mask,axs)
+mask = flight_data['turn_straight'] == 'turn'
+pu.plot_cl_curve(results['CL'], results['CD'], results['aoa'], mask,axs)
+
+
+
+
+
