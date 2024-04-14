@@ -18,9 +18,9 @@ def create_ekf_output(x, u, kite, tether,kcu):
     kite_vel = x[3:6]
     wind_vel = calculate_vw_loglaw(x[6], z0, x[2], x[7])
     tension_ground = u[1]
-    tether_length = x[11]
-    elevation_0 = x[12]
-    azimuth_0 = x[13]
+    tether_length = x[12]
+    elevation_0 = x[13]
+    azimuth_0 = x[14]
 
     if kcu.data_available:
         kcu_acc = u[2:5]
@@ -53,14 +53,15 @@ def create_ekf_output(x, u, kite, tether,kcu):
                                 yaw = euler_angles[2],
                                 kite_aoa = airflow_angles[0],
                                 kite_sideslip = airflow_angles[1],
-                                tether_length = x[11],
-                                CL = x[8],
-                                CD = x[9],
-                                CS = x[10],
-                                elevation_first_element = x[12],
-                                azimuth_first_element = x[13], 
+                                tether_length = x[12],
+                                CL = x[9],
+                                CD = x[10],
+                                CS = x[11],
+                                elevation_first_element = x[13],
+                                azimuth_first_element = x[14], 
                                 cd_kcu = cd_kcu,
-                                cd_tether = cd_tether)
+                                cd_tether = cd_tether,
+                                z_wind = x[8])
                             
     return ekf_output
 

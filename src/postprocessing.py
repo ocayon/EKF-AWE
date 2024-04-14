@@ -180,7 +180,7 @@ def postprocess_results(results,flight_data, kite, imus = [0], remove_IMU_offset
             in_cycle = False
 
     print("Number of cycles:", cycle_count)
-    results['slack'] = slack
+    # results['slack'] = slack
     results['radius_turn'] = radius_turn
     results['omega'] = omega
 
