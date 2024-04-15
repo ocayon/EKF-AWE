@@ -7,7 +7,7 @@ import numpy as np
 
 #%% Define system parameters
 # Define system parameters
-kite_model = 'v9'                   # Kite model name, if Costum, change the kite parameters next
+kite_model = 'v3'                   # Kite model name, if Costum, change the kite parameters next
 kcu_model = 'KP2'                   # KCU model name
 tether_diameter = 0.014            # Tether diameter [m]
 tether_material = 'Dyneema-SK78'    # Tether material
@@ -28,10 +28,9 @@ epsilon = 1e-6                      # Tolerance for the IEKF
 
 # Measurements
 opt_measurements = []
-log_profile = False
-
-# opt_measurements = ['a', 'uf', 'va', 'wdir', 'tether_length', 'aoa']
+log_profile = True                 # Model wind speed as logarithmic with height
 tether_offset = True                # Use tether offset in the measurements
+enforce_z_wind = True              # Enforce the z wind speed to be zero
 
 # Measurement standard deviations
 
@@ -47,7 +46,8 @@ meas_stdv = {
     'relout_speed': 0.01,       # Reelout speed
     'least_squares': 1e-5,       # Least squares
     'elevation': 0.2,
-    'azimuth':0.2
+    'azimuth':0.2,
+    'z_wind': 0.1
 }
 
 # Model standard deviations
@@ -57,6 +57,7 @@ if kite_model=='v9':
         'v': 1,                  # Velocity       
         'uf': 5e-3,               # Friction velocity
         'wdir': (0.2/180 * np.pi),   # Wind direction
+        'vw': 1e-2,
         'vwz': 1e-2,                # Vertical windspeed
         'CL': 1e-2,                 # Lift coefficient
         'CD': 1e-2,                 # Drag coefficient
@@ -73,6 +74,8 @@ elif kite_model == 'v3':
         'v': 1,                  # Velocity       
         'uf': 2e-3,               # Friction velocity
         'wdir': (0.2/180 * np.pi),   # Wind direction
+        'vw': 1e-2,
+        'vwz': 1e-2,                # Vertical windspeed
         'CL': 1e-2,                 # Lift coefficient
         'CD': 1e-2,                 # Drag coefficient
         'CS': 1e-2,                  # Side force coefficient
