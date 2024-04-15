@@ -19,7 +19,7 @@ date = year+'-'+month+'-'+day
 results = pd.read_csv(path+file_name+'_res_GPS.csv')
 flight_data = pd.read_csv(path+file_name+'_fd.csv')
 
-results = results.dropna()
+# results = results.dropna()
 rows_to_keep = results.index
 flight_data = flight_data.loc[rows_to_keep]
 
@@ -43,7 +43,7 @@ pu.plot_wind_speed(results,flight_data, plot_lidar_heights,IMU_0=False, IMU_1=Fa
 # pu.plot_wind_speed_height_bins(results,flight_data, plot_lidar_heights, savefig=False) # Plot calculated wind speed against lidar
 
 #%%
-# pu.plot_wind_profile(flight_data, results, savefig=False) # Plot wind profile
+pu.plot_wind_profile(flight_data, results, savefig=False) # Plot wind profile
 
 
 
@@ -62,7 +62,7 @@ pu.plot_aero_coeff_vs_up_us(results, flight_data, cycles_plotted,IMU_0=False,sav
 cycles_plotted = np.arange(0, 65, step=1)
 mask = np.any(
     [flight_data['cycle'] == cycle for cycle in cycles_plotted], axis=0)
-mask = (flight_data['up'] < 0.04)&mask#&(flight_data['up'] < 0.04)&(flight_data['turn_straight'] == 'straight')#&(results['CD']>0.03)
+mask = (flight_data['up'] < 0.2)&mask#&(flight_data['up'] < 0.04)&(flight_data['turn_straight'] == 'straight')#&(results['CD']>0.03)
 pu.plot_CL_CD_aoa(results,flight_data, mask, 'EKF',savefig=False) # Plot CL vs CD for different aoa
 # pu.plot_CL_CD_up(results,flight_data, mask, 'EKF',savefig=False) # Plot CL vs CD for different aoa
 # pu.plot_CL_CD_ss(results,flight_data, mask, 'EKF')    # Plot CL vs CD for different aoa_ss
@@ -226,3 +226,29 @@ slope = -5/3
 plt.plot(pos_fft_freq[subrange_mask], np.exp(intercept) * pos_fft_freq[subrange_mask] ** slope, 'g--', label=f'Fitted Slope: -5/3')
 plt.legend()
 plt.show()
+
+#%%
+#read the data
+data = pd.read_csv('../processed_data/aerostructural/v3_aero_coeffs_VSM.csv')
+cl_VSM = data['CL']
+cd_VSM = data['CD']
+aoa_VSM = np.degrees(data['aoa'])
+fig, axs = plt.subplots(2, 2, figsize=(10, 10))
+mask = (flight_data['turn_straight'] == 'straight') & (flight_data.index>5000)& (flight_data['kite_angle_of_attack']>2)#& (flight_data['ground_tether_reelout_speed']>0)# &(flight_data['up'] <0.1)#
+# pu.plot_cl_curve(results['CL'], results['CD'], results['aoa'], mask,axs)
+pu.plot_cl_curve(results['CL'], results['CD'], flight_data['kite_angle_of_attack'], mask,axs, label = "Straight")
+mask = (flight_data['turn_straight'] == 'turn') & (flight_data.index>5000)& (flight_data['kite_angle_of_attack']>2)# & (flight_data['ground_tether_reelout_speed']>0)# &(flight_data['up'] <0.1)#
+# pu.plot_cl_curve(results['CL'], results['CD'], results['aoa'], mask,axs)
+pu.plot_cl_curve(results['CL'], results['CD'], flight_data['kite_angle_of_attack'], mask,axs, label = "Turn")
+# axs[0].scatter(aoa_VSM, cl_VSM, label='VSM')
+# axs[1].scatter(aoa_VSM, cd_VSM, label='VSM')
+# axs[0,0].fill_betweenx(y=np.linspace(0.4, 1, 100), x1=15, x2=40, color='red', alpha=0.3)
+# axs[0,1].fill_betweenx(y=np.linspace(0, 0.4, 100), x1=15, x2=40, color='red', alpha=0.3)
+
+axs[0,0].legend()
+
+plt.show()
+
+
+
+

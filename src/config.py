@@ -31,6 +31,7 @@ opt_measurements = []
 log_profile = False
 
 # opt_measurements = ['a', 'uf', 'va', 'wdir', 'tether_length', 'aoa']
+tether_offset = True                # Use tether offset in the measurements
 
 # Measurement standard deviations
 
