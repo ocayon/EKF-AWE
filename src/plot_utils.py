@@ -882,13 +882,13 @@ def plot_kite_reference_frame(results, flight_data, imus):
                 color='black', length=len_arrow)
     ax.set_box_aspect([1,1,1])
 
-def plot_cl_curve(cl,cd,aoa,mask,axs,savefig=False):
+def plot_cl_curve(cl,cd,aoa,mask,axs,label = None, savefig=False):
     CL = cl[mask]
     CD = cd[mask]
     alpha = aoa[mask]
 
 
-    step = 1
+    step = 0.5
     bins = np.arange(int(alpha.min())-step/2, int(alpha.max())+step/2, step)
     bin_indices = np.digitize(alpha, bins)  # Find the bin index for each alpha value
     num_bins = len(bins)
@@ -901,19 +901,32 @@ def plot_cl_curve(cl,cd,aoa,mask,axs,savefig=False):
     bin_centers = 0.5 * (bins[:-1] + bins[1:])
 
     # Plot CL and shade the area for std deviation
-    axs[0].plot(bin_centers, CL_means, 'o-', markersize=8, linewidth=2, label='CL')
-    axs[0].fill_between(bin_centers, CL_means - CL_stds, CL_means + CL_stds, alpha=0.2)
-    axs[0].set_xlabel('Angle of Attack (degrees)', fontsize=14)
-    axs[0].set_ylabel('Lift Coefficient (CL)',  fontsize=14)
-    axs[0].tick_params(axis='y', labelsize=12)
-    axs[0].grid(True)
+    axs[0,0].plot(bin_centers, CL_means, 'o-', markersize=8, linewidth=2, label=label)
+    axs[0,0].fill_between(bin_centers, CL_means - CL_stds, CL_means + CL_stds, alpha=0.2)
+    axs[0,0].set_xlabel('Angle of Attack (degrees)', fontsize=14)
+    axs[0,0].set_ylabel('Lift Coefficient (CL)',  fontsize=14)
+    axs[0,0].grid(True)
 
     # Plot CD and shade the area for std deviation
-    axs[1].plot(bin_centers, CD_means, 'o-', markersize=8, linewidth=2, label='CD')
-    axs[1].fill_between(bin_centers, CD_means - CD_stds, CD_means + CD_stds, alpha=0.2)
-    axs[1].set_xlabel('Angle of Attack (degrees)', fontsize=14)
-    axs[1].set_ylabel('Drag Coefficient (CD)', fontsize=14)
-    axs[1].tick_params(axis='y', labelsize=12)
-    axs[1].grid(True)
+    axs[0,1].plot(bin_centers, CD_means, 'o-', markersize=8, linewidth=2, label=label)
+    axs[0,1].fill_between(bin_centers, CD_means - CD_stds, CD_means + CD_stds, alpha=0.2)
+    axs[0,1].set_xlabel('Angle of Attack (degrees)', fontsize=14)
+    axs[0,1].set_ylabel('Drag Coefficient (CD)', fontsize=14)
+    axs[0,1].grid(True)
+
+    axs[1,0].plot(CL_means, CD_means, 'o-', label=label)
+    # axs[1,0].fill_between(CL_means
+    axs[1,0].set_xlabel('Lift Coefficient (CL)', fontsize=14)
+    axs[1,0].set_ylabel('Drag Coefficient (CD)', fontsize=14)
+    axs[1,0].grid(True)
+
+    axs[1,1].plot(bin_centers, CL_means/CD_means, 'o-', label=label)
+    axs[1,1].fill_between(bin_centers, (CL_means - CL_stds)/(CD_means + CD_stds), (CL_means + CL_stds)/(CD_means - CD_stds), alpha=0.2)
+    axs[1,1].set_xlabel('Angle of Attack (degrees)', fontsize=14)
+    axs[1,1].set_ylabel('L/D Ratio', fontsize=14)
+    axs[1,1].grid(True)
+
+    
+
 
     
