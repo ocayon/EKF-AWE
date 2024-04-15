@@ -194,7 +194,7 @@ class DynamicModel:
     
     def get_fx_jac(self,kite,tether,kcu):
   
-        return ca.jacobian(self.get_fx(kite,tether,kcu),self.x)
+        return ca.simplify(ca.jacobian(self.get_fx(kite,tether,kcu),self.x))
 
     def get_fx_jac_fun(self,kite,tether,kcu):
         return ca.Function('calc_Fx', [self.x,self.u,self.x0],[self.get_fx_jac(kite,tether,kcu)])
@@ -272,7 +272,7 @@ class ObservationModel:
 
     def get_hx_jac(self,kite,tether,kcu):
         hx = self.get_hx(kite,tether,kcu)
-        return ca.jacobian(hx,self.x)
+        return ca.simplify(ca.jacobian(hx,self.x))
     
     def get_hx_jac_fun(self,kite,tether,kcu):
         return ca.Function('calc_Hx', [self.x,self.u,self.x0],[self.get_hx_jac(kite,tether,kcu)])
