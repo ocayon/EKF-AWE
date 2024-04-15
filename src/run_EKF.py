@@ -1,10 +1,10 @@
 
 import numpy as np
 import pandas as pd
-from config import z0, kappa, tether_material, model_stdv,meas_stdv
+from config import z0, kappa, model_stdv,meas_stdv
 from model_definitions import kite_models, kcu_cylinders, tether_materials
 from utils import calculate_vw_loglaw, calculate_euler_from_reference_frame, calculate_airflow_angles, ModelSpecs, SystemSpecs
-from utils import  KiteModel, KCUModel, EKFInput, convert_ekf_output_to_df, get_measurement_vector, tether_input,EKFOutput, create_input_from_KP_csv, get_input_vector
+from utils import  KiteModel, KCUModel, convert_ekf_output_to_df, get_measurement_vector, tether_input,EKFOutput, create_input_from_KP_csv, get_input_vector
 from tether_model import TetherModel
 from kalman_filter import ExtendedKalmanFilter, DynamicModel, ObservationModel, observability_Lie_method
 import time
@@ -177,7 +177,6 @@ def run_EKF(ekf_input_list, model_specs, system_specs,x0):
     # Initial measurement vector
     tether = update_tether(x0, ekf_input_list[0], model_specs, tether, kite, kcu)
         
-    print(x0)
     # Define results matrices
     n_intervals = len(ekf_input_list)
 
@@ -223,6 +222,7 @@ if __name__ == "__main__":
     tether_diameter = 0.01            # Tether diameter [m]
     n_tether_elements = 5
     opt_measurements = []
+    tether_material = 'Dyneema-SK78'    # Tether material
     # File path
     file_name = f"{kite_model}_{year}-{month}-{day}"
     file_path = Path('../processed_data/flight_data') / kite_model / (file_name + '.csv')
