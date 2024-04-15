@@ -1,15 +1,14 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from config import kappa, z0, kite_model
 from run_EKF import create_kite
 import seaborn as sns
 import plot_utils as pu
-from postprocessing import calculate_wind_speed_airborne_sensors, postprocess_results
-year = '2024'
-month = '02'
-day = '16'
-kite_model = 'v9'                   # Kite model name, if Costum, change the kite parameters next
+from postprocessing import  postprocess_results
+year = '2019'
+month = '10'
+day = '08'
+kite_model = 'v3'                   
 
 plt.close('all')
 path = '../results/'+kite_model+'/'
@@ -40,7 +39,7 @@ results, flight_data = postprocess_results(results,flight_data, kite, imus = [0]
 
 pu.plot_wind_speed(results,flight_data, plot_lidar_heights,IMU_0=False, IMU_1=False, savefig=False) # PLot calculated wind speed against lidar
 #%%
-# pu.plot_wind_speed_height_bins(results,flight_data, plot_lidar_heights, savefig=False) # Plot calculated wind speed against lidar
+pu.plot_wind_speed_height_bins(results,flight_data, plot_lidar_heights, savefig=False) # Plot calculated wind speed against lidar
 
 #%%
 pu.plot_wind_profile(flight_data, results, savefig=False) # Plot wind profile

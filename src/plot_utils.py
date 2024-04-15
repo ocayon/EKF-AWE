@@ -401,7 +401,6 @@ def plot_wind_speed_height_bins(results, flight_data, lidar_heights, savefig = F
             vw_min_col = height + 'm Wind Speed min (m/s)'
             label = 'Lidar ' + height +'m height'
             height = int(height)
-            print(height)
             col_save = column            
             if height in lidar_heights:
                 selected_values = [flight_data.iloc[j][column] for j in i_change] 
