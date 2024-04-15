@@ -130,7 +130,9 @@ def tether_input(input_class, model_specs):
 
     return input_class.kite_acc, input_class.tether_force, tether_length, kcu_acc, kcu_vel
 class ModelSpecs:
-    def __init__(self,timestep, n_tether_elements, opt_measurements = [], correct_height = False,  kcu_data = False, doIEKF = True, epsilon = 1e-6, max_iterations = 200):
+    def __init__(self,timestep, n_tether_elements, opt_measurements = [], correct_height = False,  
+                 kcu_data = False, doIEKF = True, epsilon = 1e-6, max_iterations = 200,
+                 log_profile = True):
         self.ts = timestep
         self.n_tether_elements = n_tether_elements
         self.opt_measurements = opt_measurements
@@ -139,6 +141,7 @@ class ModelSpecs:
         self.doIEKF = doIEKF
         self.epsilon = epsilon
         self.max_iterations = max_iterations
+        self.log_profile = log_profile
 
 class SystemSpecs:
     # Class to store the system specifications

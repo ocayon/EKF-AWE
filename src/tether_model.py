@@ -30,7 +30,7 @@ class TetherModel:
         if kite.KCU == True:
             n_elements += 1
         
-        wvel = np.linalg.norm(vw)
+        wvel = ca.norm_2(vw)
         wdir = vw/wvel
 
         vtau_kite = project_onto_plane(v_kite,r_kite/ca.norm_2(r_kite)) # Velocity projected onto the tangent plane

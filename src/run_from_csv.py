@@ -1,5 +1,5 @@
 from run_EKF import run_EKF
-from config import kite_model, n_tether_elements, opt_measurements, kcu_model, tether_material, tether_diameter, meas_stdv, model_stdv, doIEKF
+from config import kite_model, n_tether_elements, opt_measurements, kcu_model, tether_material, tether_diameter, meas_stdv, model_stdv, doIEKF, log_profile
 from pathlib import Path
 from utils import ModelSpecs, SystemSpecs, create_input_from_KP_csv, convert_ekf_output_to_df
 import pandas as pd
@@ -19,7 +19,7 @@ if __name__ == '__main__':
 
     timestep = flight_data['time'].iloc[1] - flight_data['time'].iloc[0]
 
-    model_specs = ModelSpecs(timestep, n_tether_elements, opt_measurements=opt_measurements, correct_height=False, doIEKF=doIEKF)
+    model_specs = ModelSpecs(timestep, n_tether_elements, opt_measurements=opt_measurements, correct_height=False, doIEKF=doIEKF, log_profile=log_profile)
     system_specs = SystemSpecs(kite_model, kcu_model, tether_material, tether_diameter, meas_stdv, model_stdv, opt_measurements)
     # Create input classes
     ekf_input_list,x0 = create_input_from_KP_csv(flight_data, system_specs, kite_sensor = 0, kcu_sensor = 1)

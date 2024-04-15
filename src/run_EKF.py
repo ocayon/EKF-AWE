@@ -100,8 +100,8 @@ def initialize_ekf(ekf_input, model_specs, system_specs):
         kcu = create_kcu(system_specs.kcu_model, data_available=False)
     tether = create_tether(system_specs.tether_material,system_specs.tether_diameter,n_tether_elements)
     # Create dynamic model and observation model
-    dyn_model = DynamicModel(kite,tether,kcu,model_specs.ts)
-    obs_model = ObservationModel(dyn_model.x,dyn_model.u,model_specs.opt_measurements,kite,tether,kcu)
+    dyn_model = DynamicModel(kite,tether,kcu,model_specs)
+    obs_model = ObservationModel(dyn_model.x,dyn_model.u,model_specs,kite,tether,kcu)
     # Initialize EKF
     ekf = ExtendedKalmanFilter(system_specs.stdv_dynamic_model, system_specs.stdv_measurements, model_specs.ts,dyn_model,obs_model, kite, tether, kcu, model_specs.doIEKF, model_specs.epsilon, model_specs.max_iterations)
     return ekf, dyn_model,kite, kcu, tether

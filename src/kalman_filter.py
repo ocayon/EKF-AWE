@@ -108,6 +108,7 @@ class ExtendedKalmanFilter:
 class DynamicModel:
     def __init__(self,kite,tether,kcu,model_specs):
         
+        self.model_specs = model_specs
 
         self.r = ca.SX.sym('r',3)    # Kite position
         self.r_tether_model = ca.SX.sym('r_tether_model',3) # Tether attachment point
@@ -123,6 +124,7 @@ class DynamicModel:
         
         self.get_wind_velocity(model_specs.log_profile)
         self.va = self.vw - self.v
+
 
         self.x = self.get_state(kite,tether,kcu)
         self.u = self.get_input(kcu)
@@ -169,9 +171,12 @@ class DynamicModel:
             a_kcu = None
             v_kcu = None
 
-        wvel = self.x0[6]/kappa*np.log(self.x0[2]/z0)
-        wdir = self.x0[7]
-        vw = np.array([wvel*np.cos(wdir),wvel*np.sin(wdir),self.x0[8]])
+        if self.model_specs.log_profile:
+            wvel = self.x0[6]/kappa*np.log(self.x0[2]/z0)
+            wdir = self.x0[7]
+            vw = np.array([wvel*np.cos(wdir),wvel*np.sin(wdir),self.x0[8]])
+        else:
+            vw = self.x0[6:9]
 
         r_thether_model, tension_last_element = tether.calculate_tether_shape_symbolic(elevation_0, azimuth_0, tether_length,
                                          tension_ground, r_kite, v_kite, vw, kite, kcu,tether,  
@@ -214,11 +219,11 @@ class DynamicModel:
 
 class ObservationModel:
 
-    def __init__(self,x,u,opt_measurements,kite,tether,kcu):
+    def __init__(self,x,u,model_specs,kite,tether,kcu):
         self.x = x
         self.u = u
         self.x0 = ca.SX.sym('x0',self.x.shape[0])    # Kite position
-        self.opt_measurements = opt_measurements 
+        self.model_specs = model_specs
     
     def get_hx(self,kite,tether,kcu):
         
@@ -237,24 +242,29 @@ class ObservationModel:
             a_kite = self.u[2:5]
             a_kcu = None
             v_kcu = None
-
-        wvel = self.x0[6]/kappa*np.log(self.x0[2]/z0)
-        wdir = self.x0[7]
-        vw = np.array([wvel*np.cos(wdir),wvel*np.sin(wdir),self.x0[8]])
+        if self.model_specs.log_profile:
+            wvel = self.x0[6]/kappa*np.log(self.x0[2]/z0)
+            wdir = self.x0[7]
+            vw = np.array([wvel*np.cos(wdir),wvel*np.sin(wdir),self.x0[8]])
+        else:
+            vw = self.x0[6:9]
         
         r_thether_model, tension_last_element = tether.calculate_tether_shape_symbolic(elevation_0, azimuth_0, tether_length,
                                          tension_ground, r_kite, v_kite, vw, kite, kcu,tether,  
                                         a_kite = a_kite, a_kcu = a_kcu, v_kcu = v_kcu)
 
-        wvel = self.x[6]/kappa*np.log(self.x[2]/z0)
-        wdir = self.x[7]
-        vw = np.array([wvel*np.cos(wdir),wvel*np.sin(wdir),self.x[8]])
+        if self.model_specs.log_profile:
+            wvel = self.x[6]/kappa*np.log(self.x[2]/z0)
+            wdir = self.x[7]
+            vw = np.array([wvel*np.cos(wdir),wvel*np.sin(wdir),self.x[8]])
+        else:
+            vw = self.x[6:9]
         va = vw -self.x[0:3]
         
         h = ca.SX()
         h = ca.vertcat(self.x[0:3])
         h = ca.vertcat(h,self.x[3:6])
-        for key in self.opt_measurements:
+        for key in self.model_specs.opt_measurements:
             if key == 'kite_acc':
                 h = ca.vertcat(h,self.fx[3:6])
             elif key == 'ground_wvel':
