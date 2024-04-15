@@ -28,7 +28,7 @@ epsilon = 1e-6                      # Tolerance for the IEKF
 
 # Measurements
 opt_measurements = []
-# opt_measurements = ['a', 'uf', 'va', 'wdir', 'tether_length', 'aoa']
+tether_offset = True                # Use tether offset in the measurements
 
 # Measurement standard deviations
 
