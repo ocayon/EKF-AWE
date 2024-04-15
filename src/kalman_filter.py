@@ -276,20 +276,20 @@ class ObservationModel:
         for key in self.model_specs.opt_measurements:
             if key == 'kite_acc':
                 h = ca.vertcat(h,self.fx[3:6])
-            elif key == 'ground_wvel':
-                h = ca.vertcat(h,self.x[6])
             elif key == 'apparent_windspeed':
                 h = ca.vertcat(h,ca.norm_2(va))
             # elif key == 'aoa':
             #     h = ca.vertcat(h,aoa+self.x[12])
         if self.model_specs.tether_offset:
-            h = ca.vertcat(h,self.x[11]-self.x[-1])
+            h = ca.vertcat(h,self.x[12]-self.x[-1])
         else:
-            h = ca.vertcat(h,self.x[11])
-        h = ca.vertcat(h,self.x[12])
+            h = ca.vertcat(h,self.x[12])
+
         h = ca.vertcat(h,self.x[13])
         h = ca.vertcat(h,self.x[14])
         h = ca.vertcat(h,(self.x[0:3]-r_thether_model)**2)
+        if self.model_specs.enforce_z_wind:
+            h = ca.vertcat(h,self.x[8])
 
         return h
 

@@ -1,8 +1,7 @@
 
 import numpy as np
 import pandas as pd
-from config import kite_model, kcu_model, tether_diameter, tether_material, \
-                     doIEKF, max_iterations, epsilon, opt_measurements, meas_stdv,model_stdv, n_tether_elements, z0, kappa
+from config import z0, kappa, tether_material, model_stdv,meas_stdv
 from model_definitions import kite_models, kcu_cylinders, tether_materials
 from utils import calculate_vw_loglaw, calculate_euler_from_reference_frame, calculate_airflow_angles, ModelSpecs, SystemSpecs
 from utils import  KiteModel, KCUModel, EKFInput, convert_ekf_output_to_df, get_measurement_vector, tether_input,EKFOutput, create_input_from_KP_csv, get_input_vector
@@ -11,12 +10,21 @@ from kalman_filter import ExtendedKalmanFilter, DynamicModel, ObservationModel, 
 import time
 from pathlib import Path
 
-def create_ekf_output(x, u, kite, tether,kcu):
+def create_ekf_output(x, u, kite, tether,kcu, model_specs):
     """Store results in a list of instances of the class EKFOutput"""
     # Store tether force and tether model results
     kite_pos = x[0:3]
     kite_vel = x[3:6]
-    wind_vel = calculate_vw_loglaw(x[6], z0, x[2], x[7])
+    if model_specs.log_profile:
+        wind_vel  = x[6]/kappa*np.log(x[2]/z0)
+        wind_dir = x[7]
+        z_wind = x[8]
+        vw = np.array([wind_vel*np.cos(wind_dir), wind_vel*np.sin(wind_dir), z_wind])
+    else:
+        vw = x[6:9]
+        wind_vel = np.linalg.norm(vw)
+        wind_dir = np.arctan2(vw[1],vw[0])
+        z_wind = vw[2]
     tension_ground = u[1]
     tether_length = x[12]
     elevation_0 = x[13]
@@ -31,18 +39,16 @@ def create_ekf_output(x, u, kite, tether,kcu):
         kcu_vel = None
         kite_acc = u[2:5]
 
-    args = (n_tether_elements, kite_pos, kite_vel, wind_vel, kite, kcu, tension_ground )
+    args = (model_specs.n_tether_elements, kite_pos, kite_vel, vw, kite, kcu, tension_ground )
     opt_guess = [elevation_0, azimuth_0, tether_length]
     res = tether.calculate_tether_shape(opt_guess, *args, a_kite = kite_acc, a_kcu = kcu_acc, v_kcu = kcu_vel, return_values=True)
     dcm_b2w = res[2]
     euler_angles = calculate_euler_from_reference_frame(dcm_b2w)
-    airflow_angles = calculate_airflow_angles(dcm_b2w, kite_vel, wind_vel)
+    airflow_angles = calculate_airflow_angles(dcm_b2w, kite_vel, vw)
     cd_kcu = res[-5]
     cd_tether = res[-4]
     
 
-    wind_vel  = x[6]/kappa*np.log(x[2]/z0)
-    wind_dir = x[7]
     ekf_output = EKFOutput(kite_pos = kite_pos,
                                 kite_vel = kite_vel,
                                 wind_velocity = wind_vel,
@@ -61,7 +67,7 @@ def create_ekf_output(x, u, kite, tether,kcu):
                                 azimuth_first_element = x[14], 
                                 cd_kcu = cd_kcu,
                                 cd_tether = cd_tether,
-                                z_wind = x[8])
+                                z_wind = z_wind)
                             
     return ekf_output
 
@@ -98,7 +104,7 @@ def initialize_ekf(ekf_input, model_specs, system_specs):
         kcu = create_kcu(system_specs.kcu_model, data_available=True)
     else:
         kcu = create_kcu(system_specs.kcu_model, data_available=False)
-    tether = create_tether(system_specs.tether_material,system_specs.tether_diameter,n_tether_elements)
+    tether = create_tether(system_specs.tether_material,system_specs.tether_diameter,model_specs.n_tether_elements)
     # Create dynamic model and observation model
     dyn_model = DynamicModel(kite,tether,kcu,model_specs)
     obs_model = ObservationModel(dyn_model.x,dyn_model.u,model_specs,kite,tether,kcu)
@@ -111,7 +117,7 @@ def initialize_ekf(ekf_input, model_specs, system_specs):
 
 def update_tether(x,ekf_input, model_specs, tether, kite, kcu):
     kite_acc, fti, lti, kcu_acc, kcu_vel = tether_input(ekf_input,model_specs)
-    tether.solve_tether_shape(n_tether_elements, x[0:3], x[3:6], calculate_vw_loglaw(x[6], z0, x[2], x[7]), kite, kcu, tension_ground = fti, tether_length = lti,
+    tether.solve_tether_shape(model_specs.n_tether_elements, x[0:3], x[3:6], calculate_vw_loglaw(x[6], z0, x[2], x[7]), kite, kcu, tension_ground = fti, tether_length = lti,
                                 a_kite = kite_acc, a_kcu = kcu_acc, v_kcu = kcu_vel)
     return tether
 
@@ -138,7 +144,7 @@ def update_state_ekf_tether(ekf, tether, kite, kcu, dyn_model, ekf_input, model_
     """Update the state of the Extended Kalman Filter and the tether model"""
 
 
-    zi = get_measurement_vector(ekf_input,model_specs.opt_measurements)
+    zi = get_measurement_vector(ekf_input,model_specs)
 
     ############################################################
     # Update EKF
@@ -151,7 +157,7 @@ def update_state_ekf_tether(ekf, tether, kite, kcu, dyn_model, ekf_input, model_
         ekf.x_k1_k1 = ekf.x_k1_k
         print('EKF update returns Nan values, integration of current step ommited')
             
-    ekf_output = create_ekf_output(ekf.x_k1_k1, u, kite, tether, kcu)
+    ekf_output = create_ekf_output(ekf.x_k1_k1, u, kite, tether, kcu, model_specs)
 
     return ekf, tether, ekf_output
 
@@ -215,6 +221,8 @@ if __name__ == "__main__":
     kite_model = 'v3'                   # Kite model name, if Costum, change the kite parameters next
     kcu_model = 'KP1'                   # KCU model name
     tether_diameter = 0.01            # Tether diameter [m]
+    n_tether_elements = 5
+    opt_measurements = []
     # File path
     file_name = f"{kite_model}_{year}-{month}-{day}"
     file_path = Path('../processed_data/flight_data') / kite_model / (file_name + '.csv')
@@ -224,9 +232,9 @@ if __name__ == "__main__":
     timestep = flight_data['time'].iloc[1] - flight_data['time'].iloc[0]
 
     model_specs = ModelSpecs(timestep, n_tether_elements, opt_measurements=opt_measurements)
-    system_specs = SystemSpecs(kite_model, kcu_model, tether_material, tether_diameter, meas_stdv, model_stdv, opt_measurements)
+    system_specs = SystemSpecs(kite_model, kcu_model, tether_material, tether_diameter, meas_stdv, model_stdv, model_specs)
     # Create input classes
-    ekf_input_list,x0 = create_input_from_KP_csv(flight_data, system_specs, kite_sensor = 0, kcu_sensor = 1)
+    ekf_input_list,x0 = create_input_from_KP_csv(flight_data, system_specs, model_specs,kite_sensor = 0, kcu_sensor = 1)
 
     # Check observability matrix
     # check_obs = False

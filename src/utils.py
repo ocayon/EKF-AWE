@@ -93,7 +93,8 @@ def get_input_vector(input_class,kcu):
         u = np.concatenate((np.array([input_class.reelout_speed, input_class.tether_force]), input_class.kite_acc))
     return u
 
-def get_measurement_vector(input_class, opt_measurements):
+def get_measurement_vector(input_class, model_specs):
+    opt_measurements = model_specs.opt_measurements
     z = np.array([])  # Initialize an empty NumPy array
 
     # Append values to the NumPy array
@@ -112,6 +113,9 @@ def get_measurement_vector(input_class, opt_measurements):
     z = np.append(z,input_class.elevation)
     z = np.append(z,input_class.azimuth)
     z = np.append(z, np.zeros(3))  # Add zeros for the least-squares problem
+
+    if model_specs.enforce_z_wind:
+        z = np.append(z,0)
 
     return z
 
@@ -132,7 +136,7 @@ def tether_input(input_class, model_specs):
 class ModelSpecs:
     def __init__(self,timestep, n_tether_elements, opt_measurements = [], correct_height = False,  
                  kcu_data = False, doIEKF = True, epsilon = 1e-6, max_iterations = 200,
-                 log_profile = True, tether_offset = True):
+                 log_profile = False, tether_offset = True, enforce_z_wind = True):
         self.ts = timestep
         self.n_tether_elements = n_tether_elements
         self.opt_measurements = opt_measurements
@@ -143,29 +147,36 @@ class ModelSpecs:
         self.max_iterations = max_iterations
         self.log_profile = log_profile
         self.tether_offset = tether_offset
+        self.enforce_z_wind = enforce_z_wind
 
 
 class SystemSpecs:
     # Class to store the system specifications
-    def __init__(self, kite_model, kcu_model, tether_material, tether_diameter, meas_stdv, model_stdv, opt_measurements):
+    def __init__(self, kite_model, kcu_model, tether_material, tether_diameter, meas_stdv, model_stdv, model_specs):
         self.kite_model = kite_model
         self.kcu_model = kcu_model
         self.tether_material = tether_material
         self.tether_diameter = tether_diameter
 
-
-        self.stdv_dynamic_model = np.array([model_stdv['x'], model_stdv['x'], model_stdv['x'], 
-                   model_stdv['v'], model_stdv['v'], model_stdv['v'], 
-                   model_stdv['uf'], model_stdv['wdir'], model_stdv['vwz'],
-                   model_stdv['CL'], model_stdv['CD'], model_stdv['CS'],
-                   model_stdv['tether_length'], model_stdv['elevation'], model_stdv['azimuth']])  # Standard deviations for the dynamic model
+        if model_specs.log_profile is True:
+            self.stdv_dynamic_model = np.array([model_stdv['x'], model_stdv['x'], model_stdv['x'], 
+                       model_stdv['v'], model_stdv['v'], model_stdv['v'], 
+                       model_stdv['uf'], model_stdv['wdir'], model_stdv['vwz'],
+                       model_stdv['CL'], model_stdv['CD'], model_stdv['CS'],
+                       model_stdv['tether_length'], model_stdv['elevation'], model_stdv['azimuth']])  # Standard deviations for the dynamic model
+        else:
+            self.stdv_dynamic_model = np.array([model_stdv['x'], model_stdv['x'], model_stdv['x'], 
+                       model_stdv['v'], model_stdv['v'], model_stdv['v'], 
+                       model_stdv['vw'], model_stdv['vw'], model_stdv['vwz'],
+                       model_stdv['CL'], model_stdv['CD'], model_stdv['CS'],
+                       model_stdv['tether_length'], model_stdv['elevation'], model_stdv['azimuth']])  # Standard deviations for the dynamic model
         
         stdv_y = []
         for _ in range(3):
             stdv_y.append(meas_stdv['x'])
         for _ in range(3):
             stdv_y.append(meas_stdv['v'])
-        for key in opt_measurements:
+        for key in model_specs.opt_measurements:
             if key == 'kite_acc':   
                 for _ in range(3):
                     stdv_y.append(meas_stdv['a'])
@@ -184,13 +195,16 @@ class SystemSpecs:
         for _ in range(3):
             stdv_y.append(meas_stdv['least_squares']) 
         
+        if model_specs.enforce_z_wind:
+            stdv_y.append(meas_stdv['z_wind'])
+
         stdv_y = np.array(stdv_y)
         self.stdv_measurements = stdv_y
 
 
 
 def find_initial_state_vector(kite_pos, kite_vel, kite_acc, ground_winddir, ground_windspeed, tether_force, tether_length, n_tether_elements,
-                              elevation, azimuth, kite, kcu,tether):
+                              elevation, azimuth, kite, kcu,tether, model_specs):
 
     # Solve for the tether shape
     uf = ground_windspeed*kappa/np.log(10/z0)
@@ -202,7 +216,12 @@ def find_initial_state_vector(kite_pos, kite_vel, kite_acc, ground_winddir, grou
     tether.solve_tether_shape(n_tether_elements, kite_pos, kite_vel, vw, kite, kcu, tension_ground = tether_force, tether_length = tether_length,
                                 a_kite = kite_acc)
     x0 = np.vstack((kite_pos,kite_vel))
-    x0 = np.append(x0,[uf,ground_winddir,0,tether.CL,tether.CD,tether.CS,tether_length, elevation, azimuth])     # Initial state vector (Last two elements are bias, used if needed)
+
+    if model_specs.log_profile:
+        x0 = np.append(x0,[uf,ground_winddir,0])  # Initial wind velocity and direction
+    else:
+        x0 = np.append(x0,vw)   # Initial wind velocity
+    x0 = np.append(x0,[tether.CL,tether.CD,tether.CS,tether_length, elevation, azimuth])     # Initial state vector (Last two elements are bias, used if needed)
     u0 = tether.Ft_kite
 
     return x0, u0
@@ -361,7 +380,7 @@ def calculate_airflow_angles(dcm, v_kite, vw):
     sideslip = 90-calculate_angle(ey_kite,va_proj)         # Sideslip angle
     return aoa, sideslip
 
-def create_input_from_KP_csv(flight_data, system_specs, kite_sensor = 0, kcu_sensor = 1):
+def create_input_from_KP_csv(flight_data, system_specs, model_specs, kite_sensor = 0, kcu_sensor = 1):
     """Create input classes and initial state vector from flight data"""
     from config import n_tether_elements
     from run_EKF import create_kite, create_kcu,create_tether
@@ -430,7 +449,7 @@ def create_input_from_KP_csv(flight_data, system_specs, kite_sensor = 0, kcu_sen
 
     x0, u0 = find_initial_state_vector(kite_pos[0], kite_vel[0], kite_acc[0], 
                                        init_wind_dir, init_wind_vel, tether_force[0], 
-                                       tether_length[0], n_tether_elements, kite_elevation[0], kite_azimuth[0], kite, kcu,tether)
+                                       tether_length[0], n_tether_elements, kite_elevation[0], kite_azimuth[0], kite, kcu,tether, model_specs)
 
     return ekf_input_list, x0
 
