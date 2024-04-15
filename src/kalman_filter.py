@@ -106,7 +106,7 @@ class ExtendedKalmanFilter:
     
         
 class DynamicModel:
-    def __init__(self,kite,tether,kcu,ts):
+    def __init__(self,kite,tether,kcu,model_specs):
         
 
         self.r = ca.SX.sym('r',3)    # Kite position
@@ -122,8 +122,9 @@ class DynamicModel:
         self.reelout_speed = ca.SX.sym('reelout_speed') # Tether reelout speed
         self.elevation_0 = ca.SX.sym('elevation_first_tether_element') # Elevation from ground to first tether element
         self.azimuth_0 = ca.SX.sym('azimuth_first_tether_element')   # Azimuth from ground to first tether element
+        self.tether_offset = ca.SX.sym('tether_offset') # Tether offset
         
-        
+
         self.wvel = self.uf/kappa*ca.log(self.r[2]/z0)
         self.vw = ca.vertcat(self.wvel*ca.cos(self.wdir),self.wvel*ca.sin(self.wdir),0)
         self.va = self.vw - self.v
@@ -133,10 +134,18 @@ class DynamicModel:
         
         
         
-
-        self.x = self.get_state(kite,tether,kcu)
         self.u = self.get_input(kcu)
-        self.x0 = ca.SX.sym('x0',self.x.shape[0])    # Kite position
+        self.x = self.get_state(kite,tether,kcu)
+        if model_specs.tether_offset:
+            self.x = ca.vertcat(self.x, self.tether_offset)
+        self.x0 = ca.SX.sym('x0',self.x.shape[0])  
+        self.fx = self.get_fx(kite,tether,kcu)
+        if model_specs.tether_offset:
+            self.fx = ca.vertcat(self.fx,0)
+        
+          # Kite position
+    
+        self.calc_fx = ca.Function('calc_fx', [self.x,self.u,self.x0],[self.fx])
 
     def get_state(self,kite,tether,kcu):    
         
@@ -194,15 +203,15 @@ class DynamicModel:
     
     def get_fx_jac(self,kite,tether,kcu):
   
-        return ca.simplify(ca.jacobian(self.get_fx(kite,tether,kcu),self.x))
+        return ca.simplify(ca.jacobian(self.fx,self.x))
 
     def get_fx_jac_fun(self,kite,tether,kcu):
         return ca.Function('calc_Fx', [self.x,self.u,self.x0],[self.get_fx_jac(kite,tether,kcu)])
     
     def propagate(self,x,u, kite,tether,kcu,ts):
-        calc_fx = ca.Function('calc_fx', [self.x,self.u,self.x0],[self.get_fx(kite,tether,kcu)])
         
-        self.fx = calc_fx(self.x,self.u,x)
+        
+        self.fx = self.calc_fx(self.x,self.u,x)
         
         # Define ODE system
         dae = {'x': self.x, 'p': self.u, 'ode': self.fx}                       # Define ODE system
@@ -212,11 +221,11 @@ class DynamicModel:
 
 class ObservationModel:
 
-    def __init__(self,x,u,opt_measurements,kite,tether,kcu):
+    def __init__(self,x,u,model_specs,kite,tether,kcu):
         self.x = x
         self.u = u
         self.x0 = ca.SX.sym('x0',self.x.shape[0])    # Kite position
-        self.opt_measurements = opt_measurements 
+        self.model_specs = model_specs
     
     def get_hx(self,kite,tether,kcu):
         
@@ -252,7 +261,7 @@ class ObservationModel:
         h = ca.SX()
         h = ca.vertcat(self.x[0:3])
         h = ca.vertcat(h,self.x[3:6])
-        for key in self.opt_measurements:
+        for key in self.model_specs.opt_measurements:
             if key == 'kite_acc':
                 h = ca.vertcat(h,self.fx[3:6])
             elif key == 'ground_wvel':
@@ -263,7 +272,10 @@ class ObservationModel:
                 h = ca.vertcat(h,ca.norm_2(self.x[0:3])-kite.distance_kcu_kite-self.x[11])
             # elif key == 'aoa':
             #     h = ca.vertcat(h,aoa+self.x[12])
-        h = ca.vertcat(h,self.x[11])
+        if self.model_specs.tether_offset:
+            h = ca.vertcat(h,self.x[11]-self.x[-1])
+        else:
+            h = ca.vertcat(h,self.x[11])
         h = ca.vertcat(h,self.x[12])
         h = ca.vertcat(h,self.x[13])
         h = ca.vertcat(h,(self.x[0:3]-r_thether_model)**2)

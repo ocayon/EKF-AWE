@@ -129,7 +129,8 @@ def tether_input(input_class, model_specs):
 
     return input_class.kite_acc, input_class.tether_force, tether_length, kcu_acc, kcu_vel
 class ModelSpecs:
-    def __init__(self,timestep, n_tether_elements, opt_measurements = [], correct_height = False,  kcu_data = False, doIEKF = True, epsilon = 1e-6, max_iterations = 200):
+    def __init__(self,timestep, n_tether_elements, opt_measurements = [], correct_height = False,  kcu_data = False, doIEKF = True, epsilon = 1e-6, max_iterations = 200,
+                 tether_offset = True):
         self.ts = timestep
         self.n_tether_elements = n_tether_elements
         self.opt_measurements = opt_measurements
@@ -138,6 +139,8 @@ class ModelSpecs:
         self.doIEKF = doIEKF
         self.epsilon = epsilon
         self.max_iterations = max_iterations
+        self.tether_offset = tether_offset
+
 
 class SystemSpecs:
     # Class to store the system specifications
@@ -153,6 +156,7 @@ class SystemSpecs:
                    model_stdv['uf'], model_stdv['wdir'], 
                    model_stdv['CL'], model_stdv['CD'], model_stdv['CS'],
                    model_stdv['tether_length'], model_stdv['elevation'], model_stdv['azimuth']])  # Standard deviations for the dynamic model
+        
         stdv_y = []
         for _ in range(3):
             stdv_y.append(meas_stdv['x'])
