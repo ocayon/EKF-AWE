@@ -106,7 +106,7 @@ class ExtendedKalmanFilter:
     
         
 class DynamicModel:
-    def __init__(self,kite,tether,kcu,ts):
+    def __init__(self,kite,tether,kcu,model_specs):
         
 
         self.r = ca.SX.sym('r',3)    # Kite position
@@ -121,11 +121,8 @@ class DynamicModel:
         self.elevation_0 = ca.SX.sym('elevation_first_tether_element') # Elevation from ground to first tether element
         self.azimuth_0 = ca.SX.sym('azimuth_first_tether_element')   # Azimuth from ground to first tether element
         
-        self.get_wind_velocity()
+        self.get_wind_velocity(model_specs.log_profile)
         self.va = self.vw - self.v
-        
-        self.uf_u = ca.SX.sym('uf_u')    # Friction velocity for input (previous timestep)
-        self.wdir_u = ca.SX.sym('wdir_u')   # Ground wind direction for input (previous timestep)
 
         self.x = self.get_state(kite,tether,kcu)
         self.u = self.get_input(kcu)
@@ -133,14 +130,19 @@ class DynamicModel:
 
     def get_state(self,kite,tether,kcu):    
         
-        return ca.vertcat(self.r,self.v,self.uf,self.wdir,self.vwz,self.CL,self.CD,self.CS,self.tether_length, self.elevation_0, self.azimuth_0)
+        return ca.vertcat(self.r,self.v,self.vw_state,self.CL,self.CD,self.CS,self.tether_length, self.elevation_0, self.azimuth_0)
     
-    def get_wind_velocity(self):
-        self.uf = ca.SX.sym('uf')    # Friction velocity
-        self.wdir = ca.SX.sym('wdir')# Ground wind direction
-        self.vwz = ca.SX.sym('vwz')  # Vertical wind velocity
-        self.wvel = self.uf/kappa*ca.log(self.r[2]/z0)
-        self.vw = ca.vertcat(self.wvel*ca.cos(self.wdir),self.wvel*ca.sin(self.wdir),self.vwz)
+    def get_wind_velocity(self, log_profile):
+        if log_profile is True:
+            self.uf = ca.SX.sym('uf')    # Friction velocity
+            self.wdir = ca.SX.sym('wdir')# Ground wind direction
+            self.vwz = ca.SX.sym('vwz')  # Vertical wind velocity
+            self.wvel = self.uf/kappa*ca.log(self.r[2]/z0)
+            self.vw = ca.vertcat(self.wvel*ca.cos(self.wdir),self.wvel*ca.sin(self.wdir),self.vwz)
+            self.vw_state = ca.vertcat(self.uf,self.wdir,self.vwz)
+        else:
+            self.vw = ca.SX.sym('vw',3)  # Wind velocity
+            self.vw_state = self.vw
     
     def get_input(self,kcu):
         if kcu.data_available:
