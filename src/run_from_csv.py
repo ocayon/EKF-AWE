@@ -19,7 +19,8 @@ if __name__ == '__main__':
 
     timestep = flight_data['time'].iloc[1] - flight_data['time'].iloc[0]
 
-    model_specs = ModelSpecs(timestep, n_tether_elements, opt_measurements=opt_measurements, correct_height=False, doIEKF=doIEKF, tether_offset=True, max_iterations=max_iterations, epsilon=epsilon)
+    model_specs = ModelSpecs(timestep, n_tether_elements, opt_measurements=opt_measurements, correct_height=False, 
+                             doIEKF=doIEKF, tether_offset=True, max_iterations=max_iterations, epsilon=epsilon)
     system_specs = SystemSpecs(kite_model, kcu_model, tether_material, tether_diameter, meas_stdv, model_stdv, opt_measurements)
     # Create input classes
     ekf_input_list,x0 = create_input_from_KP_csv(flight_data, system_specs, kite_sensor = 0, kcu_sensor = 1)
