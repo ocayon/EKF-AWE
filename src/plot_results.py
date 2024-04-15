@@ -6,10 +6,10 @@ from run_EKF import create_kite
 import seaborn as sns
 import plot_utils as pu
 from postprocessing import calculate_wind_speed_airborne_sensors, postprocess_results
-year = '2019'
-month = '10'
-day = '08'
-kite_model = 'v3'                   # Kite model name, if Costum, change the kite parameters next
+year = '2024'
+month = '02'
+day = '16'
+kite_model = 'v9'                   # Kite model name, if Costum, change the kite parameters next
 
 plt.close('all')
 path = '../results/'+kite_model+'/'
@@ -228,12 +228,26 @@ plt.legend()
 plt.show()
 
 #%%
-fig, axs = plt.subplots(1, 2, figsize=(10, 10), sharex=True)
-mask = flight_data['turn_straight'] == 'straight'
-pu.plot_cl_curve(results['CL'], results['CD'], results['aoa'], mask,axs)
-mask = flight_data['turn_straight'] == 'turn'
-pu.plot_cl_curve(results['CL'], results['CD'], results['aoa'], mask,axs)
+#read the data
+data = pd.read_csv('../processed_data/aerostructural/v3_aero_coeffs_VSM.csv')
+cl_VSM = data['CL']
+cd_VSM = data['CD']
+aoa_VSM = np.degrees(data['aoa'])
+fig, axs = plt.subplots(2, 2, figsize=(10, 10))
+mask = (flight_data['turn_straight'] == 'straight') & (flight_data.index>5000)& (flight_data['kite_angle_of_attack']>2)#& (flight_data['ground_tether_reelout_speed']>0)# &(flight_data['up'] <0.1)#
+# pu.plot_cl_curve(results['CL'], results['CD'], results['aoa'], mask,axs)
+pu.plot_cl_curve(results['CL'], results['CD'], flight_data['kite_angle_of_attack'], mask,axs, label = "Straight")
+mask = (flight_data['turn_straight'] == 'turn') & (flight_data.index>5000)& (flight_data['kite_angle_of_attack']>2)# & (flight_data['ground_tether_reelout_speed']>0)# &(flight_data['up'] <0.1)#
+# pu.plot_cl_curve(results['CL'], results['CD'], results['aoa'], mask,axs)
+pu.plot_cl_curve(results['CL'], results['CD'], flight_data['kite_angle_of_attack'], mask,axs, label = "Turn")
+# axs[0].scatter(aoa_VSM, cl_VSM, label='VSM')
+# axs[1].scatter(aoa_VSM, cd_VSM, label='VSM')
+# axs[0,0].fill_betweenx(y=np.linspace(0.4, 1, 100), x1=15, x2=40, color='red', alpha=0.3)
+# axs[0,1].fill_betweenx(y=np.linspace(0, 0.4, 100), x1=15, x2=40, color='red', alpha=0.3)
 
+axs[0,0].legend()
+
+plt.show()
 
 
 
