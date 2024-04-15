@@ -4,7 +4,7 @@ import pandas as pd
 from config import z0, kappa, model_stdv,meas_stdv
 from model_definitions import kite_models, kcu_cylinders, tether_materials
 from utils import calculate_vw_loglaw, calculate_euler_from_reference_frame, calculate_airflow_angles, ModelSpecs, SystemSpecs
-from utils import  KiteModel, KCUModel, convert_ekf_output_to_df, get_measurement_vector, tether_input,EKFOutput, create_input_from_KP_csv, get_input_vector
+from utils import  KiteModel, KCUModel, convert_ekf_output_to_df, get_measurement_vector, tether_input,EKFOutput, create_input_from_KP_csv, get_input_vector, calculate_reference_frame_euler
 from tether_model import TetherModel
 from kalman_filter import ExtendedKalmanFilter, DynamicModel, ObservationModel, observability_Lie_method
 import time
@@ -44,10 +44,20 @@ def create_ekf_output(x, u, kite, tether,kcu, model_specs):
     res = tether.calculate_tether_shape(opt_guess, *args, a_kite = kite_acc, a_kcu = kcu_acc, v_kcu = kcu_vel, return_values=True)
     dcm_b2w = res[2]
     euler_angles = calculate_euler_from_reference_frame(dcm_b2w)
-    airflow_angles = calculate_airflow_angles(dcm_b2w, kite_vel, vw)
+    
     cd_kcu = res[-5]
     cd_tether = res[-4]
+    if model_specs.model_yaw:
+        ex, ey, ez = calculate_reference_frame_euler( euler_angles[0], 
+                                                     euler_angles[1], 
+                                                     x[15]*180/np.pi, 
+                                                     bodyFrame='NED')
+        dcm = np.vstack(([ex], [ey], [ez])).T
+        airflow_angles = calculate_airflow_angles(dcm, kite_vel, vw)
+    else:
+        airflow_angles = calculate_airflow_angles(dcm_b2w, kite_vel, vw)
     
+
 
     ekf_output = EKFOutput(kite_pos = kite_pos,
                                 kite_vel = kite_vel,
@@ -68,6 +78,10 @@ def create_ekf_output(x, u, kite, tether,kcu, model_specs):
                                 cd_kcu = cd_kcu,
                                 cd_tether = cd_tether,
                                 z_wind = z_wind)
+    
+    if model_specs.model_yaw:
+        ekf_output.k_steering_law = x[16]
+        ekf_output.yaw = x[15]
                             
     return ekf_output
 

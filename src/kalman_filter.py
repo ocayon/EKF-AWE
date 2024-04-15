@@ -122,16 +122,27 @@ class DynamicModel:
         self.elevation_0 = ca.SX.sym('elevation_first_tether_element') # Elevation from ground to first tether element
         self.azimuth_0 = ca.SX.sym('azimuth_first_tether_element')   # Azimuth from ground to first tether element
         self.tether_offset = ca.SX.sym('tether_offset') # Tether offset
-        
+        self.yaw = ca.SX.sym('yaw') # Bias angle of attack
+        self.us = ca.SX.sym('us')    # Steering input
+        self.k_yaw_rate = ca.SX.sym('k_yaw_rate') # Yaw rate constant
+
+
         self.get_wind_velocity(model_specs.log_profile)
         self.va = self.vw - self.v
 
         self.u = self.get_input(kcu)
         self.x = self.get_state(kite,tether,kcu)
+        if model_specs.model_yaw:
+            self.x = ca.vertcat(self.x, self.yaw, self.k_yaw_rate)
         if model_specs.tether_offset:
             self.x = ca.vertcat(self.x, self.tether_offset)
         self.x0 = ca.SX.sym('x0',self.x.shape[0])  
         self.fx = self.get_fx(kite,tether,kcu)
+        
+        
+        if model_specs.model_yaw:
+            yaw_rate = self.k_yaw_rate*self.us*ca.norm_2(self.va)
+            self.fx = ca.vertcat(self.fx,yaw_rate,0)
         if model_specs.tether_offset:
             self.fx = ca.vertcat(self.fx,0)
         
@@ -159,7 +170,7 @@ class DynamicModel:
         if kcu.data_available:
             self.a_kcu =  ca.SX.sym('a_kcu',3)  # KCU acceleration
             self.v_kcu =  ca.SX.sym('v_kcu',3)  # KCU acceleration
-            return ca.vertcat(self.reelout_speed,self.Ftg,self.a_kcu, self.v_kcu)
+            return ca.vertcat(self.reelout_speed,self.Ftg,self.a_kcu, self.v_kcu,self.us)
     
     def get_fx(self,kite,tether,kcu):
         
@@ -281,13 +292,16 @@ class ObservationModel:
         h = ca.vertcat(h,self.x[13])
         h = ca.vertcat(h,self.x[14])
         h = ca.vertcat(h,(self.x[0:3]-r_thether_model)**2)
+        if self.model_specs.model_yaw:
+            h = ca.vertcat(h,self.x[15])
         if self.model_specs.enforce_z_wind:
             h = ca.vertcat(h,self.x[8])
+        
             
         for key in self.model_specs.opt_measurements:
             if key == 'apparent_windspeed':
                 h = ca.vertcat(h,ca.norm_2(va))
-
+        
         return h
 
     def get_hx_jac(self,kite,tether,kcu):

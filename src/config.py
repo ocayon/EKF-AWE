@@ -33,6 +33,7 @@ opt_measurements = []            # List of measurements to be used in the Kalman
 log_profile = False                 # Model wind speed as logarithmic with height
 tether_offset = True                # Use tether offset in the measurements
 enforce_z_wind = True              # Enforce the z wind speed to be zero
+model_yaw = False                   # Model the yaw angle in the state vector
 
 # Measurement standard deviations
 
@@ -49,7 +50,8 @@ meas_stdv = {
     'least_squares': 1e-5,       # Least squares
     'elevation': 0.2,
     'azimuth':0.2,
-    'z_wind': 0.1
+    'z_wind': 0.1,
+    'yaw': 5/180*np.pi
 }
 
 model_stdv = {
@@ -66,6 +68,7 @@ model_stdv = {
         'elevation' : 0.3,    # Elevation angle
         'azimuth' : 0.3,     # Azimuth angle
         'tether_length' : 0.1, # Tether length
+        'yaw': 5/180*np.pi
     },
     'v9': {
         'x': 2.5,                  # Position
@@ -80,6 +83,7 @@ model_stdv = {
         'elevation' : 0.3,    # Elevation angle
         'azimuth' : 0.3,     # Azimuth angle
         'tether_length' : 0.1, # Tether length
+        'yaw': 5/180*np.pi
     }
 }
 

@@ -61,6 +61,8 @@ class EKFInput:
     reelout_speed: float = None  # Reelout speed
     elevation: float = None      # Elevation angle
     azimuth: float = None        # Azimuth angle
+    kite_yaw: float = None            # Yaw angle
+    steering_input: float = None # Steering input
 
 @dataclass
 class EKFOutput:
@@ -83,14 +85,14 @@ class EKFOutput:
     cd_tether : float = None# Drag coefficient of the tether
     cd_kcu : float = None  # Drag coefficient of the KCU
     z_wind: float = None    # Vertical wind speed
-
+    k_steering_law: float = None # Steering law constant
     
 
 def get_input_vector(input_class,kcu):
     if kcu.data_available:   
-        u = np.concatenate((np.array([input_class.reelout_speed, input_class.tether_force]), input_class.kcu_acc, input_class.kcu_vel))
+        u = np.concatenate((np.array([input_class.reelout_speed, input_class.tether_force]), input_class.kcu_acc, input_class.kcu_vel, np.array([input_class.steering_input])))
     else:
-        u = np.concatenate((np.array([input_class.reelout_speed, input_class.tether_force]), input_class.kite_acc))
+        u = np.concatenate((np.array([input_class.reelout_speed, input_class.tether_force]), input_class.kite_acc,np.array([input_class.steering_input])))
     return u
 
 def get_measurement_vector(input_class, model_specs):
@@ -104,7 +106,8 @@ def get_measurement_vector(input_class, model_specs):
     z = np.append(z,input_class.elevation)
     z = np.append(z,input_class.azimuth)
     z = np.append(z, np.zeros(3))  # Add zeros for the least-squares problem
-
+    if model_specs.model_yaw:
+        z = np.append(z,input_class.kite_yaw)
     if model_specs.enforce_z_wind:
         z = np.append(z,0)
     if 'apparent_windspeed' in opt_measurements:
@@ -129,7 +132,8 @@ def tether_input(input_class, model_specs):
 class ModelSpecs:
     def __init__(self,timestep, n_tether_elements, opt_measurements = [], correct_height = False,  
                  kcu_data = False, doIEKF = True, epsilon = 1e-6, max_iterations = 200,
-                 log_profile = False, tether_offset = True, enforce_z_wind = True):
+                 log_profile = False, tether_offset = True, enforce_z_wind = True,
+                 model_yaw = False):
         self.ts = timestep
         self.n_tether_elements = n_tether_elements
         self.opt_measurements = opt_measurements
@@ -141,6 +145,7 @@ class ModelSpecs:
         self.log_profile = log_profile
         self.tether_offset = tether_offset
         self.enforce_z_wind = enforce_z_wind
+        self.model_yaw = model_yaw
 
 
 class SystemSpecs:
@@ -164,6 +169,8 @@ class SystemSpecs:
                        model_stdv['vw'], model_stdv['vw'], model_stdv['vwz'],
                        model_stdv['CL'], model_stdv['CD'], model_stdv['CS'],
                        model_stdv['tether_length'], model_stdv['elevation'], model_stdv['azimuth']])  # Standard deviations for the dynamic model
+        if model_specs.model_yaw:
+            self.stdv_dynamic_model = np.append(self.stdv_dynamic_model,[model_stdv['yaw'],1e-6])
         
         stdv_y = []
         for _ in range(3):
@@ -175,7 +182,8 @@ class SystemSpecs:
         stdv_y.append(meas_stdv['azimuth'])
         for _ in range(3):
             stdv_y.append(meas_stdv['least_squares']) 
-        
+        if model_specs.model_yaw:
+            stdv_y.append(meas_stdv['yaw'])
         if model_specs.enforce_z_wind:
             stdv_y.append(meas_stdv['z_wind'])
             
@@ -202,7 +210,7 @@ def find_initial_state_vector(kite_pos, kite_vel, kite_acc, ground_winddir, grou
     tether.solve_tether_shape(n_tether_elements, kite_pos, kite_vel, vw, kite, kcu, tension_ground = tether_force, tether_length = tether_length,
                                 a_kite = kite_acc)
     x0 = np.vstack((kite_pos,kite_vel))
-
+    
     if model_specs.log_profile:
         x0 = np.append(x0,[uf,ground_winddir,0])  # Initial wind velocity and direction
     else:
@@ -395,7 +403,8 @@ def create_input_from_KP_csv(flight_data, system_specs, model_specs, kite_sensor
     kite_elevation = np.arcsin(kite_pos[:,2]/np.linalg.norm(kite_pos,axis=1))
     kite_azimuth = np.arctan2(kite_pos[:,1],kite_pos[:,0])
     
-    
+    kite_yaw = np.array(flight_data['kite_'+str(kite_sensor)+'_yaw'])/180*np.pi
+
     init_wind_dir = np.mean(ground_winddir[0:3000])/180*np.pi
     init_wind_vel = np.mean(ground_windspeed[0])
     
@@ -410,7 +419,7 @@ def create_input_from_KP_csv(flight_data, system_specs, model_specs, kite_sensor
                 break
                 
         
-        
+    us = (flight_data['kcu_actual_steering'])/max(abs(flight_data['kcu_actual_steering']))
     timestep = flight_data['time'].iloc[1]-flight_data['time'].iloc[0]
     ekf_input_list = []
     for i in range(len(flight_data)):
@@ -427,7 +436,9 @@ def create_input_from_KP_csv(flight_data, system_specs, model_specs, kite_sensor
                                     reelout_speed = relout_speed[i], 
                                     elevation = kite_elevation[i],
                                     azimuth = kite_azimuth[i], 
-                                    ts = timestep))
+                                    ts = timestep,
+                                    kite_yaw = kite_yaw[i], 
+                                    steering_input = us[i]))
 
     kite = create_kite(system_specs.kite_model)
     kcu = create_kcu(system_specs.kcu_model)
@@ -436,7 +447,9 @@ def create_input_from_KP_csv(flight_data, system_specs, model_specs, kite_sensor
     x0, u0 = find_initial_state_vector(kite_pos[0], kite_vel[0], kite_acc[0], 
                                        init_wind_dir, init_wind_vel, tether_force[0], 
                                        tether_length[0], n_tether_elements, kite_elevation[0], kite_azimuth[0], kite, kcu,tether, model_specs)
-
+    if model_specs.model_yaw:
+        x0 = np.append(x0,[kite_yaw[0],0])  # Initial wind velocity and direction
+        
     return ekf_input_list, x0
 
 def convert_ekf_output_to_df(ekf_output_list):
@@ -462,6 +475,8 @@ def convert_ekf_output_to_df(ekf_output_list):
     cd_kcu = []
     cd_tether =[]
     z_wind = []
+    kite_yaw = []
+    k_steering_law = []
     for i in range(len(ekf_output_list)):
         x.append(ekf_output_list[i].kite_pos[0])
         y.append(ekf_output_list[i].kite_pos[1])
@@ -484,10 +499,41 @@ def convert_ekf_output_to_df(ekf_output_list):
         cd_kcu.append(ekf_output_list[i].cd_kcu)
         cd_tether.append(ekf_output_list[i].cd_tether)
         z_wind.append(ekf_output_list[i].z_wind)
+        kite_yaw.append(ekf_output_list[i].kite_yaw)
+        k_steering_law.append(ekf_output_list[i].k_steering_law)
         
     ekf_output_df = pd.DataFrame({'x': x, 'y': y, 'z': z, 'vx': vx, 'vy': vy, 'vz': vz, 
                                   'wind_velocity': wind_velocity, 'wind_direction': wind_direction,
                                 'tether_force': tether_force, 'roll': roll, 'pitch': pitch, 'yaw': yaw, 'aoa': aoa, 'ss': ss, 'tether_length': tether_length,
-                                'CL': CL, 'CD': CD, 'CS': CS, 'cd_kcu': cd_kcu, 'cd_tether': cd_tether, 'z_wind':z_wind})
+                                'CL': CL, 'CD': CD, 'CS': CS, 'cd_kcu': cd_kcu, 'cd_tether': cd_tether, 'z_wind':z_wind, 'kite_yaw':kite_yaw, 'k_steering_law':k_steering_law})
 
     return ekf_output_df
+
+def calculate_reference_frame_euler(roll, pitch, yaw, bodyFrame='NED'):
+    """
+    Calculate the reference frame based on euler angles
+    :param roll: roll angle
+    :param pitch: pitch angle
+    :param yaw: yaw angle
+    :param eulerFrame: euler frame
+    :return: ex, ey, ez
+    """
+    if bodyFrame == 'NED':
+        roll = -roll+180
+    elif bodyFrame == 'ENU':
+        roll = -roll
+ 
+    
+    # Calculate tether orientation based on euler angles
+    Transform_Matrix=R_EG_Body(roll/180*np.pi,pitch/180*np.pi,(yaw)/180*np.pi)
+    #    Transform_Matrix=R_EG_Body(kite_roll[i]/180*np.pi,kite_pitch[i]/180*np.pi,kite_yaw_modified[i])
+    Transform_Matrix=Transform_Matrix.T
+    #X_vector
+    ex_kite=Transform_Matrix.dot(np.array([1,0,0]))
+    #Y_vector
+    ey_kite=Transform_Matrix.dot(np.array([0,1,0]))
+    #Z_vector
+    ez_kite=Transform_Matrix.dot(np.array([0,0,1]))
+
+    # Transform from ENU to NED and return        
+    return ex_kite, ey_kite, ez_kite
