@@ -315,7 +315,7 @@ def plot_wind_speed(results, flight_data, lidar_heights, IMU_0 = False, IMU_1=Fa
         vw = np.vstack((wvel*np.cos(results['wind_direction']),wvel*np.sin(results['wind_direction']),np.zeros(len(results)))).T
         axs[0].plot(flight_data['time'], np.linalg.norm(vw,axis=1), label='EKF', alpha = 0.8)
         axs[1].plot(flight_data['time'], np.degrees(results['wind_direction'])%360, alpha = 0.8)
-        axs[2].plot(flight_data['time'], np.zeros(len(results)), label='EKF', alpha = 0.5)
+        axs[2].plot(flight_data['time'], results['z_wind'], label='EKF', alpha = 0.5)
     
 
     min_wdir = min(flight_data['ground_wind_direction'])
@@ -881,3 +881,52 @@ def plot_kite_reference_frame(results, flight_data, imus):
                 0,
                 color='black', length=len_arrow)
     ax.set_box_aspect([1,1,1])
+
+def plot_cl_curve(cl,cd,aoa,mask,axs,label = None, savefig=False):
+    CL = cl[mask]
+    CD = cd[mask]
+    alpha = aoa[mask]
+
+
+    step = 0.5
+    bins = np.arange(int(alpha.min())-step/2, int(alpha.max())+step/2, step)
+    bin_indices = np.digitize(alpha, bins)  # Find the bin index for each alpha value
+    num_bins = len(bins)
+
+    CL_means = np.array([CL[bin_indices == i].mean() for i in range(1, num_bins)])
+    CD_means = np.array([CD[bin_indices == i].mean() for i in range(1, num_bins)])
+
+    CL_stds = np.array([CL[bin_indices == i].std() for i in range(1, num_bins)])
+    CD_stds = np.array([CD[bin_indices == i].std() for i in range(1, num_bins)])
+    bin_centers = 0.5 * (bins[:-1] + bins[1:])
+
+    # Plot CL and shade the area for std deviation
+    axs[0,0].plot(bin_centers, CL_means, 'o-', markersize=8, linewidth=2, label=label)
+    axs[0,0].fill_between(bin_centers, CL_means - CL_stds, CL_means + CL_stds, alpha=0.2)
+    axs[0,0].set_xlabel('Angle of Attack (degrees)', fontsize=14)
+    axs[0,0].set_ylabel('Lift Coefficient (CL)',  fontsize=14)
+    axs[0,0].grid(True)
+
+    # Plot CD and shade the area for std deviation
+    axs[0,1].plot(bin_centers, CD_means, 'o-', markersize=8, linewidth=2, label=label)
+    axs[0,1].fill_between(bin_centers, CD_means - CD_stds, CD_means + CD_stds, alpha=0.2)
+    axs[0,1].set_xlabel('Angle of Attack (degrees)', fontsize=14)
+    axs[0,1].set_ylabel('Drag Coefficient (CD)', fontsize=14)
+    axs[0,1].grid(True)
+
+    axs[1,0].plot(CL_means, CD_means, 'o-', label=label)
+    # axs[1,0].fill_between(CL_means
+    axs[1,0].set_xlabel('Lift Coefficient (CL)', fontsize=14)
+    axs[1,0].set_ylabel('Drag Coefficient (CD)', fontsize=14)
+    axs[1,0].grid(True)
+
+    axs[1,1].plot(bin_centers, CL_means/CD_means, 'o-', label=label)
+    axs[1,1].fill_between(bin_centers, (CL_means - CL_stds)/(CD_means + CD_stds), (CL_means + CL_stds)/(CD_means - CD_stds), alpha=0.2)
+    axs[1,1].set_xlabel('Angle of Attack (degrees)', fontsize=14)
+    axs[1,1].set_ylabel('L/D Ratio', fontsize=14)
+    axs[1,1].grid(True)
+
+    
+
+
+    

@@ -102,6 +102,9 @@ def initialize_ekf(ekf_input, model_specs, system_specs):
     # Create dynamic model and observation model
     dyn_model = DynamicModel(kite,tether,kcu,model_specs)
     obs_model = ObservationModel(dyn_model.x,dyn_model.u,model_specs,kite,tether,kcu)
+
+    if model_specs.tether_offset:    
+        system_specs.stdv_dynamic_model = np.append(system_specs.stdv_dynamic_model, 1e-6)
     # Initialize EKF
     ekf = ExtendedKalmanFilter(system_specs.stdv_dynamic_model, system_specs.stdv_measurements, model_specs.ts,dyn_model,obs_model, kite, tether, kcu, model_specs.doIEKF, model_specs.epsilon, model_specs.max_iterations)
     return ekf, dyn_model,kite, kcu, tether
@@ -136,8 +139,7 @@ def update_state_ekf_tether(ekf, tether, kite, kcu, dyn_model, ekf_input, model_
 
 
     zi = get_measurement_vector(ekf_input,model_specs.opt_measurements)
-    if model_specs.correct_height:
-        zi[2] = tether.kite_pos[2]
+
     ############################################################
     # Update EKF
     ############################################################
@@ -168,8 +170,6 @@ def run_EKF(ekf_input_list, model_specs, system_specs,x0):
     
     # Initial measurement vector
     tether = update_tether(x0, ekf_input_list[0], model_specs, tether, kite, kcu)
-    if model_specs.correct_height:
-        x0[2] = tether.kite_pos[2]
         
     print(x0)
     # Define results matrices
@@ -177,6 +177,8 @@ def run_EKF(ekf_input_list, model_specs, system_specs,x0):
 
     ekf_output_list = []    # List of instances of EKFOutput
 
+    if model_specs.tether_offset:
+        x0 = np.append(x0,0)
     # Initial conditions
     ekf.x_k1_k1 = x0
      
@@ -221,7 +223,7 @@ if __name__ == "__main__":
     flight_data = flight_data.iloc[:15000]
     timestep = flight_data['time'].iloc[1] - flight_data['time'].iloc[0]
 
-    model_specs = ModelSpecs(timestep, n_tether_elements, opt_measurements=opt_measurements, correct_height=False)
+    model_specs = ModelSpecs(timestep, n_tether_elements, opt_measurements=opt_measurements)
     system_specs = SystemSpecs(kite_model, kcu_model, tether_material, tether_diameter, meas_stdv, model_stdv, opt_measurements)
     # Create input classes
     ekf_input_list,x0 = create_input_from_KP_csv(flight_data, system_specs, kite_sensor = 0, kcu_sensor = 1)

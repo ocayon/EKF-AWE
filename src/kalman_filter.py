@@ -121,14 +121,23 @@ class DynamicModel:
         self.reelout_speed = ca.SX.sym('reelout_speed') # Tether reelout speed
         self.elevation_0 = ca.SX.sym('elevation_first_tether_element') # Elevation from ground to first tether element
         self.azimuth_0 = ca.SX.sym('azimuth_first_tether_element')   # Azimuth from ground to first tether element
+        self.tether_offset = ca.SX.sym('tether_offset') # Tether offset
         
         self.get_wind_velocity(model_specs.log_profile)
         self.va = self.vw - self.v
 
-
-        self.x = self.get_state(kite,tether,kcu)
         self.u = self.get_input(kcu)
-        self.x0 = ca.SX.sym('x0',self.x.shape[0])    # Kite position
+        self.x = self.get_state(kite,tether,kcu)
+        if model_specs.tether_offset:
+            self.x = ca.vertcat(self.x, self.tether_offset)
+        self.x0 = ca.SX.sym('x0',self.x.shape[0])  
+        self.fx = self.get_fx(kite,tether,kcu)
+        if model_specs.tether_offset:
+            self.fx = ca.vertcat(self.fx,0)
+        
+          # Kite position
+    
+        self.calc_fx = ca.Function('calc_fx', [self.x,self.u,self.x0],[self.fx])
 
     def get_state(self,kite,tether,kcu):    
         
@@ -201,15 +210,15 @@ class DynamicModel:
     
     def get_fx_jac(self,kite,tether,kcu):
   
-        return ca.jacobian(self.get_fx(kite,tether,kcu),self.x)
+        return ca.simplify(ca.jacobian(self.fx,self.x))
 
     def get_fx_jac_fun(self,kite,tether,kcu):
         return ca.Function('calc_Fx', [self.x,self.u,self.x0],[self.get_fx_jac(kite,tether,kcu)])
     
     def propagate(self,x,u, kite,tether,kcu,ts):
-        calc_fx = ca.Function('calc_fx', [self.x,self.u,self.x0],[self.get_fx(kite,tether,kcu)])
         
-        self.fx = calc_fx(self.x,self.u,x)
+        
+        self.fx = self.calc_fx(self.x,self.u,x)
         
         # Define ODE system
         dae = {'x': self.x, 'p': self.u, 'ode': self.fx}                       # Define ODE system
@@ -273,6 +282,10 @@ class ObservationModel:
                 h = ca.vertcat(h,ca.norm_2(va))
             # elif key == 'aoa':
             #     h = ca.vertcat(h,aoa+self.x[12])
+        if self.model_specs.tether_offset:
+            h = ca.vertcat(h,self.x[11]-self.x[-1])
+        else:
+            h = ca.vertcat(h,self.x[11])
         h = ca.vertcat(h,self.x[12])
         h = ca.vertcat(h,self.x[13])
         h = ca.vertcat(h,self.x[14])
@@ -282,7 +295,7 @@ class ObservationModel:
 
     def get_hx_jac(self,kite,tether,kcu):
         hx = self.get_hx(kite,tether,kcu)
-        return ca.jacobian(hx,self.x)
+        return ca.simplify(ca.jacobian(hx,self.x))
     
     def get_hx_jac_fun(self,kite,tether,kcu):
         return ca.Function('calc_Hx', [self.x,self.u,self.x0],[self.get_hx_jac(kite,tether,kcu)])
