@@ -72,7 +72,7 @@ model_stdv = {
         'v': 1,                  # Velocity       
         'uf': 5e-3,               # Friction velocity
         'wdir': (0.2/180 * np.pi),   # Wind direction
-        'vw': 5e-2,
+        'vw': 8e-2,
         'vwz': 1e-2,                # Vertical windspeed
         'CL': 1e-2,                 # Lift coefficient
         'CD': 1e-2,                 # Drag coefficient
