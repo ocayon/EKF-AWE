@@ -28,6 +28,8 @@ epsilon = 1e-6                      # Tolerance for the IEKF
 
 # Measurements
 opt_measurements = []
+log_profile = False
+
 # opt_measurements = ['a', 'uf', 'va', 'wdir', 'tether_length', 'aoa']
 
 # Measurement standard deviations
