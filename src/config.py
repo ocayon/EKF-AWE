@@ -7,7 +7,7 @@ import numpy as np
 
 #%% Define system parameters
 # Define system parameters
-kite_model = 'v3'                   # Kite model name, if Costum, change the kite parameters next
+kite_model = 'v9'                   # Kite model name, if Costum, change the kite parameters next
 kcu_model = 'KP2'                   # KCU model name
 tether_diameter = 0.014            # Tether diameter [m]
 tether_material = 'Dyneema-SK78'    # Tether material
@@ -28,7 +28,7 @@ epsilon = 1e-6                      # Tolerance for the IEKF
 
 # Measurements
 opt_measurements = []
-log_profile = True                 # Model wind speed as logarithmic with height
+log_profile = False                 # Model wind speed as logarithmic with height
 tether_offset = True                # Use tether offset in the measurements
 enforce_z_wind = True              # Enforce the z wind speed to be zero
 
@@ -50,31 +50,27 @@ meas_stdv = {
     'z_wind': 0.1
 }
 
-# Model standard deviations
-if kite_model=='v9':
-    model_stdv = {
-        'x': 2.5,                  # Position
-        'v': 1,                  # Velocity       
-        'uf': 5e-3,               # Friction velocity
-        'wdir': (0.2/180 * np.pi),   # Wind direction
-        'vw': 1e-2,
-        'vwz': 1e-2,                # Vertical windspeed
-        'CL': 1e-2,                 # Lift coefficient
-        'CD': 1e-2,                 # Drag coefficient
-        'CS': 1e-2,                  # Side force coefficient
-        'elevation' : 0.3,    # Elevation angle
-        'azimuth' : 0.3,     # Azimuth angle
-        'tether_length' : 0.1, # Tether length
-    }
-
-elif kite_model == 'v3':
-    # Model standard deviations for v3
-    model_stdv = {
+model_stdv = {
+    'v3': {
         'x': 2.5,                  # Position
         'v': 1,                  # Velocity       
         'uf': 2e-3,               # Friction velocity
         'wdir': (0.2/180 * np.pi),   # Wind direction
-        'vw': 1e-2,
+        'vw': 1e-1,
+        'vwz': 1e-2,                # Vertical windspeed
+        'CL': 1e-2,                 # Lift coefficient
+        'CD': 1e-2,                 # Drag coefficient
+        'CS': 1e-2,                  # Side force coefficient
+        'elevation' : 0.3,    # Elevation angle
+        'azimuth' : 0.3,     # Azimuth angle
+        'tether_length' : 0.1, # Tether length
+    },
+    'v9': {
+        'x': 2.5,                  # Position
+        'v': 1,                  # Velocity       
+        'uf': 5e-3,               # Friction velocity
+        'wdir': (0.2/180 * np.pi),   # Wind direction
+        'vw': 5e-2,
         'vwz': 1e-2,                # Vertical windspeed
         'CL': 1e-2,                 # Lift coefficient
         'CD': 1e-2,                 # Drag coefficient
@@ -83,7 +79,7 @@ elif kite_model == 'v3':
         'azimuth' : 0.3,     # Azimuth angle
         'tether_length' : 0.1, # Tether length
     }
-
+}
 
 
 
