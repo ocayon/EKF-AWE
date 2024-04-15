@@ -5,10 +5,10 @@ from run_EKF import create_kite
 import seaborn as sns
 import plot_utils as pu
 from postprocessing import  postprocess_results
-year = '2019'
-month = '10'
-day = '08'
-kite_model = 'v3'                   
+year = '2023'
+month = '11'
+day = '27'
+kite_model = 'v9'                   
 
 plt.close('all')
 path = '../results/'+kite_model+'/'
@@ -58,11 +58,11 @@ pu.plot_aero_coeff_vs_up_us(results, flight_data, cycles_plotted,IMU_0=False,sav
 ################## Density plots ##################
 # flight_data = flight_data.iloc[1000::]
 # results = results.iloc[1000::]
-cycles_plotted = np.arange(0, 65, step=1)
-mask = np.any(
-    [flight_data['cycle'] == cycle for cycle in cycles_plotted], axis=0)
-mask = (flight_data['up'] < 0.2)&mask#&(flight_data['up'] < 0.04)&(flight_data['turn_straight'] == 'straight')#&(results['CD']>0.03)
-pu.plot_CL_CD_aoa(results,flight_data, mask, 'EKF',savefig=False) # Plot CL vs CD for different aoa
+# cycles_plotted = np.arange(0, 65, step=1)
+# mask = np.any(
+#     [flight_data['cycle'] == cycle for cycle in cycles_plotted], axis=0)
+# mask = (flight_data['up'] < 0.2)&mask#&(flight_data['up'] < 0.04)&(flight_data['turn_straight'] == 'straight')#&(results['CD']>0.03)
+# pu.plot_CL_CD_aoa(results,flight_data, mask, 'EKF',savefig=False) # Plot CL vs CD for different aoa
 # pu.plot_CL_CD_up(results,flight_data, mask, 'EKF',savefig=False) # Plot CL vs CD for different aoa
 # pu.plot_CL_CD_ss(results,flight_data, mask, 'EKF')    # Plot CL vs CD for different aoa_ss
 # pu.plot_prob_coeff_vs_aoa_ss(results, results.CL**3/results.CD**2, mask, 'EKF') # Plot CL^3/CD^2 vs aoa_ss
