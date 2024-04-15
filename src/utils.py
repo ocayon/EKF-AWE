@@ -100,15 +100,6 @@ def get_measurement_vector(input_class, model_specs):
     # Append values to the NumPy array
     z = np.append(z, input_class.kite_pos)
     z = np.append(z, input_class.kite_vel)
-    if 'kite_acc' in opt_measurements:
-        z = np.append(z, input_class.kite_acc)
-    if 'apparent_windspeed' in opt_measurements:
-        z = np.append(z, input_class.apparent_windspeed)
-    if 'tether_length' in opt_measurements:
-        z = np.append(z, input_class.tether_length)
-    if 'kite_aoa' in opt_measurements:
-        z = np.append(z, input_class.kite_aoa)
-    
     z = np.append(z,input_class.tether_length)
     z = np.append(z,input_class.elevation)
     z = np.append(z,input_class.azimuth)
@@ -116,6 +107,8 @@ def get_measurement_vector(input_class, model_specs):
 
     if model_specs.enforce_z_wind:
         z = np.append(z,0)
+    if 'apparent_windspeed' in opt_measurements:
+        z = np.append(z, input_class.apparent_windspeed)
 
     return z
 
@@ -177,19 +170,6 @@ class SystemSpecs:
             stdv_y.append(meas_stdv['x'])
         for _ in range(3):
             stdv_y.append(meas_stdv['v'])
-        for key in model_specs.opt_measurements:
-            if key == 'kite_acc':   
-                for _ in range(3):
-                    stdv_y.append(meas_stdv['a'])
-            elif key == 'ground_wvel':
-                stdv_y.append(meas_stdv['uf'])
-
-            elif key == 'apparent_windspeed':
-                stdv_y.append(meas_stdv['va'])
-            elif key == 'tether_length':
-                stdv_y.append(meas_stdv['tether_length'])
-            elif key == 'aoa':
-                stdv_y.append(meas_stdv['aoa'])
         stdv_y.append(meas_stdv['tether_length'])
         stdv_y.append(meas_stdv['elevation'])
         stdv_y.append(meas_stdv['azimuth'])
@@ -198,6 +178,11 @@ class SystemSpecs:
         
         if model_specs.enforce_z_wind:
             stdv_y.append(meas_stdv['z_wind'])
+            
+        for key in model_specs.opt_measurements:
+            if key == 'apparent_windspeed':
+                stdv_y.append(meas_stdv['va'])
+
 
         stdv_y = np.array(stdv_y)
         self.stdv_measurements = stdv_y
