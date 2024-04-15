@@ -23,11 +23,13 @@ z0 = 0.1                            # Surface roughness [m]
 n_tether_elements = 5              # Number of tether elements
 # Kalman filter parameters
 doIEKF = True                       # Use the iterated extended Kalman filter
-max_iterations = 2000                 # Maximum number of iterations for the IEKF
+max_iterations = 200                 # Maximum number of iterations for the IEKF
 epsilon = 1e-6                      # Tolerance for the IEKF
 
 # Measurements
-opt_measurements = []
+opt_measurements = []            # List of measurements to be used in the Kalman filter
+# opt_measurements = ['apparent_windspeed']            # List of measurements to be used in the Kalman filter
+
 log_profile = False                 # Model wind speed as logarithmic with height
 tether_offset = True                # Use tether offset in the measurements
 enforce_z_wind = True              # Enforce the z wind speed to be zero
