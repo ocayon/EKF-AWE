@@ -158,6 +158,7 @@ class SystemSpecs:
         self.tether_material = tether_material
         self.tether_diameter = tether_diameter
 
+        model_stdv = model_stdv[kite_model]
         if model_specs.log_profile is True:
             self.stdv_dynamic_model = np.array([model_stdv['x'], model_stdv['x'], model_stdv['x'], 
                        model_stdv['v'], model_stdv['v'], model_stdv['v'], 
