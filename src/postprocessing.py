@@ -293,7 +293,7 @@ def correct_aoa_ss_measurements(results,flight_data):
     # Correct sideslip angle based on EKF mean sideslip angle of 0
     ss_vane = np.array(flight_data['kite_sideslip_angle'])
     ss_vane = np.convolve(ss_vane, np.ones(10)/10, mode='same')
-    offset_ss = -np.mean(flight_data['kite_sideslip_angle'][mask_pow])
+    offset_ss = np.mean(results['ss'])-np.mean(flight_data['kite_sideslip_angle'][mask_pow])
 
 
 
