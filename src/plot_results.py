@@ -5,10 +5,10 @@ from run_EKF import create_kite
 import seaborn as sns
 import plot_utils as pu
 from postprocessing import  postprocess_results
-year = '2023'
-month = '11'
-day = '27'
-kite_model = 'v9'                   
+year = '2019'
+month = '10'
+day = '08'
+kite_model = 'v3'                   
 
 plt.close('all')
 path = '../results/'+kite_model+'/'
@@ -27,7 +27,7 @@ plot_lidar_heights= [100,160,200,250]
 kite = create_kite(kite_model)
 
 imus = [0]
-
+flight_data['kite_0_pitch'] = (flight_data['kite_1_pitch']+flight_data['kite_0_pitch'])/2
 #%%
 results, flight_data = postprocess_results(results,flight_data, kite, imus = [0], remove_IMU_offsets=True, 
                                             correct_IMU_deformation = True,remove_vane_offsets=True,estimate_kite_angle=True)
@@ -42,16 +42,28 @@ pu.plot_wind_speed(results,flight_data, plot_lidar_heights,IMU_0=False, IMU_1=Fa
 pu.plot_wind_speed_height_bins(results,flight_data, plot_lidar_heights, savefig=False) # Plot calculated wind speed against lidar
 
 #%%
-pu.plot_wind_profile(flight_data, results, savefig=False) # Plot wind profile
+# pu.plot_wind_profile(flight_data, results, savefig=False) # Plot wind profile
 
+axs = pu.plot_wind_profile_bins(flight_data.iloc[5000::], results.iloc[5000::], step = 10)
 
+# windpath = '../processed_data/era5_data/'
+# windfile = 'era5_data_'+year+'_'+month+'_'+day+'.npy'
 
+# data_dict = np.load(windpath+windfile, allow_pickle=True)
 
+# # Extract arrays and information
+# era5_hours = data_dict.item()['hours']
+# era5_heights = data_dict.item()['heights']
+# era5_wvel = data_dict.item()['wvel']
+# era5_wdir = data_dict.item()['wdir']
+# for i in range(len(era5_hours)-1):
+#     axs[0].fill_betweenx(era5_heights[:-2], era5_wvel[i,:-2], era5_wvel[i+1,:-2], color='lightblue', alpha=0.5)
+#     axs[1].fill_betweenx(era5_heights[:-2], era5_wdir[i,:-2], era5_wdir[i+1,:-2], color='lightblue', alpha=0.5)
 
 # %% Plot results aerodynamic coefficients
 
 # ################## Time series ##################
-cycles_plotted = np.arange(0,70,1)
+cycles_plotted = np.arange(10,15,1)
 pu.plot_aero_coeff_vs_aoa_ss(results, flight_data, cycles_plotted,IMU_0=False,savefig=False) # Plot aero coeff vs aoa_ss
 pu.plot_aero_coeff_vs_up_us(results, flight_data, cycles_plotted,IMU_0=False,savefig=False) # Plot aero coeff vs up_used
 #%%
@@ -99,6 +111,7 @@ ax.legend()
 #%%
 fig,ax = plt.subplots()
 pu.plot_time_series(flight_data, flight_data['kite_0_pitch'], ax, color='blue', label='Measured',plot_phase=False)
+# pu.plot_time_series(flight_data, flight_data['kite_1_pitch'], ax, color='blue', label='Measured',plot_phase=False)
 pu.plot_time_series(flight_data,results['pitch'], ax, color='red', label='Estimated',plot_phase=False)
 ax.grid()
 ax.legend()
@@ -232,22 +245,56 @@ data = pd.read_csv('../processed_data/aerostructural/v3_aero_coeffs_VSM.csv')
 cl_VSM = data['CL']
 cd_VSM = data['CD']
 aoa_VSM = np.degrees(data['aoa'])
+
+cycles_plotted = np.arange(2,45, step=1)
+mask = np.any(
+    [flight_data['cycle'] == cycle for cycle in cycles_plotted], axis=0)
+mask_angles =mask&(flight_data['kite_angle_of_attack']>-10) & (flight_data['kite_angle_of_attack']<35)& (flight_data['powered'] == 'powered')
+# mask_angles =(results['aoa']>0) & (results['aoa']<20)
+fig, axs = plt.subplots(2, 2, figsize=(10, 10), sharex=True)
+mask = (flight_data['turn_straight'] == 'straight') & (flight_data.index>5000)& mask_angles 
+# pu.plot_cl_curve(np.sqrt((results['CL']**2+results['CS']**2)), results['CD'], results['aoa'], mask,axs, label = "Straight")
+pu.plot_cl_curve(np.sqrt((results['CL']**2+results['CS']**2)), results['CD'], flight_data['kite_angle_of_attack'], mask,axs, label = "Straight")
+mask = (flight_data['turn_straight'] == 'turn') & (flight_data.index>5000)& mask_angles
+# pu.plot_cl_curve((results['CL']**2+results['CS']**2), results['CD'], results['aoa'], mask,axs, label = "Turn")
+pu.plot_cl_curve(np.sqrt((results['CL']**2+results['CS']**2)), results['CD'], flight_data['kite_angle_of_attack'], mask,axs, label = "Turn")
+
+axs[0,0].axvline(x = np.mean(flight_data['kite_angle_of_attack'][flight_data['powered'] == 'powered']), color = 'k',linestyle = '--', label = 'Mean reel-out angle of attack')
+axs[0,0].axvline(x = np.mean(flight_data['kite_angle_of_attack'][flight_data['powered'] == 'depowered']), color = 'b',linestyle = '--', label = 'Mean reel-in angle of attack')
+# axs[0,0].axvline(x = np.mean(results['aoa'][flight_data['powered'] == 'powered']), color = 'k',linestyle = '--', label = 'Mean reel-out angle of attack')
+# axs[0,0].axvline(x = np.mean(results['aoa'][flight_data['powered'] == 'depowered']), color = 'b',linestyle = '--', label = 'Mean reel-in angle of attack')
+# pu.plot_cl_curve(cl_VSM, cd_VSM, aoa_VSM,(cl_VSM>0) ,axs, label = "VSM")
+# axs[0,0].scatter(aoa_VSM,cl_VSM)
+# axs[0,1].scatter(aoa_VSM,cd_VSM)
+# axs[0,0].fill_betweenx(y=np.linspace(0.4, 1, 100), x1=15, x2=40, color='red', alpha=0.3)
+# axs[0,1].fill_betweenx(y=np.linspace(0, 0.4, 100), x1=15, x2=40, color='red', alpha=0.3)
+
+axs[0,0].legend()
+fig.suptitle('CL vs CD of the kite wing (without KCU and tether drag)')
+plt.show()
+
+#%%
+
+data = pd.read_csv('../processed_data/aerostructural/v3_aero_coeffs_VSM.csv')
+cl_VSM = data['CL']
+cd_VSM = data['CD']
+aoa_VSM = np.degrees(data['aoa'])
 fig, axs = plt.subplots(2, 2, figsize=(10, 10))
-mask = (flight_data['turn_straight'] == 'straight') & (flight_data.index>5000)& (flight_data['kite_angle_of_attack']>2)#& (flight_data['ground_tether_reelout_speed']>0)# &(flight_data['up'] <0.1)#
-# pu.plot_cl_curve(results['CL'], results['CD'], results['aoa'], mask,axs)
-pu.plot_cl_curve(results['CL'], results['CD'], flight_data['kite_angle_of_attack'], mask,axs, label = "Straight")
-mask = (flight_data['turn_straight'] == 'turn') & (flight_data.index>5000)& (flight_data['kite_angle_of_attack']>2)# & (flight_data['ground_tether_reelout_speed']>0)# &(flight_data['up'] <0.1)#
-# pu.plot_cl_curve(results['CL'], results['CD'], results['aoa'], mask,axs)
-pu.plot_cl_curve(results['CL'], results['CD'], flight_data['kite_angle_of_attack'], mask,axs, label = "Turn")
-# axs[0].scatter(aoa_VSM, cl_VSM, label='VSM')
-# axs[1].scatter(aoa_VSM, cd_VSM, label='VSM')
+mask = (flight_data['turn_straight'] == 'straight') & (flight_data.index>5000)& mask_angles
+# pu.plot_cl_curve(results['CL'], results['CD']+results['cd_tether']+results['cd_kcu'], results['aoa'], mask,axs, label = "Straight")
+pu.plot_cl_curve((results['CL']**2+results['CS']**2), results['CD']+results['cd_tether']+results['cd_kcu'], flight_data['kite_angle_of_attack'], mask,axs, label = "Straight")
+mask = (flight_data['turn_straight'] == 'turn') & (flight_data.index>5000)& mask_angles
+# pu.plot_cl_curve(results['CL'], results['CD']+results['cd_tether']+results['cd_kcu'], results['aoa'], mask,axs, label = "Turn")
+pu.plot_cl_curve((results['CL']**2+results['CS']**2), results['CD']+results['cd_tether']+results['cd_kcu'], flight_data['kite_angle_of_attack'], mask,axs, label = "Turn")
+# pu.plot_cl_curve(cl_VSM, cd_VSM, aoa_VSM,(cl_VSM>0) ,axs, label = "VSM")
 # axs[0,0].fill_betweenx(y=np.linspace(0.4, 1, 100), x1=15, x2=40, color='red', alpha=0.3)
 # axs[0,1].fill_betweenx(y=np.linspace(0, 0.4, 100), x1=15, x2=40, color='red', alpha=0.3)
 
 axs[0,0].legend()
 
-plt.show()
+fig.suptitle('CL vs CD of the system (incl. KCU and tether drag)')
 
+plt.show()
 
 
 
