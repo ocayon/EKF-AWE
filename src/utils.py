@@ -116,10 +116,9 @@ def get_measurement_vector(input_class, model_specs):
     return z
 
 def tether_input(input_class, model_specs):
-    if model_specs.correct_height:
-        tether_length = input_class.tether_length
-    else:
-        tether_length = None
+    
+    tether_length = input_class.tether_length
+    
     
     if model_specs.kcu_data:
         kcu_acc = input_class.kcu_acc
@@ -130,14 +129,13 @@ def tether_input(input_class, model_specs):
 
     return input_class.kite_acc, input_class.tether_force, tether_length, kcu_acc, kcu_vel
 class ModelSpecs:
-    def __init__(self,timestep, n_tether_elements, opt_measurements = [], correct_height = False,  
+    def __init__(self,timestep, n_tether_elements, opt_measurements = [],  
                  kcu_data = False, doIEKF = True, epsilon = 1e-6, max_iterations = 200,
                  log_profile = False, tether_offset = True, enforce_z_wind = True,
                  model_yaw = False):
         self.ts = timestep
         self.n_tether_elements = n_tether_elements
         self.opt_measurements = opt_measurements
-        self.correct_height = correct_height
         self.kcu_data = kcu_data
         self.doIEKF = doIEKF
         self.epsilon = epsilon
@@ -499,13 +497,12 @@ def convert_ekf_output_to_df(ekf_output_list):
         cd_kcu.append(ekf_output_list[i].cd_kcu)
         cd_tether.append(ekf_output_list[i].cd_tether)
         z_wind.append(ekf_output_list[i].z_wind)
-        kite_yaw.append(ekf_output_list[i].kite_yaw)
         k_steering_law.append(ekf_output_list[i].k_steering_law)
         
     ekf_output_df = pd.DataFrame({'x': x, 'y': y, 'z': z, 'vx': vx, 'vy': vy, 'vz': vz, 
                                   'wind_velocity': wind_velocity, 'wind_direction': wind_direction,
                                 'tether_force': tether_force, 'roll': roll, 'pitch': pitch, 'yaw': yaw, 'aoa': aoa, 'ss': ss, 'tether_length': tether_length,
-                                'CL': CL, 'CD': CD, 'CS': CS, 'cd_kcu': cd_kcu, 'cd_tether': cd_tether, 'z_wind':z_wind, 'kite_yaw':kite_yaw, 'k_steering_law':k_steering_law})
+                                'CL': CL, 'CD': CD, 'CS': CS, 'cd_kcu': cd_kcu, 'cd_tether': cd_tether, 'z_wind':z_wind, 'k_steering_law':k_steering_law})
 
     return ekf_output_df
 

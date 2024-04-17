@@ -19,8 +19,14 @@ g = 9.81                            # Gravity acceleration [m/s^2]
 z0 = 0.1                            # Surface roughness [m]
 
 #%% Define simulation parameters
+log_profile = True                 # Model wind speed as logarithmic with height
+tether_offset = True                # Use tether offset in the measurements
+enforce_z_wind = True              # Enforce the z wind speed to be zero
+model_yaw = False                   # Model the yaw angle in the state vector
+
 # Tether model
 n_tether_elements = 5              # Number of tether elements
+
 # Kalman filter parameters
 doIEKF = True                       # Use the iterated extended Kalman filter
 max_iterations = 200                 # Maximum number of iterations for the IEKF
@@ -29,11 +35,6 @@ epsilon = 1e-6                      # Tolerance for the IEKF
 # Measurements
 opt_measurements = []            # List of measurements to be used in the Kalman filter
 # opt_measurements = ['apparent_windspeed']            # List of measurements to be used in the Kalman filter
-
-log_profile = False                 # Model wind speed as logarithmic with height
-tether_offset = True                # Use tether offset in the measurements
-enforce_z_wind = True              # Enforce the z wind speed to be zero
-model_yaw = False                   # Model the yaw angle in the state vector
 
 # Measurement standard deviations
 
@@ -77,7 +78,7 @@ model_stdv = {
         'wdir': (0.2/180 * np.pi),   # Wind direction
         'vw': 8e-2,
         'vwz': 1e-2,                # Vertical windspeed
-        'CL': 1e-2,                 # Lift coefficient
+        'CL': 5e-2,                 # Lift coefficient
         'CD': 1e-2,                 # Drag coefficient
         'CS': 1e-2,                  # Side force coefficient
         'elevation' : 0.3,    # Elevation angle

@@ -232,7 +232,7 @@ if __name__ == "__main__":
     month = '10'
     day = '08'
     kite_model = 'v3'                   # Kite model name, if Costum, change the kite parameters next
-    kcu_model = 'KP1'                   # KCU model name
+    kcu_model = 'KP2'                   # KCU model name
     tether_diameter = 0.01            # Tether diameter [m]
     n_tether_elements = 5
     opt_measurements = []
@@ -242,7 +242,7 @@ if __name__ == "__main__":
     file_path = Path('../processed_data/flight_data') / kite_model / (file_name + '.csv')
     flight_data = pd.read_csv(file_path)
     flight_data = flight_data.reset_index()
-    flight_data = flight_data.iloc[:15000]
+    flight_data = flight_data.iloc[:36000]
     timestep = flight_data['time'].iloc[1] - flight_data['time'].iloc[0]
 
     model_specs = ModelSpecs(timestep, n_tether_elements, opt_measurements=opt_measurements)

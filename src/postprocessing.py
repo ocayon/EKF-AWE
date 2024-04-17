@@ -89,6 +89,9 @@ def postprocess_results(results,flight_data, kite, imus = [0], remove_IMU_offset
     flight_data['right_left'] = flight_data.apply(determine_turn_straight, axis=1)
     flight_data['powered'] = flight_data.apply(determine_powered_depowered, axis=1)
     
+    
+    results['wind_direction'] = results['wind_direction']%(2*np.pi)
+    
     if remove_IMU_offsets:
         for imu in imus:
             flight_data = remove_offsets_IMU_data(results, flight_data, sensor=imu)
