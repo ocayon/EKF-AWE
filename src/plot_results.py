@@ -28,9 +28,10 @@ kite = create_kite(kite_model)
 
 imus = [0]
 
+# flight_data['kite_0_pitch'] = (flight_data['kite_0_pitch']+flight_data['kite_1_pitch'])/2
 #%%
 results, flight_data = postprocess_results(results,flight_data, kite, imus = [0], remove_IMU_offsets=True, 
-                                            correct_IMU_deformation = True,remove_vane_offsets=True,estimate_kite_angle=True)
+                                            correct_IMU_deformation = False,remove_vane_offsets=True,estimate_kite_angle=True)
 # # #%%
 # flight_data = calculate_wind_speed_airborne_sensors(results,flight_data, imus = [0])
 # Postprocess done
@@ -44,7 +45,7 @@ pu.plot_wind_speed_height_bins(results,flight_data, plot_lidar_heights, savefig=
 #%%
 # pu.plot_wind_profile(flight_data, results, savefig=False) # Plot wind profile
 
-axs = pu.plot_wind_profile_bins(flight_data.iloc[5000:-5000], results.iloc[5000:-5000], step = 10, savefig = True)
+axs = pu.plot_wind_profile_bins(flight_data.iloc[2000:-2000], results.iloc[2000:-2000], step = 10, savefig = True)
 
 # windpath = '../processed_data/era5_data/'
 # windfile = 'era5_data_'+year+'_'+month+'_'+day+'.npy'
@@ -63,8 +64,8 @@ axs = pu.plot_wind_profile_bins(flight_data.iloc[5000:-5000], results.iloc[5000:
 # %% Plot results aerodynamic coefficients
 
 # ################## Time series ##################
-cycles_plotted = np.arange(10,15,1)
-pu.plot_aero_coeff_vs_aoa_ss(results, flight_data, cycles_plotted,IMU_0=False,savefig=False) # Plot aero coeff vs aoa_ss
+cycles_plotted = np.arange(0,100,1)
+pu.plot_aero_coeff_vs_aoa_ss(results, flight_data, cycles_plotted,IMU_0=True,savefig=False) # Plot aero coeff vs aoa_ss
 pu.plot_aero_coeff_vs_up_us(results, flight_data, cycles_plotted,IMU_0=False,savefig=False) # Plot aero coeff vs up_used
 #%%
 ################## Density plots ##################
@@ -82,10 +83,16 @@ pu.plot_aero_coeff_vs_up_us(results, flight_data, cycles_plotted,IMU_0=False,sav
 
 
 #%% Time series
-# fig,ax = plt.subplots()
-# pu.plot_time_series(flight_data, flight_data['kite_apparent_windspeed'], ax, color='blue', label='Measured',plot_phase=False)
-# pu.plot_time_series(flight_data,results['va_kite'], ax, color='red', label='Estimated',plot_phase=True)
-# ax.grid()
+fig,ax = plt.subplots()
+pu.plot_time_series(flight_data, flight_data['kite_apparent_windspeed'], ax, color='blue', label='Measured',plot_phase=False)
+pu.plot_time_series(flight_data,results['va_kite'], ax, color='red', label='Estimated',plot_phase=True)
+ax.grid()
+
+fig,ax = plt.subplots()
+pu.plot_time_series(flight_data, flight_data['kite_apparent_windspeed'], ax, color='blue', label='Measured',plot_phase=False)
+pu.plot_time_series(flight_data,results['va_kite'], ax, color='red', label='Estimated',plot_phase=True)
+ax.grid()
+
 
 # fig,ax = plt.subplots()
 # r_kite = np.vstack((np.array(flight_data['kite_0_rx']),np.array(flight_data['kite_0_ry']),np.array(flight_data['kite_0_rz']))).T
@@ -139,7 +146,7 @@ r = np.sqrt(results.x**2+results.y**2+results.z**2)
 
 
 plt.figure()
-plt.plot(results['tether_length']-r+kite.distance_kcu_kite)
+plt.plot(flight_data['time'],results['tether_length']-r+kite.distance_kcu_kite)
 #%%
 mechanic_power = []
 slack = []
@@ -246,21 +253,22 @@ cl_VSM = data['CL']
 cd_VSM = data['CD']
 aoa_VSM = np.degrees(data['aoa'])
 
+
+aoa_plot = results['aoa_IMU_0']
+# aoa_plot = flight_data['kite_angle_of_attack']
 cycles_plotted = np.arange(2,45, step=1)
 mask = np.any(
     [flight_data['cycle'] == cycle for cycle in cycles_plotted], axis=0)
-mask_angles =mask&(flight_data['kite_angle_of_attack']>-10) & (flight_data['kite_angle_of_attack']<35)& (flight_data['powered'] == 'powered')
+mask_angles =mask&(flight_data['kite_angle_of_attack']>-10) & (flight_data['kite_angle_of_attack']<35)#& (flight_data['powered'] == 'powered')
 # mask_angles =(results['aoa']>0) & (results['aoa']<20)
 fig, axs = plt.subplots(2, 2, figsize=(10, 10), sharex=True)
 mask = (flight_data['turn_straight'] == 'straight') & (flight_data.index>5000)& mask_angles 
-# pu.plot_cl_curve(np.sqrt((results['CL']**2+results['CS']**2)), results['CD'], results['aoa'], mask,axs, label = "Straight")
-pu.plot_cl_curve(np.sqrt((results['CL']**2+results['CS']**2)), results['CD'], flight_data['kite_angle_of_attack'], mask,axs, label = "Straight")
+pu.plot_cl_curve(np.sqrt((results['CL']**2+results['CS']**2)), results['CD'], aoa_plot, mask,axs, label = "Straight")
 mask = (flight_data['turn_straight'] == 'turn') & (flight_data.index>5000)& mask_angles
-# pu.plot_cl_curve((results['CL']**2+results['CS']**2), results['CD'], results['aoa'], mask,axs, label = "Turn")
-pu.plot_cl_curve(np.sqrt((results['CL']**2+results['CS']**2)), results['CD'], flight_data['kite_angle_of_attack'], mask,axs, label = "Turn")
+pu.plot_cl_curve(np.sqrt((results['CL']**2+results['CS']**2)), results['CD'], aoa_plot, mask,axs, label = "Turn")
 
-axs[0,0].axvline(x = np.mean(flight_data['kite_angle_of_attack'][flight_data['powered'] == 'powered']), color = 'k',linestyle = '--', label = 'Mean reel-out angle of attack')
-axs[0,0].axvline(x = np.mean(flight_data['kite_angle_of_attack'][flight_data['powered'] == 'depowered']), color = 'b',linestyle = '--', label = 'Mean reel-in angle of attack')
+axs[0,0].axvline(x = np.mean(aoa_plot[flight_data['powered'] == 'powered']), color = 'k',linestyle = '--', label = 'Mean reel-out angle of attack')
+axs[0,0].axvline(x = np.mean(aoa_plot[flight_data['powered'] == 'depowered']), color = 'b',linestyle = '--', label = 'Mean reel-in angle of attack')
 # axs[0,0].axvline(x = np.mean(results['aoa'][flight_data['powered'] == 'powered']), color = 'k',linestyle = '--', label = 'Mean reel-out angle of attack')
 # axs[0,0].axvline(x = np.mean(results['aoa'][flight_data['powered'] == 'depowered']), color = 'b',linestyle = '--', label = 'Mean reel-in angle of attack')
 # pu.plot_cl_curve(cl_VSM, cd_VSM, aoa_VSM,(cl_VSM>0) ,axs, label = "VSM")

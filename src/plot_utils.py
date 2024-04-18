@@ -260,7 +260,7 @@ def plot_wind_speed(results, flight_data, lidar_heights, IMU_0 = False, IMU_1=Fa
     :return: wind speed plot
     """
     palette = sns.color_palette("tab10")
-    fig, axs = plt.subplots(2, 1, figsize=(6, 8), sharex=True)
+    fig, axs = plt.subplots(3, 1, figsize=(6, 8), sharex=True)
 
     i = 1
     for column in flight_data.columns:
@@ -288,8 +288,8 @@ def plot_wind_speed(results, flight_data, lidar_heights, IMU_0 = False, IMU_1=Fa
             height = ''.join(filter(str.isdigit, column))
             label = 'Lidar ' + height +'m height'
             height = int(height)
-            # if height in lidar_heights:
-                # axs[2].plot(flight_data['time'], flight_data[column],color=palette[i], label=label)
+            if height in lidar_heights:
+                axs[2].plot(flight_data['time'], flight_data[column],color=palette[i], label=label)
 
                 
     if IMU_0:
@@ -297,25 +297,25 @@ def plot_wind_speed(results, flight_data, lidar_heights, IMU_0 = False, IMU_1=Fa
         axs[0].plot(flight_data['time'], vw_mod, label='Pitot+Vanes', alpha = 0.8)
         vw_dir = np.arctan2(flight_data['vwy_IMU_0'],flight_data['vwx_IMU_0'])
         axs[1].plot(flight_data['time'], np.degrees(vw_dir)%360, alpha = 0.8)
-        # axs[2].plot(flight_data['time'], flight_data['vwz_IMU_0'], label='IMU_0', alpha = 0.5)
+        axs[2].plot(flight_data['time'], flight_data['vwz_IMU_0'], label='IMU_0', alpha = 0.5)
     if IMU_1:
         vw_mod = np.sqrt(flight_data['vwx_IMU_1']**2+flight_data['vwy_IMU_1']**2+flight_data['vwz_IMU_1']**2)
         axs[0].plot(flight_data['time'], vw_mod, label='IMU_1', alpha = 0.5)
         vw_dir = np.arctan2(flight_data['vwy_IMU_1'],flight_data['vwx_IMU_1'])
         axs[1].plot(flight_data['time'], np.degrees(vw_dir)%360, alpha = 0.5)
-        # axs[2].plot(flight_data['time'], flight_data['vwz_IMU_1'], label='IMU_1', alpha = 0.5)
+        axs[2].plot(flight_data['time'], flight_data['vwz_IMU_1'], label='IMU_1', alpha = 0.5)
     if EKF_tether:
         vw_mod = np.sqrt(flight_data['vwx_EKF']**2+flight_data['vwy_EKF']**2+flight_data['vwz_EKF']**2)
         axs[0].plot(flight_data['time'], vw_mod, label='EKF_tether', alpha = 0.5)
         vw_dir = np.arctan2(flight_data['vwy_EKF'],flight_data['vwx_EKF'])
         axs[1].plot(flight_data['time'], np.degrees(vw_dir)%360, alpha = 0.5)
-        # axs[2].plot(flight_data['time'], flight_data['vwz_EKF'], label='EKF_tether', alpha = 0.5)
+        axs[2].plot(flight_data['time'], flight_data['vwz_EKF'], label='EKF_tether', alpha = 0.5)
     if EKF:
         wvel = results['wind_velocity']
         vw = np.vstack((wvel*np.cos(results['wind_direction']),wvel*np.sin(results['wind_direction']),np.zeros(len(results)))).T
         axs[0].plot(flight_data['time'], np.linalg.norm(vw,axis=1), label='EKF', alpha = 0.8)
         axs[1].plot(flight_data['time'], np.degrees(results['wind_direction']), alpha = 0.8)
-        # axs[2].plot(flight_data['time'], results['z_wind'], label='EKF', alpha = 0.5)
+        axs[2].plot(flight_data['time'], results['z_wind'], label='EKF', alpha = 0.5)
     
 
     min_wdir = min(flight_data['ground_wind_direction'])
@@ -342,9 +342,9 @@ def plot_wind_speed(results, flight_data, lidar_heights, IMU_0 = False, IMU_1=Fa
     axs[1].set_ylabel('Wind direction (rad)')
     axs[1].set_xlabel('Time (s)')
     # axs[1].grid()
-    # axs[2].legend()
-    # axs[2].set_ylabel('Wind speed (m/s)')
-    # axs[2].set_xlabel('Time (s)')
+    axs[2].legend()
+    axs[2].set_ylabel('Wind speed (m/s)')
+    axs[2].set_xlabel('Time (s)')
     # axs[2].grid()
     sns.set(style="whitegrid")
     # Enhance overall aesthetics
