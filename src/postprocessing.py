@@ -127,19 +127,18 @@ def postprocess_results(results,flight_data, kite, imus = [0], remove_IMU_offset
  
         
     
-
-    if correct_IMU_deformation:
-        # Correct angle of attack for depowered phase on EKF mean pitch during depower
-        mask_turn = abs(flight_data['us'])>0.9
-        mask_dep = flight_data['up']>0.9
-        pitch_EKF = np.array(results['pitch'])
-        pitch_IMU_0 = np.array(flight_data['kite_0_pitch'])
-        offset_dep = np.mean(pitch_EKF[mask_dep]-pitch_IMU_0[mask_dep])
-        offset_turn = np.mean(pitch_EKF[mask_turn]-pitch_IMU_0[mask_turn])
-        offset_pitch = offset_dep*np.array(flight_data['up'])#-offset_turn*np.array(abs(flight_data['us']))
-        flight_data['offset_pitch'] = offset_pitch
-        print('Offset pitch depower: ', offset_dep, 'Offset pitch turn: ', offset_turn)   
-        flight_data['kite_0_pitch'] = flight_data['kite_0_pitch']+offset_pitch
+    # Correct angle of attack for depowered phase on EKF mean pitch during depower
+    mask_turn = abs(flight_data['us'])>0.9
+    mask_dep = flight_data['up']>0.9
+    pitch_EKF = np.array(results['pitch'])
+    pitch_IMU_0 = np.array(flight_data['kite_0_pitch'])
+    offset_dep = np.mean(pitch_EKF[mask_dep]-pitch_IMU_0[mask_dep])
+    offset_turn = np.mean(pitch_EKF[mask_turn]-pitch_IMU_0[mask_turn])
+    offset_pitch = offset_dep*np.array(flight_data['up'])#-offset_turn*np.array(abs(flight_data['us']))
+    flight_data['offset_pitch'] = offset_pitch
+    print('Offset pitch depower: ', offset_dep, 'Offset pitch turn: ', offset_turn)  
+    
+    
         
         
     flight_data['cycle'] = np.zeros(len(flight_data))
@@ -192,11 +191,13 @@ def postprocess_results(results,flight_data, kite, imus = [0], remove_IMU_offset
         flight_data = correct_aoa_ss_measurements(results, flight_data)
     
     if estimate_kite_angle:
-        for imu in imus:
-            results['aoa_IMU_'+str(imu)] = results['aoa_IMU_'+str(imu)]-flight_data['offset_pitch']
+
         results['aoa'] = results['aoa']-flight_data['offset_pitch']
         flight_data['kite_angle_of_attack'] = flight_data['kite_angle_of_attack']-flight_data['offset_pitch']
     
+    if correct_IMU_deformation:
+        flight_data['kite_0_pitch'] = flight_data['kite_0_pitch']+offset_pitch
+        
     return results, flight_data
 
 def calculate_wind_speed_airborne_sensors(results, flight_data, imus = [0]):
