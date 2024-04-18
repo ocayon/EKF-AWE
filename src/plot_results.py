@@ -5,10 +5,10 @@ from run_EKF import create_kite
 import seaborn as sns
 import plot_utils as pu
 from postprocessing import  postprocess_results
-year = '2019'
-month = '10'
-day = '08'
-kite_model = 'v3'                   
+year = '2023'
+month = '11'
+day = '27'
+kite_model = 'v9'                   
 
 plt.close('all')
 path = '../results/'+kite_model+'/'
@@ -27,7 +27,7 @@ plot_lidar_heights= [100,160,200,250]
 kite = create_kite(kite_model)
 
 imus = [0]
-flight_data['kite_0_pitch'] = (flight_data['kite_1_pitch']+flight_data['kite_0_pitch'])/2
+
 #%%
 results, flight_data = postprocess_results(results,flight_data, kite, imus = [0], remove_IMU_offsets=True, 
                                             correct_IMU_deformation = True,remove_vane_offsets=True,estimate_kite_angle=True)
@@ -37,14 +37,14 @@ results, flight_data = postprocess_results(results,flight_data, kite, imus = [0]
 
 #%%Plot results wind speed
 
-pu.plot_wind_speed(results,flight_data, plot_lidar_heights,IMU_0=False, IMU_1=False, savefig=False) # PLot calculated wind speed against lidar
+pu.plot_wind_speed(results,flight_data, plot_lidar_heights,savefig=True) # PLot calculated wind speed against lidar
 #%%
 pu.plot_wind_speed_height_bins(results,flight_data, plot_lidar_heights, savefig=False) # Plot calculated wind speed against lidar
 
 #%%
 # pu.plot_wind_profile(flight_data, results, savefig=False) # Plot wind profile
 
-axs = pu.plot_wind_profile_bins(flight_data.iloc[5000::], results.iloc[5000::], step = 10)
+axs = pu.plot_wind_profile_bins(flight_data.iloc[5000:-5000], results.iloc[5000:-5000], step = 10, savefig = True)
 
 # windpath = '../processed_data/era5_data/'
 # windfile = 'era5_data_'+year+'_'+month+'_'+day+'.npy'
