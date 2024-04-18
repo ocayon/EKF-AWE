@@ -260,7 +260,7 @@ def plot_wind_speed(results, flight_data, lidar_heights, IMU_0 = False, IMU_1=Fa
     :return: wind speed plot
     """
     palette = sns.color_palette("tab10")
-    fig, axs = plt.subplots(3, 1, figsize=(8, 10), sharex=True)
+    fig, axs = plt.subplots(2, 1, figsize=(6, 8), sharex=True)
 
     i = 1
     for column in flight_data.columns:
@@ -288,8 +288,8 @@ def plot_wind_speed(results, flight_data, lidar_heights, IMU_0 = False, IMU_1=Fa
             height = ''.join(filter(str.isdigit, column))
             label = 'Lidar ' + height +'m height'
             height = int(height)
-            if height in lidar_heights:
-                axs[2].plot(flight_data['time'], flight_data[column],color=palette[i], label=label)
+            # if height in lidar_heights:
+                # axs[2].plot(flight_data['time'], flight_data[column],color=palette[i], label=label)
 
                 
     if IMU_0:
@@ -297,25 +297,25 @@ def plot_wind_speed(results, flight_data, lidar_heights, IMU_0 = False, IMU_1=Fa
         axs[0].plot(flight_data['time'], vw_mod, label='Pitot+Vanes', alpha = 0.8)
         vw_dir = np.arctan2(flight_data['vwy_IMU_0'],flight_data['vwx_IMU_0'])
         axs[1].plot(flight_data['time'], np.degrees(vw_dir)%360, alpha = 0.8)
-        axs[2].plot(flight_data['time'], flight_data['vwz_IMU_0'], label='IMU_0', alpha = 0.5)
+        # axs[2].plot(flight_data['time'], flight_data['vwz_IMU_0'], label='IMU_0', alpha = 0.5)
     if IMU_1:
         vw_mod = np.sqrt(flight_data['vwx_IMU_1']**2+flight_data['vwy_IMU_1']**2+flight_data['vwz_IMU_1']**2)
         axs[0].plot(flight_data['time'], vw_mod, label='IMU_1', alpha = 0.5)
         vw_dir = np.arctan2(flight_data['vwy_IMU_1'],flight_data['vwx_IMU_1'])
         axs[1].plot(flight_data['time'], np.degrees(vw_dir)%360, alpha = 0.5)
-        axs[2].plot(flight_data['time'], flight_data['vwz_IMU_1'], label='IMU_1', alpha = 0.5)
+        # axs[2].plot(flight_data['time'], flight_data['vwz_IMU_1'], label='IMU_1', alpha = 0.5)
     if EKF_tether:
         vw_mod = np.sqrt(flight_data['vwx_EKF']**2+flight_data['vwy_EKF']**2+flight_data['vwz_EKF']**2)
         axs[0].plot(flight_data['time'], vw_mod, label='EKF_tether', alpha = 0.5)
         vw_dir = np.arctan2(flight_data['vwy_EKF'],flight_data['vwx_EKF'])
         axs[1].plot(flight_data['time'], np.degrees(vw_dir)%360, alpha = 0.5)
-        axs[2].plot(flight_data['time'], flight_data['vwz_EKF'], label='EKF_tether', alpha = 0.5)
+        # axs[2].plot(flight_data['time'], flight_data['vwz_EKF'], label='EKF_tether', alpha = 0.5)
     if EKF:
         wvel = results['wind_velocity']
         vw = np.vstack((wvel*np.cos(results['wind_direction']),wvel*np.sin(results['wind_direction']),np.zeros(len(results)))).T
         axs[0].plot(flight_data['time'], np.linalg.norm(vw,axis=1), label='EKF', alpha = 0.8)
         axs[1].plot(flight_data['time'], np.degrees(results['wind_direction']), alpha = 0.8)
-        axs[2].plot(flight_data['time'], results['z_wind'], label='EKF', alpha = 0.5)
+        # axs[2].plot(flight_data['time'], results['z_wind'], label='EKF', alpha = 0.5)
     
 
     min_wdir = min(flight_data['ground_wind_direction'])
@@ -334,18 +334,23 @@ def plot_wind_speed(results, flight_data, lidar_heights, IMU_0 = False, IMU_1=Fa
     axs[1].plot(flight_data['time'],flight_data['ground_wind_direction'], label='Ground', color = 'grey', alpha = 0.8)
 
     axs[0].set_ylim([0,20])
-    axs[0].legend()
+    # axs[0].legend()
     axs[0].set_ylabel('Wind speed (m/s)')
     axs[0].set_xlabel('Time (s)')
-    axs[0].grid()
-    # axs[1].legend()
+    # axs[0].grid()
+    axs[1].legend()
     axs[1].set_ylabel('Wind direction (rad)')
     axs[1].set_xlabel('Time (s)')
-    axs[1].grid()
+    # axs[1].grid()
     # axs[2].legend()
-    axs[2].set_ylabel('Wind speed (m/s)')
-    axs[2].set_xlabel('Time (s)')
-    axs[2].grid()
+    # axs[2].set_ylabel('Wind speed (m/s)')
+    # axs[2].set_xlabel('Time (s)')
+    # axs[2].grid()
+    sns.set(style="whitegrid")
+    # Enhance overall aesthetics
+    for ax in axs:
+        ax.grid(True, which='both', linestyle='--', linewidth=0.5)
+        ax.set_axisbelow(True)
 
     if savefig:
         plt.tight_layout()
@@ -823,7 +828,7 @@ def plot_wind_profile(flight_data, results,savefig=False):
         plt.tight_layout()
         plt.savefig('wind_profile.png', dpi=300)
 
-def plot_wind_profile_bins(flight_data, results, step = 20):
+def plot_wind_profile_bins(flight_data, results, step = 20, savefig = False):
     # Extract data
     height = results['z']
     wvel = results['wind_velocity']
@@ -876,33 +881,37 @@ def plot_wind_profile_bins(flight_data, results, step = 20):
 
     # Set up plot-
     sns.set(style="whitegrid")
-    fig, axs = plt.subplots(1, 2, figsize=(14, 7), sharey=True)
-    fig.suptitle('Wind Profile Analysis', fontsize=16)
+    fig, axs = plt.subplots(1, 2, figsize=(8, 6), sharey=True)
+    # fig.suptitle('Wind Profile Analysis', fontsize=16)
+    # fontsize = 16
 
     # Wind velocity plot
-    axs[0].errorbar(wvel_means, bin_centers, xerr=wvel_stds, fmt='o-', color='deepskyblue', ecolor='lightgray', elinewidth=3, capsize=0, label='EKF ± SD')
-    axs[0].errorbar(wvel, lidar_heights,xerr = std_vel , fmt='o-', color='darkblue', ecolor='gray', elinewidth=3, capsize=0, label='Lidar ± SD')
-    axs[0].set_xlabel('Wind Velocity (m/s)', fontsize=12)
-    axs[0].set_ylabel('Height (m)', fontsize=12)
+    axs[0].errorbar(wvel_means, bin_centers, xerr=wvel_stds, fmt='o-', color='#00B8C8', ecolor='lightgray', elinewidth=3, capsize=0, label='EKF ± SD')
+    axs[0].errorbar(wvel, lidar_heights,xerr = std_vel , fmt='o-', color='#0076C2', ecolor='gray', elinewidth=3, capsize=0, label='Lidar ± SD')
+    axs[0].set_xlabel('Wind Velocity (m/s)')
+    axs[0].set_ylabel('Height (m)')
     axs[0].legend()
-    axs[0].set_xlim([min(wvel_means) - 5, max(wvel_means) + 5])
+    axs[0].set_xlim([min(wvel_means) - 2, max(wvel_means) + 2])
 
     # Wind direction plot
-    axs[1].errorbar(wdir_means, bin_centers, xerr=wdir_stds, fmt='o-', color='mediumpurple', ecolor='lightgray', elinewidth=3, capsize=0, label='EKF ± SD')
-    axs[1].errorbar(wdir, lidar_heights, xerr = std_dir, fmt='o-', color='indigo', ecolor='gray', elinewidth=3, capsize=0, label='Lidar ± SD')
-    axs[1].set_xlabel('Wind Direction (degrees)', fontsize=12)
+    axs[1].errorbar(wdir_means, bin_centers, xerr=wdir_stds, fmt='o-', color='#6CC24A', ecolor='lightgray', elinewidth=3, capsize=0, label='EKF ± SD')
+    axs[1].errorbar(wdir, lidar_heights, xerr = std_dir, fmt='o-', color='#009B77', ecolor='gray', elinewidth=3, capsize=0, label='Lidar ± SD')
+    axs[1].set_xlabel('Wind Direction (degrees)')
     axs[1].legend()
-    axs[1].set_xlim([min(wdir_means) - 10, max(wdir_means) + 10])
+    axs[1].set_xlim([min(wdir_means) - 5, max(wdir_means) + 5])
+    
 
     # Enhance overall aesthetics
     for ax in axs:
-        ax.set_ylim([bin_centers.min() - step, bin_centers.max() + step])
+        ax.set_ylim([0, bin_centers.max() + step])
         
         ax.grid(True, which='both', linestyle='--', linewidth=0.5)
         ax.set_axisbelow(True)
 
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])  # Adjust layout to make room for title
     plt.show()
+    if savefig:
+        plt.savefig('wind_profile_bins.png', dpi=300)
 
 
     return axs
