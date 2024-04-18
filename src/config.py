@@ -78,7 +78,7 @@ model_stdv = {
         'wdir': (0.2/180 * np.pi),   # Wind direction
         'vw': 8e-2,
         'vwz': 1e-2,                # Vertical windspeed
-        'CL': 5e-2,                 # Lift coefficient
+        'CL': 1e-2,                 # Lift coefficient
         'CD': 1e-2,                 # Drag coefficient
         'CS': 1e-2,                  # Side force coefficient
         'elevation' : 0.3,    # Elevation angle
