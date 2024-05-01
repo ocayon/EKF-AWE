@@ -307,8 +307,3 @@ plt.show()
 
 
 #%%
-flight_data = flight_data[mask_angles]
-results = results[mask_angles]
-
-results_jelle = pd.DataFrame({'aoa': flight_data['kite_angle_of_attack'], 'CL': results['CL'],'CS': results['CS'],'CD': results['CD'], 'powered':flight_data['powered'], 'turn_straight':flight_data['turn_straight']})
-results_jelle = results_jelle.to_csv('results_jelle.csv',index=False)
