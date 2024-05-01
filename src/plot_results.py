@@ -197,7 +197,7 @@ plt.figure()
 plt.plot(abs(np.array(elevation_escape)))
 #%%
 fs = 10
-signal = np.array(results['wind_velocity'])
+signal = np.array(results['wind_velocity'])#[results['z']<150]
 from scipy.signal import detrend
 from scipy.stats import linregress
 
@@ -254,17 +254,17 @@ cd_VSM = data['CD']
 aoa_VSM = np.degrees(data['aoa'])
 
 
-aoa_plot = results['aoa_IMU_0']
-# aoa_plot = flight_data['kite_angle_of_attack']
-cycles_plotted = np.arange(2,45, step=1)
+# aoa_plot = results['aoa_IMU_0']
+aoa_plot = flight_data['kite_angle_of_attack']
+cycles_plotted = np.arange(2,55, step=1)
 mask = np.any(
     [flight_data['cycle'] == cycle for cycle in cycles_plotted], axis=0)
-mask_angles =mask&(flight_data['kite_angle_of_attack']>-10) & (flight_data['kite_angle_of_attack']<35)#& (flight_data['powered'] == 'powered')
+mask_angles =mask&(flight_data['kite_angle_of_attack']>0) & (flight_data['kite_angle_of_attack']<35)#& (flight_data['powered'] == 'powered')
 # mask_angles =(results['aoa']>0) & (results['aoa']<20)
 fig, axs = plt.subplots(2, 2, figsize=(10, 10), sharex=True)
-mask = (flight_data['turn_straight'] == 'straight') & (flight_data.index>5000)& mask_angles 
+mask = (flight_data['turn_straight'] == 'straight') & mask_angles 
 pu.plot_cl_curve(np.sqrt((results['CL']**2+results['CS']**2)), results['CD'], aoa_plot, mask,axs, label = "Straight")
-mask = (flight_data['turn_straight'] == 'turn') & (flight_data.index>5000)& mask_angles
+mask = (flight_data['turn_straight'] == 'turn')& mask_angles
 pu.plot_cl_curve(np.sqrt((results['CL']**2+results['CS']**2)), results['CD'], aoa_plot, mask,axs, label = "Turn")
 
 axs[0,0].axvline(x = np.mean(aoa_plot[flight_data['powered'] == 'powered']), color = 'k',linestyle = '--', label = 'Mean reel-out angle of attack')
@@ -306,3 +306,9 @@ plt.show()
 
 
 
+#%%
+flight_data = flight_data[mask_angles]
+results = results[mask_angles]
+
+results_jelle = pd.DataFrame({'aoa': flight_data['kite_angle_of_attack'], 'CL': results['CL'],'CS': results['CS'],'CD': results['CD'], 'powered':flight_data['powered'], 'turn_straight':flight_data['turn_straight']})
+results_jelle = results_jelle.to_csv('results_jelle.csv',index=False)
