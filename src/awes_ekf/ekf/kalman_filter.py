@@ -104,6 +104,11 @@ class ExtendedKalmanFilter:
     def get_observation_noise_covariance(self, stdv_y):
         return np.diag(np.array(stdv_y)**2)
     
+    def get_input_vector(self,input_class,kcu):
+        if kcu.data_available:   
+            self.u = np.concatenate((np.array([input_class.reelout_speed, input_class.tether_force]), input_class.kcu_acc, input_class.kcu_vel, np.array([input_class.steering_input])))
+        else:
+            self.u = np.concatenate((np.array([input_class.reelout_speed, input_class.tether_force]), input_class.kite_acc,np.array([input_class.steering_input])))
         
 class DynamicModel:
     def __init__(self,kite,tether,kcu,model_specs):
