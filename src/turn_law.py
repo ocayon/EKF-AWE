@@ -54,7 +54,7 @@ def calculate_yaw_rate(x, kite, us, va, beta, yaw,v,radius,forces):
         yaw_rate = yaw_rate/(k_d*va+k_c*v)
 
     if 'simple' in forces:
-        yaw_rate = k_us*us*(va**2)/(k_d*va)
+        yaw_rate = k_us*us*(va)
     # yaw_rate = (-k_g*np.sin(yaw)*np.cos(beta)+k_us*us*(va**2)+k_c*v**2/radius+(va**2)*Cn_ass)/(k_d*va)
 
     return yaw_rate
@@ -81,10 +81,14 @@ date = year+'-'+month+'-'+day
 results = pd.read_csv(path+file_name+'_res_GPS.csv')
 flight_data = pd.read_csv(path+file_name+'_fd.csv')
 
+# results = results.dropna()
+rows_to_keep = results.index
+flight_data = flight_data.loc[rows_to_keep]
+
 kite = create_kite(kite_model)
 #%%
-results, flight_data = postprocess_results(results,flight_data, kite, imus = [0], remove_IMU_offsets=False, 
-                                            correct_IMU_deformation = True,remove_vane_offsets=True,estimate_kite_angle=True)
+results, flight_data = postprocess_results(results,flight_data, kite, imus = [0], remove_IMU_offsets=True, 
+                                            correct_IMU_deformation = False,remove_vane_offsets=True,estimate_kite_angle=True)
 
 #%% Define relevant variables
 
@@ -106,7 +110,7 @@ v_kite = np.linalg.norm(v_kite, axis=1)
 va_kite = results['va_kite']
 elevation = np.arctan2(r_kite[:,2],np.sqrt(r_kite[:,0]**2+r_kite[:,1]**2))
 azimuth = np.arctan2(r_kite[:,1],r_kite[:,0])*180/np.pi
-us = flight_data['us']
+us = flight_data['kcu_actual_steering']
 
 window_size = 30
 yaw_rate = np.diff(np.unwrap(flight_data['kite_0_yaw']/180*np.pi)) / 0.1
@@ -120,7 +124,7 @@ radius[yaw_rate > 0] = -radius[yaw_rate > 0]
 cycles_plotted = np.arange(5, 50, step=1)
 mask = np.any(
     [flight_data['cycle'] == cycle for cycle in cycles_plotted], axis=0)
-forces = ['weight']
+forces = ['simple']
 mask = mask&(flight_data['powered'] == 'powered')
 pow = (flight_data['powered'] == 'powered')
 x0 = [0.1, 0, 0, 0, 0]
