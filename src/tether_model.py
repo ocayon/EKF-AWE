@@ -401,8 +401,8 @@ class TetherModel:
             ex_bridle = np.cross(ey_bridle, ez_bridle)                                      # x-axis of bridle frame, perpendicular ex and ey
             dcm_b2w = np.vstack(([ex_bridle], [ey_bridle], [ez_bridle])).T
 
-            ez_tether = tensions[-2, :]/np.linalg.norm(tensions[-2, :])
-            ey_tether = np.cross(ez_tether, va)/np.linalg.norm(np.cross(ez_tether, va))
+            ez_tether = -tensions[-2, :]/np.linalg.norm(tensions[-2, :])
+            ey_tether = np.cross(ez_tether, -va)/np.linalg.norm(np.cross(ez_tether, -va))
             ex_tether = np.cross(ey_tether, ez_tether)
             dcm_t2w = np.vstack(([ex_tether], [ey_tether], [ez_tether])).T
 

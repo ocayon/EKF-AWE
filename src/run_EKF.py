@@ -43,8 +43,9 @@ def create_ekf_output(x, u, kite, tether,kcu, model_specs):
     opt_guess = [elevation_0, azimuth_0, tether_length]
     res = tether.calculate_tether_shape(opt_guess, *args, a_kite = kite_acc, a_kcu = kcu_acc, v_kcu = kcu_vel, return_values=True)
     dcm_b2w = res[2]
+    dcm_t2w = res[3]
     euler_angles = calculate_euler_from_reference_frame(dcm_b2w)
-    
+    euler_angles1 = calculate_euler_from_reference_frame(dcm_t2w)
     cd_kcu = res[-5]
     cd_tether = res[-4]
     if model_specs.model_yaw:
@@ -77,7 +78,8 @@ def create_ekf_output(x, u, kite, tether,kcu, model_specs):
                                 azimuth_first_element = x[14], 
                                 cd_kcu = cd_kcu,
                                 cd_tether = cd_tether,
-                                z_wind = z_wind)
+                                z_wind = z_wind, 
+                                roll_tether = euler_angles1[0])
     
     if model_specs.model_yaw:
         ekf_output.k_steering_law = x[16]
@@ -232,7 +234,7 @@ if __name__ == "__main__":
     month = '10'
     day = '08'
     kite_model = 'v3'                   # Kite model name, if Costum, change the kite parameters next
-    kcu_model = 'KP2'                   # KCU model name
+    kcu_model = 'KP1'                   # KCU model name
     tether_diameter = 0.01            # Tether diameter [m]
     n_tether_elements = 5
     opt_measurements = []
@@ -242,7 +244,7 @@ if __name__ == "__main__":
     file_path = Path('../processed_data/flight_data') / kite_model / (file_name + '.csv')
     flight_data = pd.read_csv(file_path)
     flight_data = flight_data.reset_index()
-    flight_data = flight_data.iloc[:36000]
+    flight_data = flight_data.iloc[:15000]
     timestep = flight_data['time'].iloc[1] - flight_data['time'].iloc[0]
 
     model_specs = ModelSpecs(timestep, n_tether_elements, opt_measurements=opt_measurements)
