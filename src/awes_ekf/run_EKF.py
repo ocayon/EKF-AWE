@@ -2,13 +2,15 @@
 import numpy as np
 import pandas as pd
 from config import z0, kappa, model_stdv,meas_stdv
-from model_definitions import kite_models, kcu_cylinders, tether_materials
 from utils import calculate_vw_loglaw, calculate_euler_from_reference_frame, calculate_airflow_angles, ModelSpecs, SystemSpecs
-from utils import  KiteModel, KCUModel, convert_ekf_output_to_df, get_measurement_vector, tether_input,EKFOutput, create_input_from_KP_csv, get_input_vector, calculate_reference_frame_euler
-from tether_model import TetherModel
-from kalman_filter import ExtendedKalmanFilter, DynamicModel, ObservationModel, observability_Lie_method
+from utils import  convert_ekf_output_to_df, get_measurement_vector, tether_input,EKFOutput,  get_input_vector, calculate_reference_frame_euler
+from tether import Tether
+from ekf.kalman_filter import ExtendedKalmanFilter, DynamicModel, ObservationModel, observability_Lie_method
+from kite import Kite
+from kcu import KCU
 import time
 from pathlib import Path
+from load_data.load_kp_csv import create_input_from_KP_csv
 
 def create_ekf_output(x, u, kite, tether,kcu, model_specs):
     """Store results in a list of instances of the class EKFOutput"""
@@ -87,48 +89,30 @@ def create_ekf_output(x, u, kite, tether,kcu, model_specs):
                             
     return ekf_output
 
-
-def create_kite(model_name):
-    """"Create kite model class from model name and model dictionary"""
-    if model_name in kite_models:
-        model_params = kite_models[model_name]
-        return KiteModel(model_name, model_params["mass"], model_params["area"], model_params["distance_kcu_kite"],
-                     model_params["total_length_bridle_lines"], model_params["diameter_bridle_lines"],model_params['KCU'], model_params["span"])
-    else:
-        raise ValueError("Invalid kite model")
-    
-def create_kcu(model_name, data_available = False):
-    """"Create KCU model class from model name and model dictionary"""
-    if model_name in kcu_cylinders:
-        model_params = kcu_cylinders[model_name]
-        return KCUModel(model_params["length"], model_params["diameter"], model_params["mass"], data_available)
-    else:
-        raise ValueError("Invalid KCU model")
-        
-def create_tether(material_name,diameter,n_tether_elements):
-    """"Create tether model class from material name and diameter"""
-    if material_name in tether_materials:
-        material_params = tether_materials[material_name]
-        return TetherModel(material_name,diameter,material_params["density"],material_params["cd"],material_params["Youngs_modulus"],n_tether_elements)
-    else:
-        raise ValueError("Invalid tether material")
-
 def initialize_ekf(ekf_input, model_specs, system_specs):
     """Initialize the Extended Kalman Filter"""
-    kite = create_kite(system_specs.kite_model)
+    kite = Kite(system_specs.kite_model)
     if ekf_input.kcu_acc is not None:
-        kcu = create_kcu(system_specs.kcu_model, data_available=True)
+        kcu = KCU(system_specs.kcu_model, data_available=True)
     else:
-        kcu = create_kcu(system_specs.kcu_model, data_available=False)
-    tether = create_tether(system_specs.tether_material,system_specs.tether_diameter,model_specs.n_tether_elements)
+        kcu = KCU(system_specs.kcu_model, data_available=False)
+        
+    tether = Tether(system_specs.tether_material,system_specs.tether_diameter,model_specs.n_tether_elements)
+    
+    
+    
+    
     # Create dynamic model and observation model
     dyn_model = DynamicModel(kite,tether,kcu,model_specs)
     obs_model = ObservationModel(dyn_model.x,dyn_model.u,model_specs,kite,tether,kcu)
 
     if model_specs.tether_offset:    
         system_specs.stdv_dynamic_model = np.append(system_specs.stdv_dynamic_model, 1e-6)
+        
+        
     # Initialize EKF
     ekf = ExtendedKalmanFilter(system_specs.stdv_dynamic_model, system_specs.stdv_measurements, model_specs.ts,dyn_model,obs_model, kite, tether, kcu, model_specs.doIEKF, model_specs.epsilon, model_specs.max_iterations)
+    
     return ekf, dyn_model,kite, kcu, tether
 
 def update_tether(x,ekf_input, model_specs, tether, kite, kcu):
@@ -241,7 +225,7 @@ if __name__ == "__main__":
     tether_material = 'Dyneema-SK78'    # Tether material
     # File path
     file_name = f"{kite_model}_{year}-{month}-{day}"
-    file_path = Path('../processed_data/flight_data') / kite_model / (file_name + '.csv')
+    file_path = Path('../../processed_data/flight_data') / kite_model / f'{file_name}.csv'
     flight_data = pd.read_csv(file_path)
     flight_data = flight_data.reset_index()
     flight_data = flight_data.iloc[:15000]

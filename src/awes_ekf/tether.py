@@ -3,20 +3,29 @@ from config import g, rho, z0
 from scipy.optimize import least_squares
 from utils import project_onto_plane, calculate_angle_2vec
 import casadi as ca
+from model_definitions import tether_materials
 
-class TetherModel:
+class Tether:
     """ Tether model class"""
-    def __init__(self,material,diameter,density,cd,Youngs_modulus,n_elements,elastic=True):
-        self.material = material
-        self.diameter = diameter
-        self.density = density
-        self.cd = cd
+    def __init__(self,material_name,diameter, n_elements,elastic=True):
+        """"Create tether model class from material name and diameter"""
+        if material_name in tether_materials:
+            material_params = tether_materials[material_name]
+            for key, value in material_params.items():
+                # Set each key-value pair as an attribute of the instance
+                setattr(self, key, value)
+        else:
+            raise ValueError("Invalid tether material")
+            
+        
         self.cf = 0.02
-        self.E = Youngs_modulus
-        self.area = np.pi*(self.diameter/2)**2
-        self.EA = self.E*self.area
-        self.elastic = elastic
+        self.diameter = diameter
         self.n_elements = n_elements
+        self.elastic = elastic
+        self.area = np.pi*(self.diameter/2)**2
+        self.EA = self.Youngs_modulus*self.area
+        
+        
     
     def calculate_tether_shape_symbolic(self, elevation_0, azimuth_0, tether_length,
                                          tension_ground, r_kite, v_kite, vw, kite, kcu,tether,  
