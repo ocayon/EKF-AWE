@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from config import kappa, z0
 from utils import  calculate_angle, project_onto_plane
 import seaborn as sns
-from postprocessing import calculate_reference_frame_euler
+from postprocess.postprocessing import calculate_reference_frame_euler
 
 
 def find_turn_law(flight_data):
@@ -78,7 +78,7 @@ def postprocess_results(results,flight_data, kite, IMU_0=False, IMU_1=False, EKF
     # Calculate apparent speed based on EKF results
     wvel = results['wind_velocity']
     vw = np.vstack((wvel*np.cos(results['wind_direction']),wvel*np.sin(results['wind_direction']),np.zeros(len(results)))).T
-    r_kite = np.vstack((np.array(results['x']),np.array(results['y']),np.array(results['z']))).T
+    r_kite = np.vstack((np.array(results['x']),np.array(results['y']),np.array(results['kite_pos_z']))).T
     v_kite = np.vstack((np.array(results['vx']),np.array(results['vy']),np.array(results['vz']))).T
     # Calculate a_kite with diff of v_kite
     dt = flight_data['time'].iloc[1]-flight_data['time'].iloc[0]
@@ -388,14 +388,14 @@ def plot_wind_speed_height_bins(results, flight_data, lidar_heights, savefig = F
         if flight_data[column].iloc[i] != flight_data[column].iloc[i+1]:
             wvel = results['wind_velocity'].iloc[i0:i]
             wdir = np.degrees(results['wind_direction'].iloc[i0:i])
-            wvel100.append(np.mean(wvel[results.z<100]))
-            wdir100.append(np.mean(wdir[results.z<100]))
-            wvel150.append(np.mean(wvel[(results.z<150)&(results.z>100)]))
-            wdir150.append(np.mean(wdir[(results.z<150)&(results.z>100)]))
-            wvel200.append(np.mean(wvel[(results.z>150)&(results.z<200)]))
-            wdir200.append(np.mean(wdir[(results.z>150)&(results.z<200)]))
-            wvel250.append(np.mean(wvel[results.z>200]))
-            wdir250.append(np.mean(wdir[results.z>200]))
+            wvel100.append(np.mean(wvel[results.kite_pos_z<100]))
+            wdir100.append(np.mean(wdir[results.kite_pos_z<100]))
+            wvel150.append(np.mean(wvel[(results.kite_pos_z<150)&(results.kite_pos_z>100)]))
+            wdir150.append(np.mean(wdir[(results.kite_pos_z<150)&(results.kite_pos_z>100)]))
+            wvel200.append(np.mean(wvel[(results.kite_pos_z>150)&(results.kite_pos_z<200)]))
+            wdir200.append(np.mean(wdir[(results.kite_pos_z>150)&(results.kite_pos_z<200)]))
+            wvel250.append(np.mean(wvel[results.kite_pos_z>200]))
+            wdir250.append(np.mean(wdir[results.kite_pos_z>200]))
             t_lidar.append(flight_data['time'].iloc[i0])
             i_change.append(i0)
             i0 = i+1
@@ -466,7 +466,7 @@ def plot_wind_speed_height_bins(results, flight_data, lidar_heights, savefig = F
 def correct_aoa_ss_measurements(results,flight_data):
 
     # Correct angle of attack and sideslip angle based on EKF mean angle of attack
-    aoa_EKF = np.array(results['aoa'])
+    aoa_EKF = np.array(results['kite_aoa'])
     aoa_vane = np.array(flight_data['kite_angle_of_attack'])
     aoa_vane = np.convolve(aoa_vane, np.ones(10)/10, mode='same')
     mask_pow = (flight_data['ground_tether_reelout_speed'] > 0) & (flight_data['up']<0.2)
@@ -535,8 +535,8 @@ def plot_aero_coeff_vs_aoa_ss(results, flight_data, cycles_plotted, IMU_0=False,
 
     # AOA and Side Slip plots with conditions
     if EKF:
-        axs[3].plot(results[mask_cycle]['time'], results[mask_cycle]['aoa'], label='aoa EKF')
-        axs[4].plot(results[mask_cycle]['time'], results[mask_cycle]['ss'], label='ss EKF')
+        axs[3].plot(results[mask_cycle]['time'], results[mask_cycle]['kite_aoa'], label='aoa EKF')
+        axs[4].plot(results[mask_cycle]['time'], results[mask_cycle]['kite_sideslip'], label='ss EKF')
     if IMU_0:
         axs[3].plot(results[mask_cycle]['time'], results[mask_cycle]['aoa_IMU_0'], label='aoa IMU 0')
         axs[4].plot(results[mask_cycle]['time'], results[mask_cycle]['ss_IMU_0'], label='ss IMU 0')
@@ -695,7 +695,7 @@ def plot_CL_CD_aoa(results,flight_data,mask,aoa_method,savefig = False):
     elif aoa_method == 'IMU_1':
         aoa = results['aoa_IMU_1']
     elif aoa_method == 'EKF':
-        aoa = results['aoa']
+        aoa = results['kite_aoa']
     else:
         aoa = flight_data['kite_angle_of_attack']
     
@@ -729,7 +729,7 @@ def plot_CL_CD_ss(results,flight_data,mask,ss_method):
     elif ss_method == 'IMU_1':
         ss = results['ss_IMU_1']
     elif ss_method == 'EKF':
-        ss = results['ss']
+        ss = results['kite_sideslip']
     else:
         ss = flight_data['kite_sideslip_angle']
 
@@ -747,10 +747,10 @@ def plot_prob_coeff_vs_aoa_ss(results,coeff,mask,aoa_method):
         aoa = results['aoa_IMU_1']
         ss = results['ss_IMU_1']
     elif aoa_method == 'EKF':
-        aoa = results['aoa']
-        ss = results['ss']
+        aoa = results['kite_aoa']
+        ss = results['kite_sideslip']
     else:
-        aoa = results['aoa']
+        aoa = results['kite_aoa']
         ss = np.zeros(len(results))
     
     fig, axs = plt.subplots(1,2, figsize=(10, 6))
@@ -814,9 +814,9 @@ def plot_wind_profile(flight_data, results,savefig=False):
     axs[1].fill_betweenx(lidar_heights, min_dir, max_dir, color=palette[0], alpha=0.3, label='Lidar')
 
     wvelEKF = results['wind_velocity']
-    plot_hexbin_density(wvelEKF,results['z'],fig,axs[0])
-    # axs[0].scatter( wvelEKF, results['z'], color=palette[1], label='EKF', alpha = 0.1)
-    axs[1].scatter(np.degrees(results['wind_direction']), results['z'], color=palette[1], label='EKF', alpha = 0.1)
+    plot_hexbin_density(wvelEKF,results['kite_pos_z'],fig,axs[0])
+    # axs[0].scatter( wvelEKF, results['kite_pos_z'], color=palette[1], label='EKF', alpha = 0.1)
+    axs[1].scatter(np.degrees(results['wind_direction']), results['kite_pos_z'], color=palette[1], label='EKF', alpha = 0.1)
 
     axs[0].legend()
     axs[0].set_xlabel('Wind speed (m/s)')
@@ -833,7 +833,7 @@ def plot_wind_profile(flight_data, results,savefig=False):
 
 def plot_wind_profile_bins(flight_data, results, step = 20, savefig = False):
     # Extract data
-    height = results['z']
+    height = results['kite_pos_z']
     wvel = results['wind_velocity']
     wdir = np.degrees(results['wind_direction'])
 
@@ -937,13 +937,13 @@ def plot_kite_reference_frame(results, flight_data, imus):
                                                      results.pitch.iloc[i], 
                                                      results.yaw.iloc[i], 
                                                      bodyFrame='ENU')
-        ax.quiver(results['x'].iloc[i], results['y'].iloc[i], results['z'].iloc[i], ex[0],  \
+        ax.quiver(results['x'].iloc[i], results['y'].iloc[i], results['kite_pos_z'].iloc[i], ex[0],  \
                     ex[1], ex[2],
                 color='r', length=len_arrow)
-        ax.quiver(results['x'].iloc[i], results['y'].iloc[i], results['z'].iloc[i], ey[0],  \
+        ax.quiver(results['x'].iloc[i], results['y'].iloc[i], results['kite_pos_z'].iloc[i], ey[0],  \
                     ey[1], ey[2],
                 color='r', length=len_arrow)
-        ax.quiver(results['x'].iloc[i], results['y'].iloc[i], results['z'].iloc[i], ez[0],  \
+        ax.quiver(results['x'].iloc[i], results['y'].iloc[i], results['kite_pos_z'].iloc[i], ez[0],  \
                     ez[1], ez[2],
                 color='r', length=len_arrow)
         # Calculate IMU tether orientation based on euler angles and plot it
@@ -973,8 +973,8 @@ def plot_kite_reference_frame(results, flight_data, imus):
                         ez[2],
                         color='b', length=len_arrow)
 
-    ax.plot(results.x, results.y, results.z,color='grey')
-    ax.scatter(results['x'].iloc[0:spacing:-1], results['y'].iloc[0:spacing:-1], results['z'].iloc[0:spacing:-1],color='r')
+    ax.plot(results.x, results.y, results.kite_pos_z,color='grey')
+    ax.scatter(results['x'].iloc[0:spacing:-1], results['y'].iloc[0:spacing:-1], results['kite_pos_z'].iloc[0:spacing:-1],color='r')
     ax.legend()
     ax.quiver(0,0,0, 
                 0, 
