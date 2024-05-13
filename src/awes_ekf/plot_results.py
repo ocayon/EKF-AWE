@@ -1,10 +1,10 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from run_EKF import create_kite
+from kite import Kite
 import seaborn as sns
-import plot_utils as pu
-from postprocessing import  postprocess_results
+import plotting.plot_utils as pu
+from postprocess.postprocessing import  postprocess_results
 #%%
 year = '2019'
 month = '10'
@@ -12,7 +12,7 @@ day = '08'
 kite_model = 'v3'                   
 
 plt.close('all')
-path = '../results/'+kite_model+'/'
+path = '../../results/'+kite_model+'/'
 file_name = kite_model+'_'+year+'-'+month+'-'+day
 date = year+'-'+month+'-'+day
 
@@ -25,7 +25,7 @@ flight_data = flight_data.loc[rows_to_keep]
 
 plot_lidar_heights= [100,160,200,250]
 
-kite = create_kite(kite_model)
+kite = Kite(kite_model)
 
 imus = [0]
 
@@ -103,17 +103,17 @@ ax.grid()
 # ax.grid()
 fig,ax = plt.subplots()
 pu.plot_time_series(flight_data, flight_data['kite_0_rx'], ax, color='blue', label='Measured',plot_phase=False)
-pu.plot_time_series(flight_data,results['x'], ax, color='red', label='Estimated',plot_phase=False)
+pu.plot_time_series(flight_data,results['kite_pos_x'], ax, color='red', label='Estimated',plot_phase=False)
 ax.grid()
 ax.legend()
 fig,ax = plt.subplots()
 pu.plot_time_series(flight_data, flight_data['kite_0_ry'], ax, color='blue', label='Measured',plot_phase=False)
-pu.plot_time_series(flight_data,results['y'], ax, color='red', label='Estimated',plot_phase=False)
+pu.plot_time_series(flight_data,results['kite_pos_y'], ax, color='red', label='Estimated',plot_phase=False)
 ax.grid()
 ax.legend()
 fig,ax = plt.subplots()
 pu.plot_time_series(flight_data, flight_data['kite_0_rz'], ax, color='blue', label='Measured',plot_phase=False)
-pu.plot_time_series(flight_data,results['z'], ax, color='red', label='Estimated',plot_phase=False)
+pu.plot_time_series(flight_data,results['kite_pos_z'], ax, color='red', label='Estimated',plot_phase=False)
 ax.grid()
 ax.legend()
 #%%
@@ -141,14 +141,9 @@ ax.legend()
 # mask = range(3600,4000)
 # pu.plot_kite_reference_frame(results.iloc[mask], flight_data.iloc[mask], imus)
 
+
 #%%
-
-r = np.sqrt(results.x**2+results.y**2+results.z**2)
-
-
-plt.figure()
-plt.plot(flight_data['time'],results['tether_length']-r+kite.distance_kcu_kite)
-#%%
+r = np.sqrt(results.kite_pos_x**2+results.kite_pos_y**2+results.kite_pos_z**2)
 mechanic_power = []
 slack = []
 for cycle in range(0,int(max(np.array(flight_data['cycle'])))):
@@ -156,7 +151,7 @@ for cycle in range(0,int(max(np.array(flight_data['cycle'])))):
     mask1 = mask#&(flight_data['powered'] == 'powered')
     mechanic_power.append(np.mean(flight_data['ground_tether_reelout_speed'][mask1]*flight_data['ground_tether_force'][mask1]))
 
-    r = np.sqrt(results.x**2+results.y**2+results.z**2)
+    
     mask= mask&(flight_data['powered'] == 'depowered')
     slack.append(np.max(results['tether_length'][mask]-r[mask]+kite.distance_kcu_kite))
 
@@ -249,7 +244,7 @@ plt.show()
 
 #%%
 #read the data
-data = pd.read_csv('../processed_data/aerostructural/v3_aero_coeffs_VSM.csv')
+data = pd.read_csv('../../processed_data/aerostructural/v3_aero_coeffs_VSM.csv')
 cl_VSM = data['CL']
 cd_VSM = data['CD']
 aoa_VSM = np.degrees(data['aoa'])
@@ -284,7 +279,6 @@ plt.show()
 
 #%%
 
-data = pd.read_csv('../processed_data/aerostructural/v3_aero_coeffs_VSM.csv')
 cl_VSM = data['CL']
 cd_VSM = data['CD']
 aoa_VSM = np.degrees(data['aoa'])
