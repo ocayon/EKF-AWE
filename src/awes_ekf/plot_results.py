@@ -39,14 +39,14 @@ results, flight_data = postprocess_results(results,flight_data, kite, imus = [0]
 
 #%%Plot results wind speed
 
-pu.plot_wind_speed(results,flight_data, plot_lidar_heights,savefig=True) # PLot calculated wind speed against lidar
+pu.plot_wind_speed(results,flight_data, plot_lidar_heights,savefig=False) # PLot calculated wind speed against lidar
 #%%
 pu.plot_wind_speed_height_bins(results,flight_data, plot_lidar_heights, savefig=False) # Plot calculated wind speed against lidar
 
 #%%
 # pu.plot_wind_profile(flight_data, results, savefig=False) # Plot wind profile
 
-axs = pu.plot_wind_profile_bins(flight_data.iloc[2000:-2000], results.iloc[2000:-2000], step = 10, savefig = True)
+axs = pu.plot_wind_profile_bins(flight_data.iloc[2000:-2000], results.iloc[2000:-2000], step = 10, savefig = False)
 
 # windpath = '../processed_data/era5_data/'
 # windfile = 'era5_data_'+year+'_'+month+'_'+day+'.npy'
