@@ -101,8 +101,8 @@ def postprocess_results(results,flight_data, kite, imus = [0], remove_IMU_offset
     # Calculate apparent speed based on EKF results
     wvel = results['wind_velocity']
     vw = np.vstack((wvel*np.cos(results['wind_direction']),wvel*np.sin(results['wind_direction']),np.zeros(len(results)))).T
-    r_kite = np.vstack((np.array(results['x']),np.array(results['y']),np.array(results['z']))).T
-    v_kite = np.vstack((np.array(results['vx']),np.array(results['vy']),np.array(results['vz']))).T
+    r_kite = np.vstack((np.array(results['kite_pos_x']),np.array(results['kite_pos_y']),np.array(results['kite_pos_z']))).T
+    v_kite = np.vstack((np.array(results['kite_vel_x']),np.array(results['kite_vel_y']),np.array(results['kite_vel_z']))).T
     # Calculate a_kite with diff of v_kite
     dt = flight_data['time'].iloc[1]-flight_data['time'].iloc[0]
     a_kite = np.vstack((np.concatenate((np.diff(v_kite[:,0])/dt, [0])),np.concatenate((np.diff(v_kite[:,1])/dt, [0])),np.concatenate((np.diff(v_kite[:,2])/dt, [0])))).T
@@ -145,15 +145,14 @@ def postprocess_results(results,flight_data, kite, imus = [0], remove_IMU_offset
     cycle_count = 0
     in_cycle = False
     ip = 0
-    slack = []
     radius_turn = []
     omega = []
+    slack = flight_data['ground_tether_length']+kite.distance_kcu_kite-np.linalg.norm(r_kite,axis=1)
     for i in range(len(results)):
         res = results.iloc[i]
         fd = flight_data.iloc[i]
         # Calculate tether orientation based on euler angles
         q = 0.5*1.225*kite.area*res['va_kite']**2
-        slack.append(fd['ground_tether_length']+kite.distance_kcu_kite-np.sqrt(res.x**2+res.y**2+res.z**2))
         for imu in imus:
             ex, ey, ez = calculate_reference_frame_euler(flight_data['kite_'+str(imu)+'_roll'].iloc[i], 
                                                             flight_data['kite_'+str(imu)+'_pitch'].iloc[i], 
@@ -192,7 +191,7 @@ def postprocess_results(results,flight_data, kite, imus = [0], remove_IMU_offset
     
     if estimate_kite_angle:
 
-        results['aoa'] = results['aoa']-flight_data['offset_pitch']
+        results['kite_aoa'] = results['kite_aoa']-flight_data['offset_pitch']
         flight_data['kite_angle_of_attack'] = flight_data['kite_angle_of_attack']-flight_data['offset_pitch']
     
     if correct_IMU_deformation:
@@ -287,7 +286,7 @@ def determine_left_right(row):
 def correct_aoa_ss_measurements(results,flight_data):
 
     # Correct angle of attack and sideslip angle based on EKF mean angle of attack
-    aoa_EKF = np.array(results['aoa'])
+    aoa_EKF = np.array(results['kite_aoa'])
     aoa_vane = np.array(flight_data['kite_angle_of_attack'])
     aoa_vane = np.convolve(aoa_vane, np.ones(10)/10, mode='same')
     mask_pow = (flight_data['ground_tether_reelout_speed'] > 0) & (flight_data['up']<0.2)
@@ -297,7 +296,7 @@ def correct_aoa_ss_measurements(results,flight_data):
     # Correct sideslip angle based on EKF mean sideslip angle of 0
     ss_vane = np.array(flight_data['kite_sideslip_angle'])
     ss_vane = np.convolve(ss_vane, np.ones(10)/10, mode='same')
-    offset_ss = np.mean(results['ss'])-np.mean(flight_data['kite_sideslip_angle'][mask_pow])
+    offset_ss = np.mean(results['kite_sideslip'])-np.mean(flight_data['kite_sideslip_angle'][mask_pow])
 
 
 
