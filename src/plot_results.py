@@ -5,10 +5,11 @@ from run_EKF import create_kite
 import seaborn as sns
 import plot_utils as pu
 from postprocessing import  postprocess_results
-year = '2023'
-month = '11'
-day = '27'
-kite_model = 'v9'                   
+#%%
+year = '2019'
+month = '10'
+day = '08'
+kite_model = 'v3'                   
 
 plt.close('all')
 path = '../results/'+kite_model+'/'
@@ -307,3 +308,27 @@ plt.show()
 
 
 #%%
+kite_vel = np.vstack((results['vx'],results['vy'],results['vz'])).T
+kite_acc = np.append(np.diff(kite_vel,axis = 0)/0.1, np.zeros((1,3)), axis = 0)
+# kite_tangential_acc = np.dot(kite_acc, kite_vel.T)
+
+# plt.plot(kite_acc)
+
+
+#%%
+
+roll_drift = results['roll']-results['roll_tether']
+
+
+plt.plot(flight_data['ground_tether_force']*np.sin(np.radians(roll_drift))/flight_data['ground_tether_force']*100)
+
+#%%
+fig, axs = plt.subplots(3, 1, figsize=(10, 10), sharex=True)
+
+axs[0].plot(np.linalg.norm(kite_acc,axis=1))
+axs[0].plot(flight_data['us'])
+axs[0].grid()
+axs[1].plot(np.linalg.norm(kite_vel,axis=1))
+axs[1].grid()
+axs[2].plot(results.z)
+plt.grid()

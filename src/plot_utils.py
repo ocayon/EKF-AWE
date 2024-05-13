@@ -276,7 +276,7 @@ def plot_wind_speed(results, flight_data, lidar_heights, IMU_0 = False, IMU_1=Fa
                 axs[0].fill_between(flight_data['time'], flight_data[vw_min_col], flight_data[vw_max_col], color=palette[i], alpha=0.3)
                 axs[0].plot(flight_data['time'], flight_data[column],color=palette[i], label=label)
 
-                i +=1
+                
         if 'Wind Direction' in column:
             height = ''.join(filter(str.isdigit, column))
             label = 'Lidar ' + height +'m height'
@@ -289,8 +289,10 @@ def plot_wind_speed(results, flight_data, lidar_heights, IMU_0 = False, IMU_1=Fa
             label = 'Lidar ' + height +'m height'
             height = int(height)
             if height in lidar_heights:
-                axs[2].plot(flight_data['time'], flight_data[column],color=palette[i], label=label)
-
+                axs[2].plot(flight_data['time'], -flight_data[column],color=palette[i], label=label)
+                i +=1
+                
+        
                 
     if IMU_0:
         vw_mod = np.sqrt(flight_data['vwx_IMU_0']**2+flight_data['vwy_IMU_0']**2+flight_data['vwz_IMU_0']**2)
@@ -314,8 +316,8 @@ def plot_wind_speed(results, flight_data, lidar_heights, IMU_0 = False, IMU_1=Fa
         wvel = results['wind_velocity']
         vw = np.vstack((wvel*np.cos(results['wind_direction']),wvel*np.sin(results['wind_direction']),np.zeros(len(results)))).T
         axs[0].plot(flight_data['time'], np.linalg.norm(vw,axis=1), label='EKF', alpha = 0.8)
-        axs[1].plot(flight_data['time'], np.degrees(results['wind_direction']), alpha = 0.8)
-        axs[2].plot(flight_data['time'], results['z_wind'], label='EKF', alpha = 0.5)
+        axs[1].plot(flight_data['time'], np.degrees(results['wind_direction']),label='EKF', alpha = 0.8)
+        axs[2].plot(flight_data['time'], results['z_wind'], label='EKF', alpha = 0.8)
     
 
     min_wdir = min(flight_data['ground_wind_direction'])
@@ -339,11 +341,12 @@ def plot_wind_speed(results, flight_data, lidar_heights, IMU_0 = False, IMU_1=Fa
     axs[0].set_xlabel('Time (s)')
     # axs[0].grid()
     axs[1].legend()
-    axs[1].set_ylabel('Wind direction (rad)')
+    axs[1].set_ylabel('Wind direction (deg)')
     axs[1].set_xlabel('Time (s)')
+    # axs[1].set_ylim([175,275])
     # axs[1].grid()
-    axs[2].legend()
-    axs[2].set_ylabel('Wind speed (m/s)')
+    # axs[2].legend()
+    axs[2].set_ylabel('Vertical Wind speed (m/s)')
     axs[2].set_xlabel('Time (s)')
     # axs[2].grid()
     sns.set(style="whitegrid")
