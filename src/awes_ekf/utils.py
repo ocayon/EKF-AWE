@@ -1,59 +1,8 @@
 import numpy as np
 import casadi as ca
 from config import kappa, z0
-from dataclasses import dataclass
 import pandas as pd
 
-#%% Class definitions
-@dataclass
-class EKFInput:
-    kite_pos: np.array      # Kite position in ENU coordinates
-    kite_vel: np.array      # Kite velocity in ENU coordinates
-    kite_acc: np.array      # Kite acceleration in ENU coordinates
-    ts: float              # Timestep (s)
-    tether_force: float     # Ground tether force
-    apparent_windspeed: float = None # Apparent windspeed
-    tether_length: float = None     # Tether length
-    kite_aoa: np.array = None      # Kite angle of attack
-    kcu_vel: np.array = None    # KCU velocity in ENU coordinates
-    kcu_acc: np.array = None    # KCU acceleration in ENU coordinates
-    reelout_speed: float = None  # Reelout speed
-    elevation: float = None      # Elevation angle
-    azimuth: float = None        # Azimuth angle
-    kite_yaw: float = None            # Yaw angle
-    steering_input: float = None # Steering input
-
-@dataclass
-class EKFOutput:
-    kite_pos: np.array    # Kite position in ENU coordinates
-    kite_vel: np.array      # Kite velocity in ENU coordinates
-    wind_velocity: float   # Wind velocity
-    wind_direction: float # Wind direction
-    roll: float           # Roll angle
-    pitch: float         # Pitch angle
-    yaw: float          # Yaw angle
-    tether_length: float # Tether length
-    tether_force: np.array # Tether force vector at the kite
-    kite_aoa: float    # Kite angle of attack
-    kite_sideslip: float # Kite sideslip angle
-    CL : float          # Lift coefficient
-    CD : float          # Drag coefficient
-    CS : float          # Side force coefficient
-    elevation_first_element : float # Elevation angle of the first tether element
-    azimuth_first_element : float # Azimuth angle of the first tether element
-    cd_tether : float = None# Drag coefficient of the tether
-    cd_kcu : float = None  # Drag coefficient of the KCU
-    z_wind: float = None    # Vertical wind speed
-    k_steering_law: float = None # Steering law constant
-    roll_tether: float = None # Roll angle tether
-    
-
-def get_input_vector(input_class,kcu):
-    if kcu.data_available:   
-        u = np.concatenate((np.array([input_class.reelout_speed, input_class.tether_force]), input_class.kcu_acc, input_class.kcu_vel, np.array([input_class.steering_input])))
-    else:
-        u = np.concatenate((np.array([input_class.reelout_speed, input_class.tether_force]), input_class.kite_acc,np.array([input_class.steering_input])))
-    return u
 
 def get_measurement_vector(input_class, model_specs):
     opt_measurements = model_specs.opt_measurements
@@ -75,20 +24,7 @@ def get_measurement_vector(input_class, model_specs):
 
     return z
 
-def tether_input(input_class, model_specs):
-    
-    tether_length = input_class.tether_length
-    
-    
-    if model_specs.kcu_data:
-        kcu_acc = input_class.kcu_acc
-        kcu_vel = input_class.kcu_vel
-    else:
-        kcu_acc = None
-        kcu_vel = None
-
-    return input_class.kite_acc, input_class.tether_force, tether_length, kcu_acc, kcu_vel
-class ModelSpecs:
+class SimulationConfig:
     def __init__(self,timestep, n_tether_elements, opt_measurements = [],  
                  kcu_data = False, doIEKF = True, epsilon = 1e-6, max_iterations = 200,
                  log_profile = False, tether_offset = True, enforce_z_wind = True,
@@ -106,7 +42,7 @@ class ModelSpecs:
         self.model_yaw = model_yaw
 
 
-class SystemSpecs:
+class SystemParameters:
     # Class to store the system specifications
     def __init__(self, kite_model, kcu_model, tether_material, tether_diameter, meas_stdv, model_stdv, model_specs):
         self.kite_model = kite_model
@@ -332,66 +268,6 @@ def calculate_airflow_angles(dcm, v_kite, vw):
     sideslip = 90-calculate_angle(ey_kite,va_proj)         # Sideslip angle
     return aoa, sideslip
 
-
-
-def convert_ekf_output_to_df(ekf_output_list):
-    """Convert list of EKFOutput instances to DataFrame"""
-    x =[]
-    y = []
-    z = []
-    vx = []
-    vy = []
-    vz = []
-    wind_velocity = []
-    wind_direction = []
-    tether_force = []
-    roll = []
-    pitch = []
-    yaw = []
-    aoa = []
-    ss = []
-    tether_length = []
-    CL = []
-    CD = []
-    CS = []
-    cd_kcu = []
-    cd_tether =[]
-    z_wind = []
-    kite_yaw = []
-    k_steering_law = []
-    roll_tether = []
-    for i in range(len(ekf_output_list)):
-        roll_tether.append(ekf_output_list[i].roll_tether)
-        x.append(ekf_output_list[i].kite_pos[0])
-        y.append(ekf_output_list[i].kite_pos[1])
-        z.append(ekf_output_list[i].kite_pos[2])
-        vx.append(ekf_output_list[i].kite_vel[0])
-        vy.append(ekf_output_list[i].kite_vel[1])
-        vz.append(ekf_output_list[i].kite_vel[2])
-        wind_velocity.append(ekf_output_list[i].wind_velocity)
-        wind_direction.append(ekf_output_list[i].wind_direction)
-        tether_force.append(ekf_output_list[i].tether_force)
-        roll.append(ekf_output_list[i].roll)
-        pitch.append(ekf_output_list[i].pitch)
-        yaw.append(ekf_output_list[i].yaw)
-        aoa.append(ekf_output_list[i].kite_aoa)
-        ss.append(ekf_output_list[i].kite_sideslip)
-        tether_length.append(ekf_output_list[i].tether_length)
-        CL.append(ekf_output_list[i].CL)
-        CD.append(ekf_output_list[i].CD)
-        CS.append(ekf_output_list[i].CS)
-        cd_kcu.append(ekf_output_list[i].cd_kcu)
-        cd_tether.append(ekf_output_list[i].cd_tether)
-        z_wind.append(ekf_output_list[i].z_wind)
-        k_steering_law.append(ekf_output_list[i].k_steering_law)
-        
-    ekf_output_df = pd.DataFrame({'x': x, 'y': y, 'z': z, 'vx': vx, 'vy': vy, 'vz': vz, 
-                                  'wind_velocity': wind_velocity, 'wind_direction': wind_direction,
-                                'tether_force': tether_force, 'roll': roll, 'pitch': pitch, 'yaw': yaw, 'aoa': aoa, 'ss': ss, 'tether_length': tether_length,
-                                'CL': CL, 'CD': CD, 'CS': CS, 'cd_kcu': cd_kcu, 'cd_tether': cd_tether, 'z_wind':z_wind, 'k_steering_law':k_steering_law,
-                                'roll_tether':roll_tether})
-
-    return ekf_output_df
 
 def calculate_reference_frame_euler(roll, pitch, yaw, bodyFrame='NED'):
     """
