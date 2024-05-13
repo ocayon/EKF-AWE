@@ -1,5 +1,6 @@
 import numpy as np
-from utils import EKFInput, find_initial_state_vector
+from ekf.ekf_input import EKFInput
+from utils import find_initial_state_vector
 from kite import Kite
 from tether import Tether
 from kcu import KCU
