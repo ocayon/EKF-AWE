@@ -86,6 +86,7 @@ class EKFOutput:
     cd_kcu : float = None  # Drag coefficient of the KCU
     z_wind: float = None    # Vertical wind speed
     k_steering_law: float = None # Steering law constant
+    roll_tether: float = None # Roll angle tether
     
 
 def get_input_vector(input_class,kcu):
@@ -475,7 +476,9 @@ def convert_ekf_output_to_df(ekf_output_list):
     z_wind = []
     kite_yaw = []
     k_steering_law = []
+    roll_tether = []
     for i in range(len(ekf_output_list)):
+        roll_tether.append(ekf_output_list[i].roll_tether)
         x.append(ekf_output_list[i].kite_pos[0])
         y.append(ekf_output_list[i].kite_pos[1])
         z.append(ekf_output_list[i].kite_pos[2])
@@ -502,7 +505,8 @@ def convert_ekf_output_to_df(ekf_output_list):
     ekf_output_df = pd.DataFrame({'x': x, 'y': y, 'z': z, 'vx': vx, 'vy': vy, 'vz': vz, 
                                   'wind_velocity': wind_velocity, 'wind_direction': wind_direction,
                                 'tether_force': tether_force, 'roll': roll, 'pitch': pitch, 'yaw': yaw, 'aoa': aoa, 'ss': ss, 'tether_length': tether_length,
-                                'CL': CL, 'CD': CD, 'CS': CS, 'cd_kcu': cd_kcu, 'cd_tether': cd_tether, 'z_wind':z_wind, 'k_steering_law':k_steering_law})
+                                'CL': CL, 'CD': CD, 'CS': CS, 'cd_kcu': cd_kcu, 'cd_tether': cd_tether, 'z_wind':z_wind, 'k_steering_law':k_steering_law,
+                                'roll_tether':roll_tether})
 
     return ekf_output_df
 
