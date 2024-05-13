@@ -21,7 +21,7 @@ z0 = 0.1                            # Surface roughness [m]
 #%% Define simulation parameters
 log_profile = True                 # Model wind speed as logarithmic with height
 tether_offset = True                # Use tether offset in the measurements
-enforce_z_wind = True              # Enforce the z wind speed to be zero
+enforce_z_wind = False              # Enforce the z wind speed to be zero
 model_yaw = False                   # Model the yaw angle in the state vector
 
 # Tether model
@@ -76,10 +76,10 @@ model_stdv = {
         'v': 1,                  # Velocity       
         'uf': 5e-3,               # Friction velocity
         'wdir': (0.2/180 * np.pi),   # Wind direction
-        'vw': 8e-2,
-        'vwz': 1e-2,                # Vertical windspeed
+        'vw': 6e-2,                 # Wind speed
+        'vwz': 6e-2,                # Vertical windspeed
         'CL': 1e-2,                 # Lift coefficient
-        'CD': 1e-2,                 # Drag coefficient
+        'CD': 3e-3,                 # Drag coefficient
         'CS': 1e-2,                  # Side force coefficient
         'elevation' : 0.3,    # Elevation angle
         'azimuth' : 0.3,     # Azimuth angle
