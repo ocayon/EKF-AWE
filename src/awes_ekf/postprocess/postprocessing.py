@@ -1,6 +1,6 @@
 import numpy as np
-from config import kappa, z0
-from utils import  R_EG_Body, calculate_angle, project_onto_plane
+from setup.settings import kappa, z0
+from utils import  calculate_angle, project_onto_plane, calculate_reference_frame_euler
 
 def unwrap_degrees(signal):
     for i in range(1,len(signal)):
@@ -89,7 +89,17 @@ def postprocess_results(results,flight_data, kite, imus = [0], remove_IMU_offset
     flight_data['right_left'] = flight_data.apply(determine_turn_straight, axis=1)
     flight_data['powered'] = flight_data.apply(determine_powered_depowered, axis=1)
     
+        
     
+    results['roll'] = np.degrees(results['roll'])
+    results['pitch'] = np.degrees(results['pitch'])
+    results['yaw'] = np.degrees(results['yaw'])
+    
+    for imu in imus:
+        flight_data['kite_'+str(imu)+'_roll'] = -flight_data['kite_'+str(imu)+'_roll']
+        flight_data['kite_'+str(imu)+'_yaw'] = -flight_data['kite_'+str(imu)+'_yaw']
+        
+        
     results['wind_direction'] = results['wind_direction']%(2*np.pi)
     
     if remove_IMU_offsets:
@@ -232,35 +242,6 @@ def calculate_wind_speed_airborne_sensors(results, flight_data, imus = [0]):
             flight_data.loc[i, 'vwz_IMU_'+str(imu)] = va[2]+results['vz'][i]
                 
     return flight_data
-
-def calculate_reference_frame_euler(roll, pitch, yaw, bodyFrame='NED'):
-    """
-    Calculate the reference frame based on euler angles
-    :param roll: roll angle
-    :param pitch: pitch angle
-    :param yaw: yaw angle
-    :param eulerFrame: euler frame
-    :return: ex, ey, ez
-    """
-    if bodyFrame == 'NED':
-        roll = -roll+180
-    elif bodyFrame == 'ENU':
-        roll = -roll
- 
-    
-    # Calculate tether orientation based on euler angles
-    Transform_Matrix=R_EG_Body(roll/180*np.pi,pitch/180*np.pi,(yaw)/180*np.pi)
-    #    Transform_Matrix=R_EG_Body(kite_roll[i]/180*np.pi,kite_pitch[i]/180*np.pi,kite_yaw_modified[i])
-    Transform_Matrix=Transform_Matrix.T
-    #X_vector
-    ex_kite=Transform_Matrix.dot(np.array([1,0,0]))
-    #Y_vector
-    ey_kite=Transform_Matrix.dot(np.array([0,1,0]))
-    #Z_vector
-    ez_kite=Transform_Matrix.dot(np.array([0,0,1]))
-
-    # Transform from ENU to NED and return        
-    return ex_kite, ey_kite, ez_kite
 
 
 def determine_turn_straight(row):
