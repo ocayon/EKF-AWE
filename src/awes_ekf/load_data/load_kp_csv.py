@@ -1,9 +1,9 @@
 import numpy as np
 from ekf.ekf_input import EKFInput
-from utils import find_initial_state_vector
-from kite import Kite
-from tether import Tether
-from kcu import KCU
+from setup.kite import Kite
+from setup.tether import Tether
+from setup.kcu import KCU
+from setup.settings import kappa,z0
 
 def create_input_from_KP_csv(flight_data, system_specs, model_specs, kite_sensor = 0, kcu_sensor = 1):
     """Create input classes and initial state vector from flight data"""
@@ -74,10 +74,32 @@ def create_input_from_KP_csv(flight_data, system_specs, model_specs, kite_sensor
     kcu = KCU(system_specs.kcu_model)
     tether = Tether(system_specs.tether_material,system_specs.tether_diameter,n_tether_elements)
 
-    x0, u0 = find_initial_state_vector(kite_pos[0], kite_vel[0], kite_acc[0], 
+    x0 = find_initial_state_vector(kite_pos[0], kite_vel[0], kite_acc[0], 
                                        init_wind_dir, init_wind_vel, tether_force[0], 
                                        tether_length[0], n_tether_elements, kite_elevation[0], kite_azimuth[0], kite, kcu,tether, model_specs)
     if model_specs.model_yaw:
         x0 = np.append(x0,[kite_yaw[0],0])  # Initial wind velocity and direction
         
     return ekf_input_list, x0
+
+def find_initial_state_vector(kite_pos, kite_vel, kite_acc, ground_winddir, ground_windspeed, tether_force, tether_length, n_tether_elements,
+                              elevation, azimuth, kite, kcu,tether, model_specs):
+
+    # Solve for the tether shape
+    uf = ground_windspeed*kappa/np.log(10/z0)
+    wvel0 = uf/kappa*np.log(kite_pos[2]/z0)
+    if np.isnan(wvel0):
+        raise ValueError('Initial wind velocity is NaN')
+    vw = [wvel0*np.cos(ground_winddir),wvel0*np.sin(ground_winddir),0] # Initial wind velocity
+
+    tether.solve_tether_shape(n_tether_elements, kite_pos, kite_vel, vw, kite, kcu, tension_ground = tether_force, tether_length = tether_length,
+                                a_kite = kite_acc)
+    x0 = np.vstack((kite_pos,kite_vel))
+    
+    if model_specs.log_profile:
+        x0 = np.append(x0,[uf,ground_winddir,0])  # Initial wind velocity and direction
+    else:
+        x0 = np.append(x0,vw)   # Initial wind velocity
+    x0 = np.append(x0,[tether.CL,tether.CD,tether.CS,tether_length, elevation, azimuth])     # Initial state vector (Last two elements are bias, used if needed)
+
+    return x0
