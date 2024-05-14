@@ -1,118 +1,7 @@
 import numpy as np
 import casadi as ca
-from config import kappa, z0
+from setup.settings import kappa, z0
 import pandas as pd
-
-
-def get_measurement_vector(input_class, model_specs):
-    opt_measurements = model_specs.opt_measurements
-    z = np.array([])  # Initialize an empty NumPy array
-
-    # Append values to the NumPy array
-    z = np.append(z, input_class.kite_pos)
-    z = np.append(z, input_class.kite_vel)
-    z = np.append(z,input_class.tether_length)
-    z = np.append(z,input_class.elevation)
-    z = np.append(z,input_class.azimuth)
-    z = np.append(z, np.zeros(3))  # Add zeros for the least-squares problem
-    if model_specs.model_yaw:
-        z = np.append(z,input_class.kite_yaw)
-    if model_specs.enforce_z_wind:
-        z = np.append(z,0)
-    if 'apparent_windspeed' in opt_measurements:
-        z = np.append(z, input_class.apparent_windspeed)
-
-    return z
-
-class SimulationConfig:
-    def __init__(self,timestep, n_tether_elements, opt_measurements = [],  
-                 kcu_data = False, doIEKF = True, epsilon = 1e-6, max_iterations = 200,
-                 log_profile = False, tether_offset = True, enforce_z_wind = True,
-                 model_yaw = False):
-        self.ts = timestep
-        self.n_tether_elements = n_tether_elements
-        self.opt_measurements = opt_measurements
-        self.kcu_data = kcu_data
-        self.doIEKF = doIEKF
-        self.epsilon = epsilon
-        self.max_iterations = max_iterations
-        self.log_profile = log_profile
-        self.tether_offset = tether_offset
-        self.enforce_z_wind = enforce_z_wind
-        self.model_yaw = model_yaw
-
-
-class SystemParameters:
-    # Class to store the system specifications
-    def __init__(self, kite_model, kcu_model, tether_material, tether_diameter, meas_stdv, model_stdv, model_specs):
-        self.kite_model = kite_model
-        self.kcu_model = kcu_model
-        self.tether_material = tether_material
-        self.tether_diameter = tether_diameter
-
-        model_stdv = model_stdv[kite_model]
-        if model_specs.log_profile is True:
-            self.stdv_dynamic_model = np.array([model_stdv['x'], model_stdv['x'], model_stdv['x'], 
-                       model_stdv['v'], model_stdv['v'], model_stdv['v'], 
-                       model_stdv['uf'], model_stdv['wdir'], model_stdv['vwz'],
-                       model_stdv['CL'], model_stdv['CD'], model_stdv['CS'],
-                       model_stdv['tether_length'], model_stdv['elevation'], model_stdv['azimuth']])  # Standard deviations for the dynamic model
-        else:
-            self.stdv_dynamic_model = np.array([model_stdv['x'], model_stdv['x'], model_stdv['x'], 
-                       model_stdv['v'], model_stdv['v'], model_stdv['v'], 
-                       model_stdv['vw'], model_stdv['vw'], model_stdv['vwz'],
-                       model_stdv['CL'], model_stdv['CD'], model_stdv['CS'],
-                       model_stdv['tether_length'], model_stdv['elevation'], model_stdv['azimuth']])  # Standard deviations for the dynamic model
-        if model_specs.model_yaw:
-            self.stdv_dynamic_model = np.append(self.stdv_dynamic_model,[model_stdv['yaw'],1e-6])
-        
-        stdv_y = []
-        for _ in range(3):
-            stdv_y.append(meas_stdv['x'])
-        for _ in range(3):
-            stdv_y.append(meas_stdv['v'])
-        stdv_y.append(meas_stdv['tether_length'])
-        stdv_y.append(meas_stdv['elevation'])
-        stdv_y.append(meas_stdv['azimuth'])
-        for _ in range(3):
-            stdv_y.append(meas_stdv['least_squares']) 
-        if model_specs.model_yaw:
-            stdv_y.append(meas_stdv['yaw'])
-        if model_specs.enforce_z_wind:
-            stdv_y.append(meas_stdv['z_wind'])
-            
-        for key in model_specs.opt_measurements:
-            if key == 'apparent_windspeed':
-                stdv_y.append(meas_stdv['va'])
-
-
-        stdv_y = np.array(stdv_y)
-        self.stdv_measurements = stdv_y
-
-
-
-def find_initial_state_vector(kite_pos, kite_vel, kite_acc, ground_winddir, ground_windspeed, tether_force, tether_length, n_tether_elements,
-                              elevation, azimuth, kite, kcu,tether, model_specs):
-
-    # Solve for the tether shape
-    uf = ground_windspeed*kappa/np.log(10/z0)
-    wvel0 = uf/kappa*np.log(kite_pos[2]/z0)
-    if np.isnan(wvel0):
-        raise ValueError('Initial wind velocity is NaN')
-    vw = [wvel0*np.cos(ground_winddir),wvel0*np.sin(ground_winddir),0] # Initial wind velocity
-
-    tether.solve_tether_shape(n_tether_elements, kite_pos, kite_vel, vw, kite, kcu, tension_ground = tether_force, tether_length = tether_length,
-                                a_kite = kite_acc)
-    x0 = np.vstack((kite_pos,kite_vel))
-    
-    if model_specs.log_profile:
-        x0 = np.append(x0,[uf,ground_winddir,0])  # Initial wind velocity and direction
-    else:
-        x0 = np.append(x0,vw)   # Initial wind velocity
-    x0 = np.append(x0,[tether.CL,tether.CD,tether.CS,tether_length, elevation, azimuth])     # Initial state vector (Last two elements are bias, used if needed)
-    u0 = tether.Ft_kite
-
-    return x0, u0
 
 #%% Function definitions
 
@@ -200,40 +89,7 @@ def rank_observability_matrix(A,C):
     rank_O = np.linalg.matrix_rank(O)
     return rank_O
 
-def Rx(theta):
-  return np.array([[ 1, 0           , 0           ],
-                   [ 0, np.cos(theta),-np.sin(theta)],
-                   [ 0, np.sin(theta), np.cos(theta)]])
-  
-def Ry(theta):
-  return np.array([[ np.cos(theta), 0, np.sin(theta)],
-                   [ 0           , 1, 0           ],
-                   [-np.sin(theta), 0, np.cos(theta)]])
-  
-def Rz(theta):
-  return np.array([[ np.cos(theta), -np.sin(theta), 0 ],
-                   [ np.sin(theta), np.cos(theta) , 0 ],
-                   [ 0           , 0            , 1 ]])
 
-def R_EG_Body(roll, pitch, yaw):  # !!In radians!!
-    
-    # Rotation matrix from earth fixed to body reference frame (ENU)
-    # Roll 0 flying parallel to ground (yaxis parallel to ground)
-    # Pitch 0 x-axis parallel to ground
-    # Yaw 0 in east direction
-    
-        
-    # Rotational matrix for Roll
-    R_Roll = Rx(roll)
-
-    # Rotational matrix for Pitch
-    R_Pitch = Ry(pitch)
-
-    # Rotational matrix for Yaw
-    R_Yaw = Rz(yaw)
-
-    # Total Rotational Matrix
-    return R_Roll.dot(R_Pitch.dot(R_Yaw))
 
 
 def calculate_polar_coordinates(r):
@@ -248,15 +104,7 @@ def calculate_vw_loglaw(uf, z0, z, wdir, kappa = 0.4,vz = 0):
     vw = np.array([wvel*np.cos(wdir),wvel*np.sin(wdir),vz])
     return vw
 
-def calculate_euler_from_reference_frame(dcm):
-    
-    # Calculate the roll, pitch and yaw angles from a direction cosine matrix, in NED coordinates   
-    Teb = dcm
-    pitch = np.arcsin(Teb[2,0])*180/np.pi
-    roll = np.arctan(Teb[2,1]/Teb[2,2])*180/np.pi
-    yaw = -np.arctan2(Teb[1,0],Teb[0,0])*180/np.pi
 
-    return roll, pitch, yaw
 
 def calculate_airflow_angles(dcm, v_kite, vw):
     ey_kite = dcm[:,1]      # Kite y axis perpendicular to v and tether
@@ -268,32 +116,78 @@ def calculate_airflow_angles(dcm, v_kite, vw):
     sideslip = 90-calculate_angle(ey_kite,va_proj)         # Sideslip angle
     return aoa, sideslip
 
+def calculate_euler_from_reference_frame(dcm):
+    
+    # Calculate the roll, pitch and yaw angles from a direction cosine matrix, in NED coordinates   
+    Teb = dcm
+    pitch = np.arcsin(-Teb[2,0])
+    roll = np.arctan(Teb[2,1]/Teb[2,2])
+    yaw = np.arctan2(Teb[1,0],Teb[0,0])
+
+    return roll, pitch, yaw
+
+def Rx(theta):
+    """Generate a rotation matrix for a rotation about the x-axis by `theta` radians."""
+    return np.array([
+        [1, 0, 0],
+        [0, np.cos(theta), -np.sin(theta)],
+        [0, np.sin(theta), np.cos(theta)]
+    ])
+
+def Ry(theta):
+    """Generate a rotation matrix for a rotation about the y-axis by `theta` radians."""
+    return np.array([
+        [np.cos(theta), 0, np.sin(theta)],
+        [0, 1, 0],
+        [-np.sin(theta), 0, np.cos(theta)]
+    ])
+
+def Rz(theta):
+    """Generate a rotation matrix for a rotation about the z-axis by `theta` radians."""
+    return np.array([
+        [np.cos(theta), -np.sin(theta), 0],
+        [np.sin(theta), np.cos(theta), 0],
+        [0, 0, 1]
+    ])
+
+def R_EG_Body(roll, pitch, yaw):
+    """Create the total rotation matrix from Earth-fixed to body reference frame in ENU coordinate system."""
+    # Perform rotation about x-axis (roll), then y-axis (pitch), then z-axis (yaw)
+    return Rz(yaw).dot(Ry(pitch).dot(Rx(roll)))
 
 def calculate_reference_frame_euler(roll, pitch, yaw, bodyFrame='NED'):
     """
-    Calculate the reference frame based on euler angles
-    :param roll: roll angle
-    :param pitch: pitch angle
-    :param yaw: yaw angle
-    :param eulerFrame: euler frame
-    :return: ex, ey, ez
-    """
-    if bodyFrame == 'NED':
-        roll = -roll+180
-    elif bodyFrame == 'ENU':
-        roll = -roll
- 
+    Calculate the Earth reference frame vectors based on Euler angles for a specified body frame.
     
-    # Calculate tether orientation based on euler angles
-    Transform_Matrix=R_EG_Body(roll/180*np.pi,pitch/180*np.pi,(yaw)/180*np.pi)
-    #    Transform_Matrix=R_EG_Body(kite_roll[i]/180*np.pi,kite_pitch[i]/180*np.pi,kite_yaw_modified[i])
-    Transform_Matrix=Transform_Matrix.T
-    #X_vector
-    ex_kite=Transform_Matrix.dot(np.array([1,0,0]))
-    #Y_vector
-    ey_kite=Transform_Matrix.dot(np.array([0,1,0]))
-    #Z_vector
-    ez_kite=Transform_Matrix.dot(np.array([0,0,1]))
+    Parameters:
+        roll (float): Roll angle in radians.
+        pitch (float): Pitch angle in radians.
+        yaw (float): Yaw angle in radians.
+        bodyFrame (str): Type of body frame ('NED' or 'ENU').
+    
+    Returns:
+        tuple: Transformed unit vectors along the x, y, and z axes of the kite/body in Earth coordinates.
+    """
+    # Adjust roll for different coordinate systems
+    # if bodyFrame == 'NED':
+    #     roll = np.radians(np.degrees(-roll + np.pi))  # Convert to degrees, adjust, convert back to radians
+    # if bodyFrame == 'ENU':
+    #     roll = -roll
+    
+    
+    # Calculate transformation matrix and its transpose
+    Transform_Matrix = R_EG_Body(roll, pitch, yaw)
+    
+    # Unit vectors in Earth frame
+    if bodyFrame == 'NED':
+        ex_kite = Transform_Matrix[:,0]
+        ey_kite = Transform_Matrix[:,1]
+        ez_kite = Transform_Matrix[:,2]
+    elif bodyFrame == 'ENU':
+        ex_kite = -Transform_Matrix[:,0]
+        ey_kite = Transform_Matrix[:,1]
+        ez_kite = -Transform_Matrix[:,2]
+    
+    
 
-    # Transform from ENU to NED and return        
     return ex_kite, ey_kite, ez_kite
