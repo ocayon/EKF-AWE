@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from kite import Kite
+from setup.kite import Kite
 import seaborn as sns
 import plotting.plot_utils as pu
 from postprocess.postprocessing import  postprocess_results
@@ -124,22 +124,22 @@ pu.plot_time_series(flight_data,results['pitch'], ax, color='red', label='Estima
 ax.grid()
 ax.legend()
 
-# fig,ax = plt.subplots()
-# pu.plot_time_series(flight_data, flight_data['kite_0_roll'], ax, color='blue', label='Measured',plot_phase=False)
-# pu.plot_time_series(flight_data,results['roll'], ax, color='red', label='Estimated',plot_phase=False)
-# ax.grid()
-# ax.legend()
+fig,ax = plt.subplots()
+pu.plot_time_series(flight_data, flight_data['kite_0_roll'], ax, color='blue', label='Measured',plot_phase=False)
+pu.plot_time_series(flight_data,results['roll'], ax, color='red', label='Estimated',plot_phase=False)
+ax.grid()
+ax.legend()
 
 
-# fig,ax = plt.subplots()
-# pu.plot_time_series(flight_data, flight_data['kite_0_yaw'], ax, color='blue', label='Measured',plot_phase=False)
-# pu.plot_time_series(flight_data,results['yaw'], ax, color='red', label='Estimated',plot_phase=False)
-# ax.grid()
-# ax.legend()
-# #%%
-# import plot_utils as pu
-# mask = range(3600,4000)
-# pu.plot_kite_reference_frame(results.iloc[mask], flight_data.iloc[mask], imus)
+fig,ax = plt.subplots()
+pu.plot_time_series(flight_data, flight_data['kite_0_yaw'], ax, color='blue', label='Measured',plot_phase=False)
+pu.plot_time_series(flight_data,results['yaw'], ax, color='red', label='Estimated',plot_phase=False)
+ax.grid()
+ax.legend()
+#%%
+
+mask = range(3600,4000)
+pu.plot_kite_reference_frame(results.iloc[mask], flight_data.iloc[mask], imus)
 
 
 #%%
