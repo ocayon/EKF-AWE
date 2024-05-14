@@ -1,17 +1,18 @@
 
 import numpy as np
 import pandas as pd
-from config import model_stdv,meas_stdv
-from utils import SimulationConfig, SystemParameters
-from utils import  get_measurement_vector
-from tether import Tether
-from ekf.kalman_filter import ExtendedKalmanFilter, DynamicModel, ObservationModel, observability_Lie_method
-from kite import Kite
-from kcu import KCU
+# from utils import SimulationConfig, SystemParameters
+from setup.tether import Tether
+from ekf.kalman_filter import ExtendedKalmanFilter, observability_Lie_method
+from ekf.dynamic_model import DynamicModel
+from ekf.observation_model import ObservationModel
+from setup.kite import Kite
+from setup.kcu import KCU
 import time
 from pathlib import Path
 from load_data.load_kp_csv import create_input_from_KP_csv
 from ekf.ekf_output import create_ekf_output, convert_ekf_output_to_df
+from setup.settings import load_config, SimulationConfig, SystemParameters
 
 
 def initialize_ekf(ekf_input, model_specs, system_specs):
@@ -46,7 +47,7 @@ def initialize_ekf(ekf_input, model_specs, system_specs):
     # Initialize EKF
     ekf = ExtendedKalmanFilter(system_specs.stdv_dynamic_model, system_specs.stdv_measurements, model_specs.ts,dyn_model,obs_model, kite, tether, kcu, model_specs.doIEKF, model_specs.epsilon, model_specs.max_iterations)
     # Initialize input vector
-    ekf.get_input_vector(ekf_input,kcu)
+    ekf.update_input_vector(ekf_input,kcu)
     return ekf, dyn_model,kite, kcu, tether
 
 
@@ -67,18 +68,14 @@ def update_state_ekf_tether(ekf, tether, kite, kcu, dyn_model, ekf_input, model_
         tuple: Returns updated EKF instance, tether model, and an output structure with updated state.
     """
 
-
-    zi = get_measurement_vector(ekf_input,model_specs)
-
     ############################################################
     # Update EKF
     ############################################################
-    ekf.get_input_vector(ekf_input,kcu)
-    
+    ekf.update_input_vector(ekf_input,kcu)
+    ekf.update_measurement_vector(ekf_input, model_specs)
     ############################################################
     # Update state with Kalmann filter
     ############################################################
-    ekf.initialize(ekf.x_k1_k,ekf.u,zi)
     # Predict next step
     ekf.predict()
     # Update next step
@@ -157,13 +154,16 @@ if __name__ == "__main__":
     file_path = Path('../../processed_data/flight_data') / kite_model / f'{file_name}.csv'
     flight_data = pd.read_csv(file_path)
     flight_data = flight_data.reset_index()
-    flight_data = flight_data.iloc[:36000]
+    flight_data = flight_data.iloc[:10000]
     timestep = flight_data['time'].iloc[1] - flight_data['time'].iloc[0]
 
-    model_specs = SimulationConfig(timestep, n_tether_elements, opt_measurements=opt_measurements)
-    system_specs = SystemParameters(kite_model, kcu_model, tether_material, tether_diameter, meas_stdv, model_stdv, model_specs)
+    
+    # Load configuration settings
+    config_data = load_config('v3_config.yaml')
+    simConfig = SimulationConfig(**config_data['simulation_parameters'])
+    systemParams = SystemParameters(config_data['system_parameters'], simConfig)
     # Create input classes
-    ekf_input_list,x0 = create_input_from_KP_csv(flight_data, system_specs, model_specs,kite_sensor = 0, kcu_sensor = 1)
+    ekf_input_list,x0 = create_input_from_KP_csv(flight_data, systemParams, simConfig,kite_sensor = 0, kcu_sensor = 1)
 
     # Check observability matrix
     # check_obs = False
@@ -171,7 +171,7 @@ if __name__ == "__main__":
     #     observability_Lie_method(dyn_model.fx,obs_model.hx,dyn_model.x, dyn_model.u, ekf_input.x0,ekf_input.u0)
 
     #%% Main loop
-    ekf_output_list = run_EKF(ekf_input_list, model_specs, system_specs,x0)
+    ekf_output_list = run_EKF(ekf_input_list, simConfig, systemParams,x0)
 
     #%% Store results
     save_results = True
