@@ -5,10 +5,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib.pyplot as plt
-from config import kappa, z0
-from utils import  calculate_angle, project_onto_plane
+from setup.settings import kappa, z0
+from utils import  calculate_angle, project_onto_plane,calculate_reference_frame_euler
 import seaborn as sns
-from postprocess.postprocessing import calculate_reference_frame_euler
+
 
 
 def find_turn_law(flight_data):
@@ -78,7 +78,7 @@ def postprocess_results(results,flight_data, kite, IMU_0=False, IMU_1=False, EKF
     # Calculate apparent speed based on EKF results
     wvel = results['wind_velocity']
     vw = np.vstack((wvel*np.cos(results['wind_direction']),wvel*np.sin(results['wind_direction']),np.zeros(len(results)))).T
-    r_kite = np.vstack((np.array(results['x']),np.array(results['y']),np.array(results['kite_pos_z']))).T
+    r_kite = np.vstack((np.array(results['kite_pos_x']),np.array(results['kite_pos_y']),np.array(results['kite_pos_z']))).T
     v_kite = np.vstack((np.array(results['vx']),np.array(results['vy']),np.array(results['vz']))).T
     # Calculate a_kite with diff of v_kite
     dt = flight_data['time'].iloc[1]-flight_data['time'].iloc[0]
@@ -933,17 +933,17 @@ def plot_kite_reference_frame(results, flight_data, imus):
     for i in np.arange(0,len(flight_data), spacing):
         len_arrow = 30
         # Calculate EKF tether orientation based on euler angles and plot it
-        ex, ey, ez = calculate_reference_frame_euler( results.roll.iloc[i], 
-                                                     results.pitch.iloc[i], 
-                                                     results.yaw.iloc[i], 
+        ex, ey, ez = calculate_reference_frame_euler( np.radians(results.roll.iloc[i]), 
+                                                     np.radians(results.pitch.iloc[i]), 
+                                                     np.radians(results.yaw.iloc[i]), 
                                                      bodyFrame='ENU')
-        ax.quiver(results['x'].iloc[i], results['y'].iloc[i], results['kite_pos_z'].iloc[i], ex[0],  \
+        ax.quiver(results['kite_pos_x'].iloc[i], results['kite_pos_y'].iloc[i], results['kite_pos_z'].iloc[i], ex[0],  \
                     ex[1], ex[2],
-                color='r', length=len_arrow)
-        ax.quiver(results['x'].iloc[i], results['y'].iloc[i], results['kite_pos_z'].iloc[i], ey[0],  \
+                color='green', length=len_arrow)
+        ax.quiver(results['kite_pos_x'].iloc[i], results['kite_pos_y'].iloc[i], results['kite_pos_z'].iloc[i], ey[0],  \
                     ey[1], ey[2],
-                color='r', length=len_arrow)
-        ax.quiver(results['x'].iloc[i], results['y'].iloc[i], results['kite_pos_z'].iloc[i], ez[0],  \
+                color='black', length=len_arrow)
+        ax.quiver(results['kite_pos_x'].iloc[i], results['kite_pos_y'].iloc[i], results['kite_pos_z'].iloc[i], ez[0],  \
                     ez[1], ez[2],
                 color='r', length=len_arrow)
         # Calculate IMU tether orientation based on euler angles and plot it
@@ -973,8 +973,8 @@ def plot_kite_reference_frame(results, flight_data, imus):
                         ez[2],
                         color='b', length=len_arrow)
 
-    ax.plot(results.x, results.y, results.kite_pos_z,color='grey')
-    ax.scatter(results['x'].iloc[0:spacing:-1], results['y'].iloc[0:spacing:-1], results['kite_pos_z'].iloc[0:spacing:-1],color='r')
+    ax.plot(results.kite_pos_x, results.kite_pos_y, results.kite_pos_z,color='grey')
+    ax.scatter(results['kite_pos_x'].iloc[0:spacing:-1], results['kite_pos_y'].iloc[0:spacing:-1], results['kite_pos_z'].iloc[0:spacing:-1],color='r')
     ax.legend()
     ax.quiver(0,0,0, 
                 0, 
