@@ -1,5 +1,5 @@
 # This file contains the class definition for the KiteModel class
-from model_definitions import kite_models
+from setup.model_definitions import kite_models
 
 class Kite:
     def __init__(self, model_name):
