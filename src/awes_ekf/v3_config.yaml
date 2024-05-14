@@ -1,0 +1,44 @@
+simulation_parameters:
+  timestep: 0.1                       # Timestep in seconds
+  n_tether_elements: 5                # Number of tether elements
+  opt_measurements:                   # Optional measurements array
+    - 
+    # - 'apparent_windspeed'           # Example optional measurement
+  doIEKF: true                        # Use iterated extended Kalman filter
+  epsilon: 1e-6                       # Tolerance for the IEKF
+  max_iterations: 200                 # Maximum number of iterations for the IEKF
+  log_profile: true                   # Model wind speed as logarithmic with height
+  tether_offset: true                 # Use tether offset in the measurements
+  enforce_z_wind: true               # Enforce the z wind speed to be zero
+  model_yaw: false                    # Model the yaw angle in the state vector
+  kcu_data: false                      # Boolean for KCU data availability
+
+system_parameters:
+  kite_model: 'v3'
+  kcu_model: 'KP1'
+  tether_material: 'Dyneema-SK78'
+  tether_diameter: 0.01
+  meas_stdv:
+    x: 2.5
+    v: 1
+    tether_length: 1
+    elevation: 0.2
+    azimuth: 0.2
+    least_squares: 1e-5
+    yaw: 0.0873  # 5 degrees in radians
+    z_wind: 0.1
+    va: 0.5
+  model_stdv:
+    x: 2.5
+    v: 1
+    uf: 0.002
+    wdir: 0.00349  # 0.2 degrees in radians
+    vw: 0.1
+    vwz: 0.01
+    CL: 0.01
+    CD: 0.003
+    CS: 0.01
+    elevation: 0.3
+    azimuth: 0.3
+    tether_length: 0.1
+    yaw: 0.0873

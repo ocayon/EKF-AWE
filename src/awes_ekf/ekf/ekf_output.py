@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 import pandas as pd
 import numpy as np
-from config import z0, kappa
+from setup.settings import z0, kappa
 from utils import calculate_euler_from_reference_frame, calculate_airflow_angles, calculate_reference_frame_euler
  
 
