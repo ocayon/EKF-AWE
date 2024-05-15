@@ -947,31 +947,31 @@ def plot_kite_reference_frame(results, flight_data, imus):
                     ez[1], ez[2],
                 color='r', length=len_arrow)
         # Calculate IMU tether orientation based on euler angles and plot it
-        for imu in imus:
-            ex, ey, ez = calculate_reference_frame_euler(flight_data['kite_'+str(imu)+'_roll'].iloc[i], 
-                                                        flight_data['kite_'+str(imu)+'_pitch'].iloc[i], 
-                                                        flight_data['kite_'+str(imu)+'_yaw'].iloc[i])    
-            ax.quiver(flight_data['kite_'+str(imu)+'_rx'].iloc[i], 
-                        flight_data['kite_'+str(imu)+'_ry'].iloc[i], 
-                        flight_data['kite_'+str(imu)+'_rz'].iloc[i], 
-                        ex[0],
-                        ex[1],
-                        ex[2],
-                        color='b', length=len_arrow)
-            ax.quiver(flight_data['kite_'+str(imu)+'_rx'].iloc[i],
-                        flight_data['kite_'+str(imu)+'_ry'].iloc[i], 
-                        flight_data['kite_'+str(imu)+'_rz'].iloc[i], 
-                        ey[0], 
-                        ey[1], 
-                        ey[2],
-                        color='b', length=len_arrow)
-            ax.quiver(flight_data['kite_'+str(imu)+'_rx'].iloc[i],
-                        flight_data['kite_'+str(imu)+'_ry'].iloc[i], 
-                        flight_data['kite_'+str(imu)+'_rz'].iloc[i], 
-                        ez[0], 
-                        ez[1], 
-                        ez[2],
-                        color='b', length=len_arrow)
+        # for imu in imus:
+        #     ex, ey, ez = calculate_reference_frame_euler(flight_data['kite_'+str(imu)+'_roll'].iloc[i], 
+        #                                                 flight_data['kite_'+str(imu)+'_pitch'].iloc[i], 
+        #                                                 flight_data['kite_'+str(imu)+'_yaw'].iloc[i])    
+        #     ax.quiver(flight_data['kite_'+str(imu)+'_rx'].iloc[i], 
+        #                 flight_data['kite_'+str(imu)+'_ry'].iloc[i], 
+        #                 flight_data['kite_'+str(imu)+'_rz'].iloc[i], 
+        #                 ex[0],
+        #                 ex[1],
+        #                 ex[2],
+        #                 color='b', length=len_arrow)
+        #     ax.quiver(flight_data['kite_'+str(imu)+'_rx'].iloc[i],
+        #                 flight_data['kite_'+str(imu)+'_ry'].iloc[i], 
+        #                 flight_data['kite_'+str(imu)+'_rz'].iloc[i], 
+        #                 ey[0], 
+        #                 ey[1], 
+        #                 ey[2],
+        #                 color='b', length=len_arrow)
+        #     ax.quiver(flight_data['kite_'+str(imu)+'_rx'].iloc[i],
+        #                 flight_data['kite_'+str(imu)+'_ry'].iloc[i], 
+        #                 flight_data['kite_'+str(imu)+'_rz'].iloc[i], 
+        #                 ez[0], 
+        #                 ez[1], 
+        #                 ez[2],
+        #                 color='b', length=len_arrow)
 
     ax.plot(results.kite_pos_x, results.kite_pos_y, results.kite_pos_z,color='grey')
     ax.scatter(results['kite_pos_x'].iloc[0:spacing:-1], results['kite_pos_y'].iloc[0:spacing:-1], results['kite_pos_z'].iloc[0:spacing:-1],color='r')
