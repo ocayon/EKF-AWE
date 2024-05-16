@@ -119,7 +119,7 @@ def calculate_airflow_angles(dcm, v_kite, vw):
 def calculate_euler_from_reference_frame(dcm):
     
     # Calculate the roll, pitch and yaw angles from a direction cosine matrix, in NED coordinates   
-    Teb = dcm
+    Teb = rotate_ENU2NED(dcm)
     pitch = np.arcsin(-Teb[2,0])
     roll = np.arctan(Teb[2,1]/Teb[2,2])
     yaw = np.arctan2(Teb[1,0],Teb[0,0])
@@ -150,12 +150,30 @@ def Rz(theta):
         [0, 0, 1]
     ])
 
+def rotate_ENU2NED(vector):
+    """Generate a rotation matrix to convert from ENU to NED coordinate system."""
+    R = np.array([
+        [0, 1, 0],
+        [1, 0, 0],
+        [0, 0, -1]
+    ])
+    return R@vector
+
+def rotate_NED2ENU(vector):
+    """Generate a rotation matrix to convert from NED to ENU coordinate system."""
+    R = np.array([
+        [0, 1, 0],
+        [1, 0, 0],
+        [0, 0, -1]
+    ]).T
+    return R@vector
+
 def R_EG_Body(roll, pitch, yaw):
     """Create the total rotation matrix from Earth-fixed to body reference frame in ENU coordinate system."""
     # Perform rotation about x-axis (roll), then y-axis (pitch), then z-axis (yaw)
     return Rz(yaw).dot(Ry(pitch).dot(Rx(roll)))
 
-def calculate_reference_frame_euler(roll, pitch, yaw, bodyFrame='NED'):
+def calculate_reference_frame_euler(roll, pitch, yaw, bodyFrame='ENU'):
     """
     Calculate the Earth reference frame vectors based on Euler angles for a specified body frame.
     
@@ -168,25 +186,22 @@ def calculate_reference_frame_euler(roll, pitch, yaw, bodyFrame='NED'):
     Returns:
         tuple: Transformed unit vectors along the x, y, and z axes of the kite/body in Earth coordinates.
     """
-    # Adjust roll for different coordinate systems
-    # if bodyFrame == 'NED':
-    #     roll = np.radians(np.degrees(-roll + np.pi))  # Convert to degrees, adjust, convert back to radians
-    # if bodyFrame == 'ENU':
-    #     roll = -roll
-    
     
     # Calculate transformation matrix and its transpose
-    Transform_Matrix = R_EG_Body(roll, pitch, yaw)
+    
+    
     
     # Unit vectors in Earth frame
     if bodyFrame == 'NED':
+        Transform_Matrix = R_EG_Body(roll, pitch, yaw)
         ex_kite = Transform_Matrix[:,0]
         ey_kite = Transform_Matrix[:,1]
         ez_kite = Transform_Matrix[:,2]
     elif bodyFrame == 'ENU':
-        ex_kite = -Transform_Matrix[:,0]
+        Transform_Matrix = rotate_NED2ENU(R_EG_Body(roll, pitch, yaw))
+        ex_kite = Transform_Matrix[:,0]
         ey_kite = Transform_Matrix[:,1]
-        ez_kite = -Transform_Matrix[:,2]
+        ez_kite = Transform_Matrix[:,2]
     
     
 
