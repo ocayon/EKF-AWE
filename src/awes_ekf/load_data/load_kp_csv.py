@@ -33,7 +33,7 @@ def create_input_from_KP_csv(flight_data, system_specs, model_specs, kite_sensor
     kite_elevation = np.arcsin(kite_pos[:,2]/np.linalg.norm(kite_pos,axis=1))
     kite_azimuth = np.arctan2(kite_pos[:,1],kite_pos[:,0])
     
-    kite_yaw = np.array(flight_data['kite_'+str(kite_sensor)+'_yaw'])/180*np.pi
+    kite_yaw = np.unwrap(np.array(flight_data['kite_'+str(kite_sensor)+'_yaw']-90)/180*np.pi)
 
     init_wind_dir = np.mean(ground_winddir[0:3000])/180*np.pi
     init_wind_vel = np.mean(ground_windspeed[0])
