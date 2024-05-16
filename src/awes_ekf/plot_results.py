@@ -6,10 +6,10 @@ import seaborn as sns
 import plotting.plot_utils as pu
 from postprocess.postprocessing import  postprocess_results
 #%%
-year = '2019'
-month = '10'
-day = '08'
-kite_model = 'v3'                   
+year = '2024'
+month = '02'
+day = '16'
+kite_model = 'v9'                   
 
 plt.close('all')
 path = '../../results/'+kite_model+'/'
@@ -29,10 +29,19 @@ kite = Kite(kite_model)
 
 imus = [0]
 
-# flight_data['kite_0_pitch'] = (flight_data['kite_0_pitch']+flight_data['kite_1_pitch'])/2
+flight_data['kite_0_pitch'] = (flight_data['kite_0_pitch']+flight_data['kite_1_pitch'])/2
 #%%
 results, flight_data = postprocess_results(results,flight_data, kite, imus = [0], remove_IMU_offsets=True, 
                                             correct_IMU_deformation = False,remove_vane_offsets=True,estimate_kite_angle=True)
+
+for column in results.columns:
+    if 'pitch' in column or 'roll' in column or 'yaw' in column:
+        results[column] = np.degrees(results[column])
+
+for column in flight_data.columns:
+    if 'pitch' in column or 'roll' in column or 'yaw' in column:
+        flight_data[column] = np.degrees(flight_data[column])
+
 # # #%%
 # flight_data = calculate_wind_speed_airborne_sensors(results,flight_data, imus = [0])
 # Postprocess done
@@ -250,17 +259,19 @@ cd_VSM = data['CD']
 aoa_VSM = np.degrees(data['aoa'])
 
 
-# aoa_plot = results['aoa_IMU_0']
-aoa_plot = flight_data['kite_angle_of_attack']
+aoa_plot = results['kite_aoa']
+aoa_plot = results['aoa_IMU_0']
+# aoa_plot = flight_data['kite_angle_of_attack']
 cycles_plotted = np.arange(2,55, step=1)
 mask = np.any(
     [flight_data['cycle'] == cycle for cycle in cycles_plotted], axis=0)
 mask_angles =mask&(flight_data['kite_angle_of_attack']>0) & (flight_data['kite_angle_of_attack']<35)#& (flight_data['powered'] == 'powered')
+
 # mask_angles =(results['aoa']>0) & (results['aoa']<20)
 fig, axs = plt.subplots(2, 2, figsize=(10, 10), sharex=True)
-mask = (flight_data['turn_straight'] == 'straight') & mask_angles 
+mask = (flight_data['turn_straight'] == 'straight') & mask_angles & (flight_data.index>5000)#&(flight_data.index<len(results)-15000)
 pu.plot_cl_curve(np.sqrt((results['CL']**2+results['CS']**2)), results['CD'], aoa_plot, mask,axs, label = "Straight")
-mask = (flight_data['turn_straight'] == 'turn')& mask_angles
+mask = (flight_data['turn_straight'] == 'turn')& mask_angles& (flight_data.index>5000)#&(flight_data.index<len(results)-15000)
 pu.plot_cl_curve(np.sqrt((results['CL']**2+results['CS']**2)), results['CD'], aoa_plot, mask,axs, label = "Turn")
 
 axs[0,0].axvline(x = np.mean(aoa_plot[flight_data['powered'] == 'powered']), color = 'k',linestyle = '--', label = 'Mean reel-out angle of attack')
@@ -285,10 +296,10 @@ aoa_VSM = np.degrees(data['aoa'])
 fig, axs = plt.subplots(2, 2, figsize=(10, 10))
 mask = (flight_data['turn_straight'] == 'straight') & (flight_data.index>5000)& mask_angles
 # pu.plot_cl_curve(results['CL'], results['CD']+results['cd_tether']+results['cd_kcu'], results['aoa'], mask,axs, label = "Straight")
-pu.plot_cl_curve((results['CL']**2+results['CS']**2), results['CD']+results['cd_tether']+results['cd_kcu'], flight_data['kite_angle_of_attack'], mask,axs, label = "Straight")
+pu.plot_cl_curve(np.sqrt((results['CL']**2+results['CS']**2)), results['CD']+results['cd_tether']+results['cd_kcu'], flight_data['kite_angle_of_attack'], mask,axs, label = "Straight")
 mask = (flight_data['turn_straight'] == 'turn') & (flight_data.index>5000)& mask_angles
 # pu.plot_cl_curve(results['CL'], results['CD']+results['cd_tether']+results['cd_kcu'], results['aoa'], mask,axs, label = "Turn")
-pu.plot_cl_curve((results['CL']**2+results['CS']**2), results['CD']+results['cd_tether']+results['cd_kcu'], flight_data['kite_angle_of_attack'], mask,axs, label = "Turn")
+pu.plot_cl_curve(np.sqrt((results['CL']**2+results['CS']**2)), results['CD']+results['cd_tether']+results['cd_kcu'], flight_data['kite_angle_of_attack'], mask,axs, label = "Turn")
 # pu.plot_cl_curve(cl_VSM, cd_VSM, aoa_VSM,(cl_VSM>0) ,axs, label = "VSM")
 # axs[0,0].fill_betweenx(y=np.linspace(0.4, 1, 100), x1=15, x2=40, color='red', alpha=0.3)
 # axs[0,1].fill_betweenx(y=np.linspace(0, 0.4, 100), x1=15, x2=40, color='red', alpha=0.3)
