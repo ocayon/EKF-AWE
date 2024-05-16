@@ -268,7 +268,7 @@ def determine_left_right(row):
 def correct_aoa_ss_measurements(results,flight_data):
 
     # Correct angle of attack and sideslip angle based on EKF mean angle of attack
-    aoa_EKF = np.array(results['aoa_IMU_0'])
+    aoa_EKF = np.array(results['kite_aoa'])
     aoa_vane = np.array(flight_data['kite_angle_of_attack'])
     aoa_vane = np.convolve(aoa_vane, np.ones(10)/10, mode='same')
     mask_pow = (flight_data['ground_tether_reelout_speed'] > 0) & (flight_data['up']<0.2)

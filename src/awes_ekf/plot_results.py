@@ -29,7 +29,7 @@ kite = Kite(kite_model)
 
 imus = [0]
 
-flight_data['kite_0_pitch'] = (flight_data['kite_0_pitch']+flight_data['kite_1_pitch'])/2
+# flight_data['kite_0_pitch'] = (flight_data['kite_0_pitch']+flight_data['kite_1_pitch'])/2
 #%%
 results, flight_data = postprocess_results(results,flight_data, kite, imus = [0], remove_IMU_offsets=True, 
                                             correct_IMU_deformation = False,remove_vane_offsets=True,estimate_kite_angle=True)
