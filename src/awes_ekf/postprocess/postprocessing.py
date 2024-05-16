@@ -28,7 +28,7 @@ def compute_mse(sig1, sig2, offset):
     mse = np.mean((sig1 - shifted_sig2) ** 2)
     return mse
 
-def find_offset(signal1, signal2, offset_range=[-360, 360]):
+def find_offset(signal1, signal2, offset_range=[-2*np.pi, 2*np.pi]):
     """
     Find the offset between two signals
     :param signal1: first signal
@@ -47,10 +47,10 @@ def construct_transformation_matrix(e_x_b, e_y_b, e_z_b):
 
 def remove_offsets_IMU_data(results, flight_data, sensor=0):
     """ Remove offsets of IMU euler angles based on EKF results"""
-    unwrapped_angles = np.unwrap(np.radians(flight_data['kite_'+str(sensor)+'_yaw']))
-    flight_data['kite_'+str(sensor)+'_yaw' ] = np.degrees(unwrapped_angles)
-    unwrapped_angles = np.unwrap(np.radians(results['yaw']))
-    results['yaw'] = np.degrees(unwrapped_angles)
+    unwrapped_angles = np.unwrap(flight_data['kite_'+str(sensor)+'_yaw'])
+    flight_data['kite_'+str(sensor)+'_yaw' ] = unwrapped_angles
+    unwrapped_angles = np.unwrap(results['yaw'])
+    results['yaw'] = unwrapped_angles
     # Roll
     roll_offset = find_offset(results['roll'], flight_data['kite_'+str(sensor)+'_roll'])
     flight_data['kite_0_roll'] = flight_data['kite_'+str(sensor)+'_roll'] + roll_offset
@@ -91,13 +91,14 @@ def postprocess_results(results,flight_data, kite, imus = [0], remove_IMU_offset
     
         
     
-    results['roll'] = np.degrees(results['roll'])
-    results['pitch'] = np.degrees(results['pitch'])
-    results['yaw'] = np.degrees(results['yaw'])
+    # results['roll'] = np.degrees(results['roll'])
+    # results['pitch'] = np.degrees(results['pitch'])
+    # results['yaw'] = np.degrees(results['yaw'])
     
     for imu in imus:
-        flight_data['kite_'+str(imu)+'_roll'] = -flight_data['kite_'+str(imu)+'_roll']
-        flight_data['kite_'+str(imu)+'_yaw'] = -flight_data['kite_'+str(imu)+'_yaw']
+        flight_data['kite_'+str(imu)+'_pitch'] = np.radians(-flight_data['kite_'+str(imu)+'_pitch'])
+        flight_data['kite_'+str(imu)+'_roll'] = np.radians(-flight_data['kite_'+str(imu)+'_roll'])
+        flight_data['kite_'+str(imu)+'_yaw'] = np.radians(flight_data['kite_'+str(imu)+'_yaw'])
         
         
     results['wind_direction'] = results['wind_direction']%(2*np.pi)
@@ -201,8 +202,8 @@ def postprocess_results(results,flight_data, kite, imus = [0], remove_IMU_offset
     
     if estimate_kite_angle:
 
-        results['kite_aoa'] = results['kite_aoa']-flight_data['offset_pitch']
-        flight_data['kite_angle_of_attack'] = flight_data['kite_angle_of_attack']-flight_data['offset_pitch']
+        results['kite_aoa'] = results['kite_aoa']+np.degrees(flight_data['offset_pitch'])
+        flight_data['kite_angle_of_attack'] = flight_data['kite_angle_of_attack']+np.degrees(flight_data['offset_pitch'])
     
     if correct_IMU_deformation:
         flight_data['kite_0_pitch'] = flight_data['kite_0_pitch']+offset_pitch
@@ -267,7 +268,7 @@ def determine_left_right(row):
 def correct_aoa_ss_measurements(results,flight_data):
 
     # Correct angle of attack and sideslip angle based on EKF mean angle of attack
-    aoa_EKF = np.array(results['kite_aoa'])
+    aoa_EKF = np.array(results['aoa_IMU_0'])
     aoa_vane = np.array(flight_data['kite_angle_of_attack'])
     aoa_vane = np.convolve(aoa_vane, np.ones(10)/10, mode='same')
     mask_pow = (flight_data['ground_tether_reelout_speed'] > 0) & (flight_data['up']<0.2)
