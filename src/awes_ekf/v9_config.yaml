@@ -9,8 +9,8 @@ simulation_parameters:
   max_iterations: 200                 # Maximum number of iterations for the IEKF
   log_profile: true                   # Model wind speed as logarithmic with height
   tether_offset: true                 # Use tether offset in the measurements
-  enforce_z_wind: false               # Enforce the z wind speed to be zero
-  model_yaw: false                    # Model the yaw angle in the state vector
+  enforce_z_wind: true               # Enforce the z wind speed to be zero
+  model_yaw: true                    # Model the yaw angle in the state vector
   kcu_data: true                      # Boolean for KCU data availability
 
 system_parameters:
@@ -25,7 +25,7 @@ system_parameters:
     elevation: 0.2
     azimuth: 0.2
     least_squares: 1e-5
-    yaw: 0.0873  # 5 degrees in radians
+    yaw: 0.15  # 5 degrees in radians
     z_wind: 0.1
     va: 0.5
   model_stdv:
