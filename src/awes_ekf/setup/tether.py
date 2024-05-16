@@ -414,6 +414,11 @@ class Tether:
             ey_tether = np.cross(ez_tether, va)/np.linalg.norm(np.cross(ez_tether, va))
             ex_tether = np.cross(ey_tether, ez_tether)
             dcm_t2w = np.vstack(([ex_tether], [ey_tether], [ez_tether])).T
+            
+            ez_bridle = -tensions[-1, :]/np.linalg.norm(tensions[-1, :])                # Bridle direction, pointing down
+            ey_bridle = np.cross(ez_bridle, -vj)/np.linalg.norm(np.cross(ez_bridle, -vj)) # y-axis of bridle frame, perpendicular to va
+            ex_bridle = np.cross(ey_bridle, ez_bridle)                                      # x-axis of bridle frame, perpendicular ex and ey
+            dcm_b2vel =  np.vstack(([ex_bridle], [ey_bridle], [ez_bridle])).T
 
             ez_f_aero = aerodynamic_force/np.linalg.norm(aerodynamic_force)
             ey_f_aero = np.cross(ez_f_aero, va)/np.linalg.norm(np.cross(ez_f_aero, va))
@@ -436,7 +441,7 @@ class Tether:
             cd_tether = drag_tether/(0.5*rho*np.linalg.norm(vaj)**2*kite.area)
 
             return positions, stretched_tether_length, dcm_b2w, dcm_t2w, dcm_fa2w, \
-                dcm_tau2w, aerodynamic_force, va,tensions[-1,:], dcm_t2w[:,1],cd_kcu,cd_tether, CL,CD,CS
+                dcm_tau2w, aerodynamic_force, va,tensions[-1,:], dcm_t2w[:,1],cd_kcu,cd_tether, CL,CD,CS,dcm_b2vel
         else:
             if len(x) == 2:
                 return (positions[-1, :2] - r_kite[:2])
