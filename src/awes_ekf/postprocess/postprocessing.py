@@ -49,19 +49,19 @@ def remove_offsets_IMU_data(results, flight_data, sensor=0):
     """ Remove offsets of IMU euler angles based on EKF results"""
     unwrapped_angles = np.unwrap(flight_data['kite_'+str(sensor)+'_yaw'])
     flight_data['kite_'+str(sensor)+'_yaw' ] = unwrapped_angles
-    unwrapped_angles = np.unwrap(results['yaw'])
-    results['yaw'] = unwrapped_angles
+    unwrapped_angles = np.unwrap(results['kite_yaw'])
+    results['kite_yaw'] = unwrapped_angles
     # Roll
-    roll_offset = find_offset(results['roll'], flight_data['kite_'+str(sensor)+'_roll'])
+    roll_offset = find_offset(results['kite_roll'], flight_data['kite_'+str(sensor)+'_roll'])
     flight_data['kite_0_roll'] = flight_data['kite_'+str(sensor)+'_roll'] + roll_offset
     print('Roll offset: ', roll_offset)
     # Pitch
     mask_pitch = (flight_data['turn_straight'] == 'straight')&(flight_data['powered'] == 'powered')
-    pitch_offset = find_offset(results[mask_pitch]['pitch'], flight_data[mask_pitch]['kite_'+str(sensor)+'_pitch'])
+    pitch_offset = find_offset(results[mask_pitch]['kite_pitch'], flight_data[mask_pitch]['kite_'+str(sensor)+'_pitch'])
     flight_data['kite_0_pitch'] = flight_data['kite_'+str(sensor)+'_pitch'] + pitch_offset
     print('Pitch offset: ', pitch_offset)
     # Yaw
-    yaw_offset = find_offset(results['yaw'], flight_data['kite_'+str(sensor)+'_yaw'])
+    yaw_offset = find_offset(results['kite_yaw'], flight_data['kite_'+str(sensor)+'_yaw'])
     flight_data['kite_0_yaw'] = flight_data['kite_'+str(sensor)+'_yaw'] + yaw_offset
     print('Yaw offset: ', yaw_offset)
 
@@ -91,9 +91,9 @@ def postprocess_results(results,flight_data, kite, imus = [0], remove_IMU_offset
     
         
     
-    # results['roll'] = np.degrees(results['roll'])
-    # results['pitch'] = np.degrees(results['pitch'])
-    # results['yaw'] = np.degrees(results['yaw'])
+    # results['kite_roll'] = np.degrees(results['kite_roll'])
+    # results['kite_pitch'] = np.degrees(results['kite_pitch'])
+    # results['kite_yaw'] = np.degrees(results['kite_yaw'])
     
     for imu in imus:
         flight_data['kite_'+str(imu)+'_pitch'] = np.radians(-flight_data['kite_'+str(imu)+'_pitch'])
@@ -141,7 +141,7 @@ def postprocess_results(results,flight_data, kite, imus = [0], remove_IMU_offset
     # Correct angle of attack for depowered phase on EKF mean pitch during depower
     mask_turn = abs(flight_data['us'])>0.9
     mask_dep = flight_data['up']>0.9
-    pitch_EKF = np.array(results['pitch'])
+    pitch_EKF = np.array(results['kite_pitch'])
     pitch_IMU_0 = np.array(flight_data['kite_0_pitch'])
     offset_dep = np.mean(pitch_EKF[mask_dep]-pitch_IMU_0[mask_dep])
     offset_turn = np.mean(pitch_EKF[mask_turn]-pitch_IMU_0[mask_turn])
