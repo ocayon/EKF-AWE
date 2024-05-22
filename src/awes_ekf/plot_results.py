@@ -129,20 +129,20 @@ ax.legend()
 fig,ax = plt.subplots()
 pu.plot_time_series(flight_data, flight_data['kite_0_pitch'], ax, color='blue', label='Measured',plot_phase=False)
 # pu.plot_time_series(flight_data, flight_data['kite_1_pitch'], ax, color='blue', label='Measured',plot_phase=False)
-pu.plot_time_series(flight_data,results['pitch'], ax, color='red', label='Estimated',plot_phase=False)
+pu.plot_time_series(flight_data,results['kite_pitch'], ax, color='red', label='Estimated',plot_phase=False)
 ax.grid()
 ax.legend()
 
 fig,ax = plt.subplots()
 pu.plot_time_series(flight_data, flight_data['kite_0_roll'], ax, color='blue', label='Measured',plot_phase=False)
-pu.plot_time_series(flight_data,results['roll'], ax, color='red', label='Estimated',plot_phase=False)
+pu.plot_time_series(flight_data,results['kite_roll'], ax, color='red', label='Estimated',plot_phase=False)
 ax.grid()
 ax.legend()
 
 
 fig,ax = plt.subplots()
 pu.plot_time_series(flight_data, flight_data['kite_0_yaw'], ax, color='blue', label='Measured',plot_phase=False)
-pu.plot_time_series(flight_data,results['yaw'], ax, color='red', label='Estimated',plot_phase=False)
+pu.plot_time_series(flight_data,results['kite_yaw'], ax, color='red', label='Estimated',plot_phase=False)
 ax.grid()
 ax.legend()
 #%%
@@ -313,27 +313,10 @@ plt.show()
 
 
 #%%
-kite_vel = np.vstack((results['vx'],results['vy'],results['vz'])).T
-kite_acc = np.append(np.diff(kite_vel,axis = 0)/0.1, np.zeros((1,3)), axis = 0)
-# kite_tangential_acc = np.dot(kite_acc, kite_vel.T)
+fig,ax = plt.subplots()
+pu.plot_time_series(flight_data, results['kite_roll']-results['kcu_roll'], ax, color='blue', label='Roll',plot_phase=False)
+pu.plot_time_series(flight_data,results['kite_pitch']-results['kcu_pitch'], ax, color='red', label='Pitch',plot_phase=True)
 
-# plt.plot(kite_acc)
-
-
-#%%
-
-roll_drift = results['roll']-results['roll_tether']
+ax.legend()
 
 
-plt.plot(flight_data['ground_tether_force']*np.sin(np.radians(roll_drift))/flight_data['ground_tether_force']*100)
-
-#%%
-fig, axs = plt.subplots(3, 1, figsize=(10, 10), sharex=True)
-
-axs[0].plot(np.linalg.norm(kite_acc,axis=1))
-axs[0].plot(flight_data['us'])
-axs[0].grid()
-axs[1].plot(np.linalg.norm(kite_vel,axis=1))
-axs[1].grid()
-axs[2].plot(results.z)
-plt.grid()

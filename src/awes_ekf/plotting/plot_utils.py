@@ -933,9 +933,9 @@ def plot_kite_reference_frame(results, flight_data, imus):
     for i in np.arange(0,len(flight_data), spacing):
         len_arrow = 30
         # Calculate EKF tether orientation based on euler angles and plot it
-        ex, ey, ez = calculate_reference_frame_euler( np.radians(results.roll.iloc[i]), 
-                                                     np.radians(results.pitch.iloc[i]), 
-                                                     np.radians(results.yaw.iloc[i]), 
+        ex, ey, ez = calculate_reference_frame_euler( np.radians(results.kite_roll.iloc[i]), 
+                                                     np.radians(results.kite_pitch.iloc[i]), 
+                                                     np.radians(results.kite_yaw.iloc[i]), 
                                                      bodyFrame='ENU')
         ax.quiver(results['kite_pos_x'].iloc[i], results['kite_pos_y'].iloc[i], results['kite_pos_z'].iloc[i], ex[0],  \
                     ex[1], ex[2],
