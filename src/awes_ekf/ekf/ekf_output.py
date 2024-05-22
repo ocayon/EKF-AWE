@@ -15,9 +15,9 @@ class EKFOutput:
     kite_vel_z: float
     wind_velocity: float
     wind_direction: float
-    roll: float
-    pitch: float
-    yaw: float
+    kite_roll: float
+    kite_pitch: float
+    kite_yaw: float
     tether_length: float
     kite_aoa: float
     kite_sideslip: float
@@ -97,9 +97,9 @@ def create_ekf_output(x, u, kite, tether,kcu, model_specs):
         kite_vel_z = kite_vel_z,
         wind_velocity = wind_vel,
         wind_direction = wind_dir,
-        roll = euler_angles[0],
-        pitch = euler_angles[1],
-        yaw = euler_angles[2],
+        kite_roll = euler_angles[0],
+        kite_pitch = euler_angles[1],
+        kite_yaw = euler_angles[2],
         tether_length = x[12],
         kite_aoa = airflow_angles[0],
         kite_sideslip = airflow_angles[1],
@@ -111,7 +111,9 @@ def create_ekf_output(x, u, kite, tether,kcu, model_specs):
         cd_kcu = cd_kcu,
         cd_tether = cd_tether,
         z_wind = z_wind,
-        kcu_roll = euler_angles1[0]
+        kcu_roll = euler_angles1[0],
+        kcu_pitch = euler_angles1[1],
+        kcu_yaw = euler_angles1[2]
     )
     
     if model_specs.model_yaw:
