@@ -41,9 +41,9 @@ def Rz(theta):
 def R_EG_Body(roll, pitch, yaw):
     """Create the total rotation matrix from Earth-fixed to body reference frame in ENU coordinate system."""
     # Perform rotation about x-axis (roll), then y-axis (pitch), then z-axis (yaw)
-    return Rz(yaw).dot(Ry(pitch).dot(Rx(roll).dot(Ry(90))))
+    return Rz(yaw).dot(Ry(pitch).dot(Rx(roll)))
 
-def calculate_reference_frame_euler(roll, pitch, yaw, bodyFrame='NED'):
+def calculate_reference_frame_euler(roll, pitch, yaw, bodyFrame='default'):
     """
     Calculate the Earth reference frame vectors based on Euler angles for a specified body frame.
     
@@ -51,33 +51,24 @@ def calculate_reference_frame_euler(roll, pitch, yaw, bodyFrame='NED'):
         roll (float): Roll angle in radians.
         pitch (float): Pitch angle in radians.
         yaw (float): Yaw angle in radians.
-        bodyFrame (str): Type of body frame ('NED' or 'ENU').
+        bodyFrame (str): Type of body frame 
+        'default' - Aircraft body frame (x-forward, y-right, z-down)
     
     Returns:
         tuple: Transformed unit vectors along the x, y, and z axes of the kite/body in Earth coordinates.
     """
-    # Adjust roll for different coordinate systems
-    # if bodyFrame == 'NED':
-    #     roll = np.radians(np.degrees(-roll + np.pi))  # Convert to degrees, adjust, convert back to radians
-    # if bodyFrame == 'ENU':
-    #     roll = -roll
-    
-    
-    # Calculate transformation matrix and its transpose
-    Transform_Matrix = R_EG_Body(roll, pitch, yaw)
-    
     # Unit vectors in Earth frame
-    if bodyFrame == 'NED':
+    if bodyFrame == 'default':
+         # Calculate transformation matrix and its transpose
+        Transform_Matrix = R_EG_Body(roll, pitch, yaw)
         ex_kite = Transform_Matrix[:,0]
         ey_kite = Transform_Matrix[:,1]
         ez_kite = Transform_Matrix[:,2]
-    elif bodyFrame == 'ENU':
-        ex_kite = -Transform_Matrix[:,0]
-        ey_kite = Transform_Matrix[:,1]
-        ez_kite = -Transform_Matrix[:,2]
-    
-    
-
+    elif bodyFrame == 'kitekraft':
+       Transform_Matrix = Rz(yaw).dot(Ry(pitch).dot(Rx(roll).dot(Ry(np.radians(90)))))
+       ex_kite = Transform_Matrix[:,0]
+       ey_kite = Transform_Matrix[:,1]
+       ez_kite = Transform_Matrix[:,2]
     return ex_kite, ey_kite, ez_kite
 
 file_path = './kitekraft/'
@@ -137,8 +128,8 @@ for i in np.arange(0,len(time), spacing):
     # Calculate EKF tether orientation based on euler angles and plot it
     ex, ey, ez = calculate_reference_frame_euler( kite_euler_0[i], 
                                                  kite_euler_1[i], 
-                                                 kite_euler_2[i], 
-                                                 bodyFrame='NED')
+                                                 kite_euler_2[i],
+                                                 bodyFrame='kitekraft')
     ax.quiver(kite_pos_x[i], kite_pos_y[i], kite_pos_z[i], ex[0],  \
                 ex[1], ex[2],
             color='green', length=len_arrow)
@@ -148,5 +139,5 @@ for i in np.arange(0,len(time), spacing):
     ax.quiver(kite_pos_x[i], kite_pos_y[i], kite_pos_z[i], ez[0],  \
                 ez[1], ez[2],
             color='r', length=len_arrow)
-
+    ax.scatter(kite_pos_x[i], kite_pos_y[i], kite_pos_z[i])
 ax.plot(kite_pos_x, kite_pos_y, kite_pos_z,color='grey')
