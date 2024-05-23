@@ -1,8 +1,9 @@
 from dataclasses import dataclass
 import pandas as pd
 import numpy as np
-from setup.settings import z0, kappa
-from utils import calculate_euler_from_reference_frame, calculate_airflow_angles, calculate_reference_frame_euler
+from typing import List
+from awes_ekf.setup.settings import z0, kappa
+from awes_ekf.utils import calculate_euler_from_reference_frame, calculate_airflow_angles, calculate_reference_frame_euler
  
 
 @dataclass
@@ -122,12 +123,10 @@ def create_ekf_output(x, u, kite, tether,kcu, model_specs):
                             
     return ekf_output
 
-def convert_ekf_output_to_df(ekf_output_list):
+def convert_ekf_output_to_df(ekf_output_list:List[EKFOutput])->pd.DataFrame:
     """Convert list of EKFOutput instances to DataFrame by using the __dict__ of each instance."""
     # List comprehension that converts each instance to a dictionary
     data_dicts = [vars(output) for output in ekf_output_list]
     
     # Create DataFrame directly from list of dictionaries
-    ekf_output_df = pd.DataFrame(data_dicts)
-    
-    return ekf_output_df
+    return pd.DataFrame(data_dicts)

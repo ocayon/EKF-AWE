@@ -1,14 +1,14 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from run_EKF import create_kite
-import plot_utils as pu
-from postprocessing import postprocess_results
+from awes_ekf.run_EKF import create_kite
+import awes_ekf.plot_utils as pu
+from awes_ekf.postprocessing import postprocess_results
 from scipy.optimize import minimize, least_squares
 from scipy.integrate import cumtrapz
 from scipy.stats import pearsonr
 from scipy import stats
-from utils import Rz
+from awes_ekf.utils import Rz
 def calculate_mae(measured, calculated):
     return np.mean(np.abs(measured - calculated))
 

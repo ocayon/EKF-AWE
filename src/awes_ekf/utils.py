@@ -1,19 +1,24 @@
 import numpy as np
 import casadi as ca
-from setup.settings import kappa, z0
-import pandas as pd
+from typing import Union
 
 #%% Function definitions
 
-def project_onto_plane(vector, plane_normal):
+def project_onto_plane(vector: Union[ca.SX,np.ndarray], plane_normal: Union[ca.SX,np.ndarray])->Union[ca.SX,np.ndarray]:
+    """
+    Projects a vector onto a plane defined by its normal.
+
+    Parameters:
+    vector (array-like): The vector to be projected onto the plane.
+    plane_normal (array-like): The normal vector of the plane.
+
+    Returns:
+    array-like: The projected vector onto the plane.
+    """
     if type(vector) == ca.SX:
         return vector - ca.dot(vector, plane_normal) * plane_normal
     
     return vector - np.dot(vector, plane_normal) * plane_normal
-
-
-def project_onto_plane_sym(vector, plane_normal):
-    return vector - ca.dot(vector, plane_normal) * plane_normal
 
 def rotate_vector(v, u, theta):
     # Normalize vectors

@@ -1,9 +1,9 @@
 
 import numpy as np
 import casadi as ca
-from setup.settings import kappa, z0, rho, g
+from awes_ekf.setup.settings import kappa, z0, rho, g
 import control
-from utils import project_onto_plane, calculate_angle_2vec
+from awes_ekf.utils import project_onto_plane, calculate_angle_2vec
 #%% 
 class ExtendedKalmanFilter:
     def __init__(self, stdv_x, stdv_y, ts,dyn_model,obs_model,kite,tether, kcu, doIEKF=True, epsilon=1e-6, max_iterations=200):
