@@ -2,7 +2,7 @@
 import pandas as pd
 # from utils import SimulationConfig, SystemParameters
 
-from run_EKF import run_EKF
+from awes_ekf.run_EKF import run_EKF
 from pathlib import Path
 from load_data.load_kp_csv import create_input_from_KP_csv
 from ekf.ekf_output import convert_ekf_output_to_df

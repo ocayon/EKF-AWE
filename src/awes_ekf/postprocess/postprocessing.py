@@ -1,6 +1,5 @@
 import numpy as np
-from setup.settings import kappa, z0
-from utils import  calculate_angle, project_onto_plane, calculate_reference_frame_euler
+from awes_ekf.utils import  calculate_angle, project_onto_plane, calculate_reference_frame_euler
 
 def unwrap_degrees(signal):
     for i in range(1,len(signal)):

@@ -2,17 +2,15 @@
 import numpy as np
 import pandas as pd
 # from utils import SimulationConfig, SystemParameters
-from setup.tether import Tether
-from ekf.kalman_filter import ExtendedKalmanFilter, observability_Lie_method
-from ekf.dynamic_model import DynamicModel
-from ekf.observation_model import ObservationModel
-from setup.kite import Kite
-from setup.kcu import KCU
+from awes_ekf.setup.tether import Tether
+from awes_ekf.ekf import ExtendedKalmanFilter, DynamicModel, ObservationModel, observability_Lie_method
+from awes_ekf.setup.kite import Kite
+from awes_ekf.setup.kcu import KCU
 import time
 from pathlib import Path
-from load_data.load_kp_csv import create_input_from_KP_csv
-from ekf.ekf_output import create_ekf_output, convert_ekf_output_to_df
-from setup.settings import load_config, SimulationConfig, SystemParameters
+from awes_ekf.load_data.load_kp_csv import create_input_from_KP_csv
+from awes_ekf.ekf.ekf_output import create_ekf_output, convert_ekf_output_to_df
+from awes_ekf.setup.settings import load_config, SimulationConfig, SystemParameters
 
 
 def initialize_ekf(ekf_input, model_specs, system_specs):
@@ -118,9 +116,8 @@ def run_EKF(ekf_input_list, model_specs, system_specs,x0):
     start_time = time.time()
     mins = -1
     
-    for k in range(1,n_intervals):
-        # Prediction step
-        ekf_input = ekf_input_list[k]
+    for k,ekf_input in enumerate(ekf_input_list):
+        # Predict step
         ekf.x_k1_k = dyn_model.propagate(ekf.x_k1_k1,ekf.u, kite, tether, kcu, ekf_input.ts)
 
         ## Update step
@@ -144,11 +141,6 @@ if __name__ == "__main__":
     month = '10'
     day = '08'
     kite_model = 'v3'                   # Kite model name, if Costum, change the kite parameters next
-    kcu_model = 'KP1'                   # KCU model name
-    tether_diameter = 0.01            # Tether diameter [m]
-    n_tether_elements = 5
-    opt_measurements = []
-    tether_material = 'Dyneema-SK78'    # Tether material
     # File path
     file_name = f"{kite_model}_{year}-{month}-{day}"
     file_path = Path('../../processed_data/flight_data') / kite_model / f'{file_name}.csv'
