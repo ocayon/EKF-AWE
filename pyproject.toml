@@ -1,0 +1,10 @@
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "awes_ekf"
+version = "0.0.2"
+description = "Read the latest Real Python tutorials"
+readme = "README.md"
+authors = [{ name = "Real Python", email = "info@realpython.com" }]
