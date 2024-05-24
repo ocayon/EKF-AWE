@@ -136,10 +136,10 @@ def calculate_vw_loglaw(uf, z0, z, wdir, kappa = 0.4,vz = 0):
 
 
 
-def calculate_airflow_angles(dcm, v_kite, vw):
+def calculate_airflow_angles(dcm, apparent_wind_speed):
     ey_kite = dcm[:,1]      # Kite y axis perpendicular to v and tether
     ez_kite = dcm[:,2]      # Kite z axis pointing in the direction of the tension
-    va = vw-v_kite
+    va = apparent_wind_speed
     va_proj = project_onto_plane(va, ey_kite)           # Projected apparent wind velocity onto kite y axis
     aoa = calculate_angle(ez_kite,va_proj)-90             # Angle of attack
     va_proj = project_onto_plane(va, ez_kite)           # Projected apparent wind velocity onto kite z axis
@@ -242,9 +242,3 @@ def calculate_reference_frame_euler(roll, pitch, yaw, eulerFrame='ENU', outputFr
             rotation_matrix = rotate_ENU2NED(rotation_matrix)
 
     return rotation_matrix
-    # Extract unit vectors
-    ex_kite = rotation_matrix[:, 0]
-    ey_kite = rotation_matrix[:, 1]
-    ez_kite = rotation_matrix[:, 2]
-
-    return ex_kite, ey_kite, ez_kite
