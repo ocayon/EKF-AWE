@@ -1,9 +1,10 @@
 import numpy as np
-from ekf.ekf_input import EKFInput
-from setup.kite import Kite
-from setup.tether import Tether
-from setup.kcu import KCU
-from setup.settings import kappa,z0
+import pandas as pd
+from awes_ekf.ekf.ekf_input import EKFInput
+from awes_ekf.setup.kite import Kite
+from awes_ekf.setup.tether import Tether
+from awes_ekf.setup.kcu import KCU
+from awes_ekf.setup.settings import kappa,z0
 
 def create_input_from_KP_csv(flight_data, system_specs, model_specs, kite_sensor = 0, kcu_sensor = 1):
     """Create input classes and initial state vector from flight data"""
@@ -79,7 +80,8 @@ def create_input_from_KP_csv(flight_data, system_specs, model_specs, kite_sensor
                                        tether_length[0], n_tether_elements, kite_elevation[0], kite_azimuth[0], kite, kcu,tether, model_specs)
     if model_specs.model_yaw:
         x0 = np.append(x0,[kite_yaw[0],0])  # Initial wind velocity and direction
-        
+    if model_specs.tether_offset:
+        x0 = np.append(x0,0)
     return ekf_input_list, x0
 
 def find_initial_state_vector(kite_pos, kite_vel, kite_acc, ground_winddir, ground_windspeed, tether_force, tether_length, n_tether_elements,
@@ -103,3 +105,7 @@ def find_initial_state_vector(kite_pos, kite_vel, kite_acc, ground_winddir, grou
     x0 = np.append(x0,[tether.CL,tether.CD,tether.CS,tether_length, elevation, azimuth])     # Initial state vector (Last two elements are bias, used if needed)
 
     return x0
+
+def read_processed_flight_data(year,month,day,kite_model):
+    filename = 'processed_data/'+str(year)+'_'+str(month)+'_'+str(day)+'_flight_'+str(flight_number)+'.csv'
+    return pd.read_csv(filename)

@@ -1,6 +1,6 @@
 import numpy as np
 import casadi as ca
-from setup.settings import kappa, z0
+from awes_ekf.setup.settings import kappa, z0
 
 class ObservationModel:
 

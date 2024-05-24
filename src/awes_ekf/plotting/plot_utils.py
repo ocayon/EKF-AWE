@@ -1,15 +1,11 @@
 # Plotting utilities for the project
 # Author: Oriol Cayon
-
 import numpy as np
 import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib.pyplot as plt
-from setup.settings import kappa, z0
-from utils import  calculate_angle, project_onto_plane,calculate_reference_frame_euler
+from awes_ekf.utils import  calculate_reference_frame_euler
 import seaborn as sns
-
-
 
 def find_turn_law(flight_data):
 

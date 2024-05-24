@@ -1,6 +1,6 @@
 import numpy as np
 import casadi as ca
-from setup.settings import kappa, z0, rho, g
+from awes_ekf.setup.settings import kappa, z0, rho, g
 
 class DynamicModel:
     def __init__(self,kite,tether,kcu,model_specs):

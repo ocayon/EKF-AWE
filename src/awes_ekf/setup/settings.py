@@ -43,13 +43,16 @@ class SystemParameters:
         self.stdv_dynamic_model = np.array([float(model_stdv[key]) for key in indices])
         if simConfig.model_yaw:
             self.stdv_dynamic_model = np.append(self.stdv_dynamic_model, [model_stdv['yaw'], 1e-6])
-        
+        if simConfig.tether_offset:    
+            self.stdv_dynamic_model = np.append(self.stdv_dynamic_model, 1e-6)
         indices = ['x', 'x', 'x', 'v', 'v', 'v', 'tether_length', 'elevation', 'azimuth', 'least_squares', 'least_squares', 'least_squares']
         stdv_y = [float(meas_stdv[key]) for key in indices]
         if simConfig.model_yaw:
             stdv_y.append(meas_stdv['yaw'])
         if simConfig.enforce_z_wind:
             stdv_y.append(meas_stdv['z_wind'])
+            
+        
         
         for key in simConfig.opt_measurements:
             if key == 'apparent_windspeed':
