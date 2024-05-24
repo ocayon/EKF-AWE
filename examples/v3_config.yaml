@@ -10,7 +10,7 @@ simulation_parameters:
   log_profile: true                   # Model wind speed as logarithmic with height
   tether_offset: true                 # Use tether offset in the measurements
   enforce_z_wind: true               # Enforce the z wind speed to be zero
-  model_yaw: true                    # Model the yaw angle in the state vector
+  model_yaw: false                    # Model the yaw angle in the state vector
   kcu_data: false                      # Boolean for KCU data availability
 
 system_parameters:
