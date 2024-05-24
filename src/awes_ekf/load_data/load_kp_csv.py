@@ -105,7 +105,3 @@ def find_initial_state_vector(kite_pos, kite_vel, kite_acc, ground_winddir, grou
     x0 = np.append(x0,[tether.CL,tether.CD,tether.CS,tether_length, elevation, azimuth])     # Initial state vector (Last two elements are bias, used if needed)
 
     return x0
-
-def read_processed_flight_data(year,month,day,kite_model):
-    filename = 'processed_data/'+str(year)+'_'+str(month)+'_'+str(day)+'_flight_'+str(flight_number)+'.csv'
-    return pd.read_csv(filename)
