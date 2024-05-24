@@ -20,17 +20,42 @@ def project_onto_plane(vector: Union[ca.SX,np.ndarray], plane_normal: Union[ca.S
     
     return vector - np.dot(vector, plane_normal) * plane_normal
 
-def rotate_vector(v, u, theta):
-    # Normalize vectors
-    v = v 
-    u = u / ca.norm_2(u)
+def rotate_vector_around_axis(vector, rotation_axis, theta):
+    """
+    Rotates a vector v around an axis u by an angle theta using Rodrigues' rotation formula.
+    The function supports both NumPy arrays and CasADi symbolic expressions.
 
-    cos_theta = ca.cos(theta)
-    sin_theta = ca.sin(theta)
+    Parameters:
+    vector (np.ndarray or casadi.SX/MX): The vector to be rotated.
+    rotation_axis (np.ndarray or casadi.SX/MX): The axis vector around which to rotate.
+    theta (float or casadi.SX/MX): The angle of rotation in radians.
 
-    v_rot = v * cos_theta + ca.cross(u, v) * sin_theta + u * ca.dot(u, v) * (1 - cos_theta)
+    Returns:
+    np.ndarray or casadi.SX/MX: The rotated vector, type depends on the input type.
+    """
+    if type(vector) == ca.SX:
+        # Normalize the axis vector u for CasADi expressions
+        rotation_axis = rotation_axis / ca.norm_2(rotation_axis)
 
-    return v_rot    
+        # Compute the cosine and sine of the angle for CasADi
+        cos_theta = ca.cos(theta)
+        sin_theta = ca.sin(theta)
+
+        # Rodrigues' rotation formula for CasADi
+        v_rot = vector * cos_theta + ca.cross(rotation_axis, vector) * sin_theta + rotation_axis * ca.dot(rotation_axis, vector) * (1 - cos_theta)
+    else:
+        # Assuming vector, rotation_axis, theta are NumPy arrays or can be treated as such
+        # Normalize the axis vector rotation_axis for NumPy arrays
+        rotation_axis = rotation_axis / np.linalg.norm(rotation_axis)
+
+        # Compute the cosine and sine of the angle for NumPy
+        cos_theta = np.cos(theta)
+        sin_theta = np.sin(theta)
+
+        # Rodrigues' rotation formula for NumPy
+        v_rot = vector * cos_theta + np.cross(rotation_axis, vector) * sin_theta + rotation_axis * np.dot(rotation_axis, vector) * (1 - cos_theta)
+
+    return v_rot
 
 def calculate_angle(vector_a, vector_b, deg=True):
     dot_product = np.dot(vector_a, vector_b)
@@ -121,15 +146,7 @@ def calculate_airflow_angles(dcm, v_kite, vw):
     sideslip = 90-calculate_angle(ey_kite,va_proj)         # Sideslip angle
     return aoa, sideslip
 
-def calculate_euler_from_reference_frame(dcm):
-    
-    # Calculate the roll, pitch and yaw angles from a direction cosine matrix, in NED coordinates   
-    Teb = rotate_ENU2NED(dcm)
-    pitch = np.arcsin(-Teb[2,0])
-    roll = np.arctan(Teb[2,1]/Teb[2,2])
-    yaw = np.arctan2(Teb[1,0],Teb[0,0])
 
-    return roll, pitch, yaw
 
 def Rx(theta):
     """Generate a rotation matrix for a rotation about the x-axis by `theta` radians."""
@@ -178,36 +195,56 @@ def R_EG_Body(roll, pitch, yaw):
     # Perform rotation about x-axis (roll), then y-axis (pitch), then z-axis (yaw)
     return Rz(yaw).dot(Ry(pitch).dot(Rx(roll)))
 
-def calculate_reference_frame_euler(roll, pitch, yaw, bodyFrame='ENU'):
+def calculate_euler_from_reference_frame(dcm):
+    
+    # Calculate the roll, pitch and yaw angles from a direction cosine matrix, in NED coordinates   
+    r = R.from_matrix(dcm)
+    euler = r.as_euler('xyz')
+    
+    return euler[0],euler[1],euler[2]
+
+from scipy.spatial.transform import Rotation as R
+
+def calculate_reference_frame_euler(roll, pitch, yaw, eulerFrame='ENU', outputFrame='ENU'):
     """
-    Calculate the Earth reference frame vectors based on Euler angles for a specified body frame.
+    Calculate the Earth reference frame vectors based on Euler angles using quaternions to avoid gimbal lock.
     
     Parameters:
         roll (float): Roll angle in radians.
         pitch (float): Pitch angle in radians.
         yaw (float): Yaw angle in radians.
-        bodyFrame (str): Type of body frame ('NED' or 'ENU').
+        eulerFrame (str): Type of input frame ('NED' or 'ENU').
+        outputFrame (str): Type of output frame ('NED' or 'ENU').
     
     Returns:
-        tuple: Transformed unit vectors along the x, y, and z axes of the kite/body in Earth coordinates.
+        tuple: Transformed unit vectors along the x, y, and z axes in Earth coordinates.
     """
     
-    # Calculate transformation matrix and its transpose
-    
-    
-    
-    # Unit vectors in Earth frame
-    if bodyFrame == 'NED':
-        Transform_Matrix = R_EG_Body(roll, pitch, yaw)
-        ex_kite = Transform_Matrix[:,0]
-        ey_kite = Transform_Matrix[:,1]
-        ez_kite = Transform_Matrix[:,2]
-    elif bodyFrame == 'ENU':
-        Transform_Matrix = rotate_NED2ENU(R_EG_Body(roll, pitch, yaw))
-        ex_kite = Transform_Matrix[:,0]
-        ey_kite = Transform_Matrix[:,1]
-        ez_kite = Transform_Matrix[:,2]
-    
-    
+    # Convert Euler angles to a quaternion
+    if eulerFrame == 'NED':
+        # NED uses a ZYX rotation sequence
+        quaternion = R.from_euler('xyz', [roll, pitch, yaw])
+    elif eulerFrame == 'ENU':
+        # ENU uses a ZYX rotation sequence as well but the interpretation of angles is different
+        quaternion = R.from_euler('xyz', [roll, pitch, yaw])
+
+    # Convert quaternion to a rotation matrix
+    rotation_matrix = quaternion.as_matrix()
+
+    # If converting from one frame to another, apply the appropriate rotation
+    if eulerFrame != outputFrame:
+        if outputFrame == 'ENU' and eulerFrame == 'NED':
+            # Convert NED to ENU rotation matrix
+            rotation_matrix = rotate_NED2ENU(rotation_matrix)
+
+        elif outputFrame == 'NED' and eulerFrame == 'ENU':
+            # Convert ENU to NED rotation matrix
+            rotation_matrix = rotate_ENU2NED(rotation_matrix)
+
+    return rotation_matrix
+    # Extract unit vectors
+    ex_kite = rotation_matrix[:, 0]
+    ey_kite = rotation_matrix[:, 1]
+    ez_kite = rotation_matrix[:, 2]
 
     return ex_kite, ey_kite, ez_kite
