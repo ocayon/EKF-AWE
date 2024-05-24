@@ -7,3 +7,5 @@ data/v9/
 data/kitekraft/
 processed_data/flight_data/v9/
 results/
+build/
+src/awes_ekf.egg-info/
