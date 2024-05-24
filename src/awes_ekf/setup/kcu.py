@@ -1,4 +1,4 @@
-from setup.model_definitions import kcu_cylinders
+from awes_ekf.setup.model_definitions import kcu_cylinders
 import numpy as np
 from scipy.interpolate import splrep, splev
 

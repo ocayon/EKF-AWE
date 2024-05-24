@@ -1,9 +1,9 @@
 import numpy as np
-from setup.settings import g, rho, z0
+from awes_ekf.setup.settings import g, rho, z0
 from scipy.optimize import least_squares
-from utils import project_onto_plane, calculate_angle_2vec
+from awes_ekf.utils import project_onto_plane, calculate_angle_2vec
 import casadi as ca
-from setup.model_definitions import tether_materials
+from awes_ekf.setup.model_definitions import tether_materials
 
 class Tether:
     """ Tether model class"""
