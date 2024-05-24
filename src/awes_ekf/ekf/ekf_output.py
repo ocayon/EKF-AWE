@@ -80,10 +80,11 @@ def create_ekf_output(x, u, kite, tether,kcu, model_specs):
         dcm = calculate_reference_frame_euler( euler_angles[0], 
                                                      euler_angles[1], 
                                                      x[15], 
-                                                     bodyFrame='ENU')
-        airflow_angles = calculate_airflow_angles(dcm, kite_vel, vw)
+                                                     eulerFrame='NED',
+                                                     outputFrame='ENU')
+        airflow_angles = calculate_airflow_angles(dcm, vw-kite_vel)
     else:
-        airflow_angles = calculate_airflow_angles(dcm_b2vel, kite_vel, vw)
+        airflow_angles = calculate_airflow_angles(dcm_b2vel, vw-kite_vel)
 
     # Unpack position and velocity vectors
     kite_pos_x, kite_pos_y, kite_pos_z = x[0:3]
