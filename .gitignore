@@ -9,3 +9,4 @@ processed_data/flight_data/v9/
 results/
 build/
 src/awes_ekf.egg-info/
+examples/v9_config.yaml
