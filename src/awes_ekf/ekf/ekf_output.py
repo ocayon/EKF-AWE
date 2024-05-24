@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from typing import List
 from awes_ekf.setup.settings import z0, kappa
-from awes_ekf.utils import calculate_euler_from_reference_frame, calculate_airflow_angles, calculate_reference_frame_euler
+from awes_ekf.utils import calculate_euler_from_reference_frame, calculate_airflow_angles, calculate_reference_frame_euler, rotate_ENU2NED
  
 
 @dataclass
@@ -69,17 +69,18 @@ def create_ekf_output(x, u, kite, tether,kcu, model_specs):
     res = tether.calculate_tether_shape(opt_guess, *args, a_kite = kite_acc, a_kcu = kcu_acc, v_kcu = kcu_vel, return_values=True)
     dcm_b2w = res[2]
     dcm_t2w = res[3]
+    dcm_b2w = rotate_ENU2NED(dcm_b2w)
+    dcm_t2w = rotate_ENU2NED(dcm_t2w)
     euler_angles = calculate_euler_from_reference_frame(dcm_b2w)
     euler_angles1 = calculate_euler_from_reference_frame(dcm_t2w)
     cd_kcu = res[-6]
     cd_tether = res[-5]
     dcm_b2vel = res[-1]
     if model_specs.model_yaw:
-        ex, ey, ez = calculate_reference_frame_euler( euler_angles[0], 
+        dcm = calculate_reference_frame_euler( euler_angles[0], 
                                                      euler_angles[1], 
                                                      x[15], 
                                                      bodyFrame='ENU')
-        dcm = np.vstack(([ex], [ey], [ez])).T
         airflow_angles = calculate_airflow_angles(dcm, kite_vel, vw)
     else:
         airflow_angles = calculate_airflow_angles(dcm_b2vel, kite_vel, vw)
