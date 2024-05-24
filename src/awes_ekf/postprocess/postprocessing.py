@@ -1,5 +1,5 @@
 import numpy as np
-from awes_ekf.utils import  calculate_angle, project_onto_plane, calculate_reference_frame_euler
+from awes_ekf.utils import  calculate_reference_frame_euler, calculate_airflow_angles
 
 def unwrap_degrees(signal):
     for i in range(1,len(signal)):
@@ -55,7 +55,7 @@ def remove_offsets_IMU_data(results, flight_data, sensor=0):
     flight_data['kite_0_roll'] = flight_data['kite_'+str(sensor)+'_roll'] + roll_offset
     print('Roll offset: ', roll_offset)
     # Pitch
-    mask_pitch = (flight_data['turn_straight'] == 'straight')&(flight_data['powered'] == 'powered')
+    mask_pitch = (flight_data['powered'] == 'powered')
     pitch_offset = find_offset(results[mask_pitch]['kite_pitch'], flight_data[mask_pitch]['kite_'+str(sensor)+'_pitch'])
     flight_data['kite_0_pitch'] = flight_data['kite_'+str(sensor)+'_pitch'] + pitch_offset
     print('Pitch offset: ', pitch_offset)
@@ -95,8 +95,8 @@ def postprocess_results(results,flight_data, kite, imus = [0], remove_IMU_offset
     # results['kite_yaw'] = np.degrees(results['kite_yaw'])
     
     for imu in imus:
-        flight_data['kite_'+str(imu)+'_pitch'] = np.radians(-flight_data['kite_'+str(imu)+'_pitch'])
-        flight_data['kite_'+str(imu)+'_roll'] = np.radians(-flight_data['kite_'+str(imu)+'_roll'])
+        flight_data['kite_'+str(imu)+'_pitch'] = np.radians(flight_data['kite_'+str(imu)+'_pitch'])
+        flight_data['kite_'+str(imu)+'_roll'] = np.radians(flight_data['kite_'+str(imu)+'_roll'])
         flight_data['kite_'+str(imu)+'_yaw'] = np.radians(flight_data['kite_'+str(imu)+'_yaw'])
         
         
@@ -164,14 +164,14 @@ def postprocess_results(results,flight_data, kite, imus = [0], remove_IMU_offset
         # Calculate tether orientation based on euler angles
         q = 0.5*1.225*kite.area*res['va_kite']**2
         for imu in imus:
-            ex, ey, ez = calculate_reference_frame_euler(flight_data['kite_'+str(imu)+'_roll'].iloc[i], 
+            dcm = calculate_reference_frame_euler(flight_data['kite_'+str(imu)+'_roll'].iloc[i], 
                                                             flight_data['kite_'+str(imu)+'_pitch'].iloc[i], 
-                                                            flight_data['kite_'+str(imu)+'_yaw'].iloc[i])  
+                                                            flight_data['kite_'+str(imu)+'_yaw'].iloc[i], 
+                                                            eulerFrame='NED', outputFrame='ENU')  
             # Calculate wind velocity based on KCU orientation and wind speed and direction
-            va_proj = project_onto_plane(va_kite[i], ey)           # Projected apparent wind velocity onto kite y axis
-            results.loc[i,'aoa_IMU_'+str(imu)] = calculate_angle(ez,va_proj)-90            # Angle of attack
-            va_proj = project_onto_plane(va_kite[i], ez)           # Projected apparent wind velocity onto kite z axis
-            results.loc[i,'ss_IMU_'+str(imu)] = 90-calculate_angle(ey,va_proj)        # Sideslip angle
+            airflow_angles = calculate_airflow_angles(dcm, va_kite[i])
+            results.loc[i,'aoa_IMU_'+str(imu)] = airflow_angles[0]        # Angle of attack
+            results.loc[i,'ss_IMU_'+str(imu)] = airflow_angles[1]         # Sideslip angle
             
         at = np.dot(a_kite[i],np.array(v_kite[i])/np.linalg.norm(v_kite[i]))*np.array(v_kite[i])/np.linalg.norm(v_kite[i])
         omega_kite = np.cross(a_kite[i]-at,v_kite[i])/(np.linalg.norm(v_kite[i])**2)
@@ -201,8 +201,8 @@ def postprocess_results(results,flight_data, kite, imus = [0], remove_IMU_offset
     
     if estimate_kite_angle:
 
-        results['kite_aoa'] = results['kite_aoa']+np.degrees(flight_data['offset_pitch'])
-        flight_data['kite_angle_of_attack'] = flight_data['kite_angle_of_attack']+np.degrees(flight_data['offset_pitch'])
+        results['kite_aoa'] = results['kite_aoa']-np.degrees(flight_data['offset_pitch'])
+        flight_data['kite_angle_of_attack'] = flight_data['kite_angle_of_attack']-np.degrees(flight_data['offset_pitch'])
     
     if correct_IMU_deformation:
         flight_data['kite_0_pitch'] = flight_data['kite_0_pitch']+offset_pitch
