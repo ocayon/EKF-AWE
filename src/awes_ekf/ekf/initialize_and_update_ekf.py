@@ -20,10 +20,7 @@ def initialize_ekf(ekf_input, model_specs, system_specs,x0):
                dynamic model, kite, KCU (Kite Control Unit), and tether.
     """
     kite = Kite(system_specs.kite_model)
-    if ekf_input.kcu_acc is not None:
-        kcu = KCU(system_specs.kcu_model, data_available=True)
-    else:
-        kcu = KCU(system_specs.kcu_model, data_available=False)
+    kcu = KCU(system_specs.kcu_model, data_available=model_specs.kcu_data)  
         
     tether = Tether(system_specs.tether_material,system_specs.tether_diameter,model_specs.n_tether_elements)
     
