@@ -48,8 +48,8 @@ class Tether:
         if a_kite is not None:
             # Find instantaneuous center of rotation and omega of the kite
             at = ca.dot(a_kite,v_kite/ca.norm_2(v_kite))*v_kite/ca.norm_2(v_kite) # Tangential acceleration
-            omega_kite = omega_tether
-            # omega_kite = ca.cross(a_kite-at,v_kite)/(ca.norm_2(v_kite)**2) # Angular velocity of the kite
+            # omega_kite = omega_tether
+            omega_kite = ca.cross(a_kite-at,v_kite)/(ca.norm_2(v_kite)**2) # Angular velocity of the kite
 
             ICR = ca.cross(v_kite,omega_kite)/(ca.norm_2(omega_kite)**2) # Instantaneous center of rotation     
             alpha = ca.cross(at,ICR)/ca.norm_2(ICR)**2 # Angular acceleration of the kite
