@@ -68,6 +68,9 @@ class DynamicModel:
             self.a_kcu =  ca.SX.sym('a_kcu',3)  # KCU acceleration
             self.v_kcu =  ca.SX.sym('v_kcu',3)  # KCU acceleration
             return ca.vertcat(self.reelout_speed,self.Ftg,self.a_kcu, self.v_kcu,self.us)
+        else:
+            self.a_kite =  ca.SX.sym('a_kite',3)
+            return ca.vertcat(self.reelout_speed,self.Ftg,self.a_kite,self.us)
     
     def get_fx(self,kite,tether,kcu):
         
@@ -116,6 +119,9 @@ class DynamicModel:
 
         return ca.vertcat(rp,vp,0,0,0,0,0,0,v_reelout,0,0)
     
+    def get_fx_fun(self,kite,tether,kcu):
+        return ca.Function('calc_Fx', [self.x,self.u,self.x0],[self.get_fx(kite,tether,kcu)])
+
     def get_fx_jac(self,kite,tether,kcu):
   
         return ca.simplify(ca.jacobian(self.fx,self.x))
