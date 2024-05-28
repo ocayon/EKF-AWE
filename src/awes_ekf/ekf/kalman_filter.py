@@ -6,12 +6,12 @@ import control
 from awes_ekf.utils import project_onto_plane, calculate_angle_2vec
 #%% 
 class ExtendedKalmanFilter:
-    def __init__(self, stdv_x, stdv_y, ts,dyn_model,obs_model,kite,tether, kcu, doIEKF=True, epsilon=1e-6, max_iterations=200):
-        self.Q = self.get_state_noise_covariance(stdv_x)
+    def __init__(self, stdv_x, stdv_y, ts,dyn_model,obs_model,kite,tether, kcu, simConfig):
+        self.Q = self.get_state_noise_covariance(stdv_x,simConfig)
         self.R = self.get_observation_noise_covariance(stdv_y)
-        self.doIEKF = doIEKF
-        self.epsilon = epsilon
-        self.max_iterations = max_iterations
+        self.doIEKF = simConfig.doIEKF
+        self.epsilon = simConfig.epsilon
+        self.max_iterations = simConfig.max_iterations
         self.ts = ts
         self.n = len(stdv_x)
         self.P_k1_k1 = np.eye(self.n) * 1 ** 2
@@ -94,8 +94,14 @@ class ExtendedKalmanFilter:
         self.P_k1_k1 = (np.eye(self.n) - self.K @ self.Hx) @ self.P_k1_k
         self.std_x_cor   = np.sqrt(np.diag(self.P_k1_k1))        # standard deviation of state estimation error (for validation)
 
-    def get_state_noise_covariance(self, stdv_x):
-        return np.diag(np.array(stdv_x)**2)
+    def get_state_noise_covariance(self, stdv_x,simConfig):
+        Q = np.diag(np.array(stdv_x)**2)
+        if simConfig.log_profile == False:
+            # Add correlation between wind components
+            Q[6,7] = Q[7,6] = 0.2*stdv_x[6]*stdv_x[7]
+            Q[6,8] = Q[8,6] = -0.1*stdv_x[6]*stdv_x[8]
+            Q[7,8] = Q[8,7] = -0.1*stdv_x[7]*stdv_x[8]
+        return Q
     def get_observation_noise_covariance(self, stdv_y):
         return np.diag(np.array(stdv_y)**2)
     
