@@ -7,10 +7,10 @@ import awes_ekf.plotting.plot_utils as pu
 from awes_ekf.postprocess.postprocessing import  postprocess_results
 from awes_ekf.load_data.read_data import read_results
 #%%
-year = '2019'
-month = '10'
-day = '08'
-kite_model = 'v3'                   
+year = '2024'
+month = '02'
+day = '16'
+kite_model = 'v9'                   
 
 plt.close('all')
 
@@ -313,3 +313,20 @@ pu.plot_time_series(flight_data,results['kite_pitch']-results['kcu_pitch'], ax, 
 ax.legend()
 
 
+#%% Compute orietnation errors
+
+pitch_error = abs(flight_data['kite_0_pitch']-results['kite_pitch'])
+roll_error = abs(flight_data['kite_0_roll']-results['kite_roll'])
+yaw_error = abs(flight_data['kite_0_yaw']-results['kite_yaw'])
+
+mean_pitch_error = np.mean(pitch_error)
+mean_roll_error = np.mean(roll_error)
+mean_yaw_error = np.mean(yaw_error)
+
+std_pitch_error = np.std(pitch_error)
+std_roll_error = np.std(roll_error)
+std_yaw_error = np.std(yaw_error)
+
+print(f'Mean pitch error: {mean_pitch_error:.2f} deg, std: {std_pitch_error:.2f} deg')
+print(f'Mean roll error: {mean_roll_error:.2f} deg, std: {std_roll_error:.2f} deg')
+print(f'Mean yaw error: {mean_yaw_error:.2f} deg, std: {std_yaw_error:.2f} deg')
