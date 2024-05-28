@@ -96,11 +96,6 @@ class ExtendedKalmanFilter:
 
     def get_state_noise_covariance(self, stdv_x,simConfig):
         Q = np.diag(np.array(stdv_x)**2)
-        if simConfig.log_profile == False:
-            # Add correlation between wind components
-            Q[6,7] = Q[7,6] = 0.2*stdv_x[6]*stdv_x[7]
-            Q[6,8] = Q[8,6] = -0.1*stdv_x[6]*stdv_x[8]
-            Q[7,8] = Q[8,7] = -0.1*stdv_x[7]*stdv_x[8]
         return Q
     def get_observation_noise_covariance(self, stdv_y):
         return np.diag(np.array(stdv_y)**2)
