@@ -55,7 +55,7 @@ flight_data['kite_0_rx'] = df['kite_pos_east']
 flight_data['kite_0_ry'] = df['kite_pos_north']
 flight_data['kite_0_rz'] = df['kite_height']
 
-# Add GPS + IMU data Sensor 0
+# Add GPS + IMU data Sensor 0 - Convert from NED to ENU
 flight_data['kite_0_vx'] = df['kite_0_vy']
 flight_data['kite_0_vy'] = df['kite_0_vx']
 flight_data['kite_0_vz'] = -df['kite_0_vz']
@@ -63,6 +63,7 @@ flight_data['kite_0_pitch'] = df['kite_0_pitch']
 flight_data['kite_0_roll'] = df['kite_0_roll']
 flight_data['kite_0_yaw'] = df['kite_0_yaw']
 
+# Add acceleration data Sensor 0 - Convert from NED to ENU and differentiate velocity if needed
 window_size = 5
 if df['kite_0_ax'].isnull().all():
     ax = np.diff(df['kite_0_vy']) / dt
@@ -114,11 +115,11 @@ else:
 
 
 # Add the ground station data
-flight_data['ground_tether_force'] = df['ground_tether_force']*9.81
-flight_data['ground_wind_velocity'] = df['ground_wind_velocity']
-flight_data['ground_wind_direction'] = 360-90-df['ground_upwind_direction'] 
-flight_data['ground_tether_length'] = df['ground_tether_length']
-flight_data['ground_tether_reelout_speed'] = df['ground_tether_reelout_speed']
+flight_data['ground_tether_force'] = df['ground_tether_force']*9.81 # Convert to N
+flight_data['ground_wind_velocity'] = df['ground_wind_velocity']    
+flight_data['ground_wind_direction'] = 360-90-df['ground_upwind_direction']     # Convert from NED clockwise to ENU counter-clockwise
+flight_data['ground_tether_length'] = df['ground_tether_length']            # Tether length
+flight_data['ground_tether_reelout_speed'] = df['ground_tether_reelout_speed']      # Tether reelout speed
 
 # Add the KCU data
 flight_data['kcu_set_depower'] = df['kite_set_depower']
