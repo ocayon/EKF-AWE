@@ -15,7 +15,7 @@ class ExtendedKalmanFilter:
         self.ts = ts
         self.n = len(stdv_x)
         self.P_k1_k1 = np.eye(self.n) * 1 ** 2
-        
+        self.simConfig = simConfig
 
         self.kite = kite
         self.kcu = kcu
@@ -100,9 +100,11 @@ class ExtendedKalmanFilter:
     def get_observation_noise_covariance(self, stdv_y):
         return np.diag(np.array(stdv_y)**2)
     
-    def update_input_vector(self,input_class,kcu):
+    def update_input_vector(self,input_class,kcu,kite):
         if kcu.data_available:   
             self.u = np.concatenate((np.array([input_class.reelout_speed, input_class.tether_force]), input_class.kcu_acc, input_class.kcu_vel, np.array([input_class.steering_input])))
+        elif kite.thrust:
+            self.u = np.concatenate((np.array([input_class.reelout_speed, input_class.tether_force]), input_class.kite_acc, np.array([input_class.steering_input]), input_class.thrust_force))
         else:
             self.u = np.concatenate((np.array([input_class.reelout_speed, input_class.tether_force]), input_class.kite_acc,np.array([input_class.steering_input])))
 
@@ -145,3 +147,4 @@ def observability_Lie_method(f,h,x,u, x0, u0):
         print('System is observable')
     else:
         print('System is not observable')   
+# %%

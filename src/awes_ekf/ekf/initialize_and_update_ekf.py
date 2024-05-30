@@ -32,7 +32,7 @@ def initialize_ekf(ekf_input, simConfig, systemParams,x0):
     # Initialize EKF
     ekf = ExtendedKalmanFilter(systemParams.stdv_dynamic_model, systemParams.stdv_measurements, simConfig.ts,dyn_model,obs_model, kite, tether, kcu, simConfig)
     # Initialize input vector
-    ekf.update_input_vector(ekf_input,kcu)
+    ekf.update_input_vector(ekf_input,kcu,kite)
     # Initialize state vector
     ekf.x_k1_k1 = x0
 
@@ -59,7 +59,7 @@ def update_state_ekf_tether(ekf, tether, kite, kcu, ekf_input, simConfig):
     ############################################################
     # Update EKF
     ############################################################
-    ekf.update_input_vector(ekf_input,kcu)
+    ekf.update_input_vector(ekf_input,kcu,kite)
     ekf.update_measurement_vector(ekf_input, simConfig)
     ############################################################
     # Update state with Kalmann filter

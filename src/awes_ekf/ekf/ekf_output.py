@@ -27,6 +27,7 @@ class EKFOutput:
     CS: float
     elevation_first_element: float
     azimuth_first_element: float
+    thrust_force: float = None
     cd_tether: float = None
     cd_kcu: float = None
     z_wind: float = None
