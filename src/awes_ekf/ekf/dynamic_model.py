@@ -22,12 +22,13 @@ class DynamicModel:
         self.yaw = ca.SX.sym('yaw') # Bias angle of attack
         self.us = ca.SX.sym('us')    # Steering input
         self.k_yaw_rate = ca.SX.sym('k_yaw_rate') # Yaw rate constant
+        
 
 
         self.get_wind_velocity(model_specs.log_profile)
         self.va = self.vw - self.v
 
-        self.u = self.get_input(kcu)
+        self.u = self.get_input(kcu,kite)
         self.x = self.get_state(kite,tether,kcu)
         if model_specs.model_yaw:
             self.x = ca.vertcat(self.x, self.yaw, self.k_yaw_rate)
@@ -63,14 +64,19 @@ class DynamicModel:
             self.vw = ca.SX.sym('vw',3)  # Wind velocity
             self.vw_state = self.vw
     
-    def get_input(self,kcu):
+    def get_input(self,kcu,kite):
         if kcu.data_available:
             self.a_kcu =  ca.SX.sym('a_kcu',3)  # KCU acceleration
             self.v_kcu =  ca.SX.sym('v_kcu',3)  # KCU acceleration
             return ca.vertcat(self.reelout_speed,self.Ftg,self.a_kcu, self.v_kcu,self.us)
+        elif kite.thrust:
+            self.thrust = ca.SX.sym('thrust', 3)    # Thrust force
+            return ca.vertcat(self.reelout_speed,self.Ftg,self.a_kite,self.us,self.thrust)
         else:
             self.a_kite =  ca.SX.sym('a_kite',3)
             return ca.vertcat(self.reelout_speed,self.Ftg,self.a_kite,self.us)
+        
+        
     
     def get_fx(self,kite,tether,kcu):
         
@@ -115,7 +121,10 @@ class DynamicModel:
 
         Fg = ca.vertcat(0, 0, -kite.mass*g)
         rp = self.v
-        vp = (-tension_last_element+L+D+S+Fg)/kite.mass
+        if kite.thrust:
+            vp = (-tension_last_element+L+D+S+Fg+self.thrust)/kite.mass
+        else:
+            vp = (-tension_last_element+L+D+S+Fg)/kite.mass
 
         return ca.vertcat(rp,vp,0,0,0,0,0,0,v_reelout,0,0)
     

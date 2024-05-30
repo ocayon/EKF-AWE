@@ -17,14 +17,14 @@ file_name = '2023-11-27_13-37-48_ProtoLogger_lidar.csv'
 # file_name = '2023-12-11_13-15-42_ProtoLogger_lidar.csv'
 # file_name = '2024-01-09_12-28-51_ProtoLogger_lidar.csv'
 
-file_path = './'+model+'/v9.60.F-different-bridle/'
-file_name = '2024-03-26_15-00-03_ProtoLogger_lidar.csv'
+# file_path = './'+model+'/v9.60.F-different-bridle/'
+# file_name = '2024-03-26_15-00-03_ProtoLogger_lidar.csv'
 
-file_path = './'+model+'/more-depowered-reelin/'
-file_name = '2024-03-25_14-08-47_ProtoLogger_lidar.csv'
+# file_path = './'+model+'/more-depowered-reelin/'
+# file_name = '2024-03-25_14-08-47_ProtoLogger_lidar.csv'
 # file_name = '2024-03-12_13-36-02_ProtoLogger_lidar.csv'
-file_path = './'+model+'/front_stall/'
-file_name = '2024-04-11_12-51-46_ProtoLogger_lidar.csv'
+# file_path = './'+model+'/front_stall/'
+# file_name = '2024-04-11_12-51-46_ProtoLogger_lidar.csv'
 
 
 # Smooth radius
@@ -48,71 +48,55 @@ flight_data = pd.DataFrame()    # Create a new dataframe for the flight data
 
 date = str(df['date'].iloc[0])
 
+sensors = [0,1]
 #%% Add the data to the flight data dataframe
+# Add position data
+flight_data['kite_position_east'] = df['kite_pos_east']
+flight_data['kite_position_north'] = df['kite_pos_north']
+flight_data['kite_position_up'] = df['kite_height']
 
-# Add GPS data
-flight_data['kite_0_rx'] = df['kite_pos_east']
-flight_data['kite_0_ry'] = df['kite_pos_north']
-flight_data['kite_0_rz'] = df['kite_height']
+for sensor in sensors:
+    # Velocity data
+    flight_data['kite_velocity_east_s'+str(sensor)] = df['kite_'+str(sensor)+'_vy']
+    flight_data['kite_velocity_north_s'+str(sensor)] = df['kite_'+str(sensor)+'_vx']
+    flight_data['kite_velocity_up_s'+str(sensor)] = -df['kite_'+str(sensor)+'_vz'] 
+    # Euler angles data
+    flight_data['kite_pitch_s'+str(sensor)] = df['kite_'+str(sensor)+'_pitch']
+    flight_data['kite_roll_s'+str(sensor)] = df['kite_'+str(sensor)+'_roll']
+    flight_data['kite_yaw_s'+str(sensor)] = df['kite_'+str(sensor)+'_yaw']
+    # Acceleration data
+    if df['kite_'+str(sensor)+'_ax'].isnull().all():
+        # Differentiate velocity to get acceleration
+        ax = np.diff(flight_data['kite_velocity_east_s'+str(sensor)]) / dt
+        ay = np.diff(flight_data['kite_velocity_north_s'+str(sensor)]) / dt
+        az = np.diff(flight_data['kite_velocity_up_s'+str(sensor)]) / dt
+        # Add the last value as 0 to keep the same length
+        flight_data['kite_acceleration_east_s'+str(sensor)] = np.concatenate((ax, [0]))
+        flight_data['kite_acceleration_north_s'+str(sensor)] = np.concatenate((ay, [0]))
+        flight_data['kite_acceleration_up_s'+str(sensor)] = np.concatenate((az, [0]))
+        # Smooth the acceleration data
+        flight_data['kite_acceleration_east_s'+str(sensor)]=np.convolve(flight_data['kite_acceleration_east_s'+str(sensor)], np.ones(window_size)/window_size, mode='same')
+        flight_data['kite_acceleration_north_s'+str(sensor)]=np.convolve(flight_data['kite_acceleration_north_s'+str(sensor)], np.ones(window_size)/window_size, mode='same')
+        flight_data['kite_acceleration_up_s'+str(sensor)]=np.convolve(flight_data['kite_acceleration_up_s'+str(sensor)], np.ones(window_size)/window_size, mode='same')
+    else:
+        flight_data['kite_acceleration_east_s'+str(sensor)] = df['kite_0_ay']
+        flight_data['kite_acceleration_north_s'+str(sensor)] = df['kite_0_ax']
+        flight_data['kite_acceleration_up_s'+str(sensor)] = -df['kite_0_az']
 
-# Add GPS + IMU data Sensor 0 - Convert from NED to ENU
-flight_data['kite_0_vx'] = df['kite_0_vy']
-flight_data['kite_0_vy'] = df['kite_0_vx']
-flight_data['kite_0_vz'] = -df['kite_0_vz']
-flight_data['kite_0_pitch'] = df['kite_0_pitch']
-flight_data['kite_0_roll'] = df['kite_0_roll']
-flight_data['kite_0_yaw'] = df['kite_0_yaw']
-
-# Add acceleration data Sensor 0 - Convert from NED to ENU and differentiate velocity if needed
-window_size = 5
-if df['kite_0_ax'].isnull().all():
-    ax = np.diff(df['kite_0_vy']) / dt
-    ay = np.diff(df['kite_0_vx']) / dt
-    az = -np.diff(df['kite_0_vz']) / dt
-    flight_data['kite_0_ax'] = np.concatenate((ax, [0]))
-    flight_data['kite_0_ay'] = np.concatenate((ay, [0]))
-    flight_data['kite_0_az'] = np.concatenate((az, [0]))
-    flight_data['kite_0_ax']=np.convolve(flight_data['kite_0_ax'], np.ones(window_size)/window_size, mode='same')
-    flight_data['kite_0_ay']=np.convolve(flight_data['kite_0_ay'], np.ones(window_size)/window_size, mode='same')
-    flight_data['kite_0_az']=np.convolve(flight_data['kite_0_az'], np.ones(window_size)/window_size, mode='same')
-else:
-    flight_data['kite_0_ax'] = df['kite_0_ay']
-    flight_data['kite_0_ay'] = df['kite_0_ax']
-    flight_data['kite_0_az'] = -df['kite_0_az']
-
-# Add GPS + IMU data Sensor 1
-flight_data['kite_1_vx'] = df['kite_1_vy']
-flight_data['kite_1_vy'] = df['kite_1_vx']
-flight_data['kite_1_vz'] = -df['kite_1_vz']
-flight_data['kite_1_pitch'] = df['kite_1_pitch']
-flight_data['kite_1_roll'] = df['kite_1_roll']
-flight_data['kite_1_yaw'] = df['kite_1_yaw']
-flight_data['kite_1_ax'] = df['kite_1_ay']
-flight_data['kite_1_ay'] = df['kite_1_ax']
-flight_data['kite_1_az'] = -df['kite_1_az']
-flight_data['kite_1_yaw_rate'] = df['kite_1_yaw_rate']
-flight_data['kite_1_pitch_rate'] = df['kite_1_pitch_rate']
-flight_data['kite_1_roll_rate'] = df['kite_1_roll_rate']
-if df['kite_1_ax'].isnull().all():
-    ax = np.diff(df['kite_1_vy']) / dt
-    ay = np.diff(df['kite_1_vx']) / dt
-    az = -np.diff(df['kite_1_vz']) / dt
-    flight_data['kite_1_ax'] = np.concatenate((ax, [0]))
-    flight_data['kite_1_ay'] = np.concatenate((ay, [0]))
-    flight_data['kite_1_az'] = np.concatenate((az, [0]))
-    flight_data['kite_1_ax']=np.convolve(flight_data['kite_1_ax'], np.ones(window_size)/window_size, mode='same')
-    flight_data['kite_1_ay']=np.convolve(flight_data['kite_1_ay'], np.ones(window_size)/window_size, mode='same')
-    flight_data['kite_1_az']=np.convolve(flight_data['kite_1_az'], np.ones(window_size)/window_size, mode='same')
-else:   
-    flight_data['kite_1_ax'] = df['kite_1_ay']
-    flight_data['kite_1_ay'] = df['kite_1_ax']
-    flight_data['kite_1_az'] = -df['kite_1_az']
-    flight_data['kite_1_ax']=np.convolve(flight_data['kite_1_ax'], np.ones(window_size)/window_size, mode='same')
-    flight_data['kite_1_ay']=np.convolve(flight_data['kite_1_ay'], np.ones(window_size)/window_size, mode='same')
-    flight_data['kite_1_az']=np.convolve(flight_data['kite_1_az'], np.ones(window_size)/window_size, mode='same')
-
-
-
+    # Add angular velocity data
+    if df['kite_'+str(sensor)+'_yaw_rate'].isnull().all():
+        # Differentiate orientation to get angular velocity
+        roll_rate = np.diff(flight_data['kite_roll_s'+str(sensor)]) / dt
+        pitch_rate = np.diff(flight_data['kite_pitch_s'+str(sensor)]) / dt
+        yaw_rate = np.diff(flight_data['kite_yaw_s'+str(sensor)]) / dt
+        # Add the last value as 0 to keep the same length
+        flight_data['kite_roll_rate_s'+str(sensor)] = np.concatenate((roll_rate, [0]))
+        flight_data['kite_pitch_rate_s'+str(sensor)] = np.concatenate((pitch_rate, [0]))
+        flight_data['kite_yaw_rate_s'+str(sensor)] = np.concatenate((yaw_rate, [0]))
+        # Smooth the yaw rate data
+        flight_data['kite_roll_rate_s'+str(sensor)]=np.convolve(flight_data['kite_roll_rate_s'+str(sensor)], np.ones(window_size)/window_size, mode='same')
+        flight_data['kite_pitch_rate_s'+str(sensor)]=np.convolve(flight_data['kite_pitch_rate_s'+str(sensor)], np.ones(window_size)/window_size, mode='same')
+        flight_data['kite_yaw_rate_s'+str(sensor)]=np.convolve(flight_data['kite_yaw_rate_s'+str(sensor)], np.ones(window_size)/window_size, mode='same')
 
 # Add the ground station data
 flight_data['ground_tether_force'] = df['ground_tether_force']*9.81 # Convert to N
@@ -166,60 +150,6 @@ if 'lidar' in file_name:
             
             flight_data[column] = df[column]
 
-if 'v9' in file_path:
-    radius_kcu = []
-    radius_kite = []
-    for i in range(len(flight_data)):
-        row = flight_data.iloc[i]
-        # Calculate KCU omega and turn radius from acceleration and velocity
-        a_kcu = np.array([row['kite_1_ax'],row['kite_1_ay'],row['kite_1_az']]).T
-        v_kcu = np.array([row['kite_1_vx'],row['kite_1_vy'],row['kite_1_vz']]).T
-        at = np.dot(a_kcu,np.array(v_kcu)/np.linalg.norm(v_kcu))*np.array(v_kcu)/np.linalg.norm(v_kcu)
-        omega_kcu = np.cross(a_kcu-at,v_kcu)/(np.linalg.norm(v_kcu)**2)
-        ICR_kcu = np.cross(v_kcu,omega_kcu)/(np.linalg.norm(omega_kcu)**2)      
-        alpha = np.cross(at,ICR_kcu)/np.linalg.norm(ICR_kcu)**2
-        radius_kcu.append(np.linalg.norm(ICR_kcu))
-        
-        # Calculate kite omega and turn radius from acceleration and velocity
-        a_kite = np.array([row['kite_0_ax'],row['kite_0_ay'],row['kite_0_az']]).T
-        v_kite = np.array([row['kite_0_vx'],row['kite_0_vy'],row['kite_0_vz']]).T
-        at = np.dot(a_kite,np.array(v_kite)/np.linalg.norm(v_kite))*np.array(v_kite)/np.linalg.norm(v_kite)
-        omega_kite = np.cross(a_kite-at,v_kite)/(np.linalg.norm(v_kite)**2)
-        ICR_kite = np.cross(v_kite,omega_kite)/(np.linalg.norm(omega_kite)**2)
-        alpha = np.cross(at,ICR_kite)/np.linalg.norm(ICR_kite)**2
-        radius_kite.append(np.linalg.norm(ICR_kite))
-
-# # Smooth radius
-# window_size = 10
-# radius_kcu = np.convolve(radius_kcu, np.ones(window_size)/window_size, mode='same')
-# radius_kite = np.convolve(radius_kite, np.ones(window_size)/window_size, mode='same')
-
-#%% Find tether length offset
-# Function to compute mean squared error for a given offset
-def compute_mse(sig1, sig2, offset):
-    shifted_sig2 = sig2 + offset
-    mse = np.mean((sig1 - shifted_sig2) ** 2)
-    return mse
-
-up = (flight_data['kcu_actual_depower']-min(flight_data['kcu_actual_depower']))/(max(flight_data['kcu_actual_depower'])-min(flight_data['kcu_actual_depower']))
-us = (flight_data['kcu_actual_steering'])/max(abs(flight_data['kcu_actual_steering']))
-dep = (up>0.25)
-pow = (flight_data['ground_tether_reelout_speed'] > 0) & (up<0.25)
-trans = ~pow & ~dep
-turn = pow & (flight_data['kite_0_vz']<0)
-straight = pow & ~turn
-
-# Tether length
-r = np.sqrt(flight_data['kite_0_rx']**2+flight_data['kite_0_ry']**2+flight_data['kite_0_rz']**2)
-# Try different offsets and find the one with the minimum MSE
-offsets = np.linspace(-50,50,500)  # Adjust range and step size as needed
-mse_values = [compute_mse( r[pow], flight_data['ground_tether_length'][pow],offset) for offset in offsets]
-off_lt = offsets[np.argmin(mse_values)]
-
-
-flight_data['ground_tether_length'] = flight_data['ground_tether_length']+off_lt
-
-print('Offset tether length:',off_lt)
 
 #%%
 csv_filepath = '../processed_data/flight_data/'+model+'/'

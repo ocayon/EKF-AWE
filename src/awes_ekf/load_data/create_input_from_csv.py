@@ -6,18 +6,18 @@ from awes_ekf.setup.tether import Tether
 from awes_ekf.setup.kcu import KCU
 from awes_ekf.setup.settings import kappa,z0
 
-def create_input_from_KP_csv(flight_data, system_specs, model_specs, kite_sensor = 0, kcu_sensor = 1):
+def create_input_from_csv(flight_data, system_specs, model_specs, kite_sensor = 0, kcu_sensor = 1, thrust_force = False):
     """Create input classes and initial state vector from flight data"""
     n_tether_elements = model_specs.n_tether_elements
     n_intervals = len(flight_data)
     # Kite measurements
-    kite_pos = np.array([flight_data['kite_'+str(kite_sensor)+'_rx'],flight_data['kite_'+str(kite_sensor)+'_ry'],flight_data['kite_'+str(kite_sensor)+'_rz']]).T
-    kite_vel = np.array([flight_data['kite_'+str(kite_sensor)+'_vx'],flight_data['kite_'+str(kite_sensor)+'_vy'],flight_data['kite_'+str(kite_sensor)+'_vz']]).T
-    kite_acc = np.array([flight_data['kite_'+str(kite_sensor)+'_ax'],flight_data['kite_'+str(kite_sensor)+'_ay'],flight_data['kite_'+str(kite_sensor)+'_az']]).T
+    kite_pos = np.array([flight_data['kite_position_east'],flight_data['kite_position_north'], flight_data['kite_position_up']]).T
+    kite_vel = np.array([flight_data['kite_velocity_east_s'+str(kite_sensor)],flight_data['kite_velocity_north_s'+str(kite_sensor)],flight_data['kite_velocity_up_s'+str(kite_sensor)]]).T
+    kite_acc = np.array([flight_data['kite_acceleration_east_s'+str(kite_sensor)],flight_data['kite_acceleration_north_s'+str(kite_sensor)],flight_data['kite_acceleration_up_s'+str(kite_sensor)]]).T
     # KCU measurements
     if kcu_sensor is not None:
-        kcu_vel = np.array([flight_data['kite_'+str(kcu_sensor)+'_vx'],flight_data['kite_'+str(kcu_sensor)+'_vy'],flight_data['kite_'+str(kcu_sensor)+'_vz']]).T
-        kcu_acc = np.array([flight_data['kite_'+str(kcu_sensor)+'_ax'],flight_data['kite_'+str(kcu_sensor)+'_ay'],flight_data['kite_'+str(kcu_sensor)+'_az']]).T
+        kcu_vel = np.array([flight_data['kite_velocity_east_s'+str(kcu_sensor)],flight_data['kite_velocity_north_s'+str(kcu_sensor)],flight_data['kite_velocity_up_s'+str(kcu_sensor)]]).T
+        kcu_acc = np.array([flight_data['kite_acceleration_east_s'+str(kcu_sensor)],flight_data['kite_acceleration_north_s'+str(kcu_sensor)],flight_data['kite_acceleration_up_s'+str(kcu_sensor)]]).T
     else:
         kcu_vel = np.zeros((n_intervals,3))
         kcu_acc = np.zeros((n_intervals,3))
@@ -34,7 +34,7 @@ def create_input_from_KP_csv(flight_data, system_specs, model_specs, kite_sensor
     kite_elevation = np.arcsin(kite_pos[:,2]/np.linalg.norm(kite_pos,axis=1))
     kite_azimuth = np.arctan2(kite_pos[:,1],kite_pos[:,0])
     
-    kite_yaw = np.unwrap(np.array(flight_data['kite_'+str(kite_sensor)+'_yaw']-90)/180*np.pi)
+    kite_yaw = np.unwrap(np.array(flight_data['kite_yaw_s'+str(kite_sensor)]-90)/180*np.pi)
 
     init_wind_dir = np.mean(ground_winddir[0:3000])/180*np.pi
     init_wind_vel = np.mean(ground_windspeed[0])
@@ -54,8 +54,8 @@ def create_input_from_KP_csv(flight_data, system_specs, model_specs, kite_sensor
     timestep = flight_data['time'].iloc[1]-flight_data['time'].iloc[0]
     ekf_input_list = []
     for i in range(len(flight_data)):
-        
-        ekf_input_list.append(EKFInput(kite_pos = kite_pos[i], 
+        if kcu_sensor is not None:
+            ekf_input_list.append(EKFInput(kite_pos = kite_pos[i], 
                                     kite_vel = kite_vel[i], 
                                     kite_acc = kite_acc[i],
                                     kcu_acc = kcu_acc[i], 
@@ -70,6 +70,21 @@ def create_input_from_KP_csv(flight_data, system_specs, model_specs, kite_sensor
                                     ts = timestep,
                                     kite_yaw = kite_yaw[i], 
                                     steering_input = us[i]))
+        elif thrust_force is not None:
+            ekf_input_list.append(EKFInput(kite_pos = kite_pos[i], 
+                                    kite_vel = kite_vel[i], 
+                                    kite_acc = kite_acc[i],
+                                    tether_force = tether_force[i],
+                                    apparent_windspeed = apparent_windspeed[i], 
+                                    tether_length = tether_length[i],
+                                    kite_aoa = kite_aoa[i], 
+                                    reelout_speed = relout_speed[i], 
+                                    elevation = kite_elevation[i],
+                                    azimuth = kite_azimuth[i], 
+                                    ts = timestep,
+                                    kite_yaw = kite_yaw[i], 
+                                    steering_input = us[i],
+                                    thrust_force = thrust_force[i]))
 
     kite = Kite(system_specs.kite_model)
     kcu = KCU(system_specs.kcu_model)
@@ -105,3 +120,4 @@ def find_initial_state_vector(kite_pos, kite_vel, kite_acc, ground_winddir, grou
     x0 = np.append(x0,[tether.CL,tether.CD,tether.CS,tether_length, elevation, azimuth])     # Initial state vector (Last two elements are bias, used if needed)
 
     return x0
+

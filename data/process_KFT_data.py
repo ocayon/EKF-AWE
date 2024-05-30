@@ -94,6 +94,10 @@ kite_pos_x = df['positionKiteIdentified_0']
 kite_pos_y = df['positionKiteIdentified_1']
 kite_pos_z = df['positionKiteIdentified_2']
 
+kite_pos = np.array([kite_pos_x,kite_pos_y,kite_pos_z]).T
+
+
+
 kite_vel_x = df['velocityKiteIdentifiedByXsens_0']
 kite_vel_y = df['velocityKiteIdentifiedByXsens_1']
 kite_vel_z = df['velocityKiteIdentifiedByXsens_2']
@@ -115,14 +119,16 @@ perch_speed = df['speedPerchIdentified']
 thrust_force = df['thrustSet']
 
 
+
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
-ax.set_xlabel('X_N')
-ax.set_ylabel('Y_E')
+ax.set_xlabel('X_E')
+ax.set_ylabel('Y_N')
 ax.set_zlabel('Z_U')
 spacing = 300
+thrust_force_vector = []
 for i in np.arange(0,len(time), spacing):
     len_arrow = 30
     # Calculate EKF tether orientation based on euler angles and plot it
@@ -130,7 +136,9 @@ for i in np.arange(0,len(time), spacing):
                                                  kite_euler_1[i], 
                                                  kite_euler_2[i],
                                                  bodyFrame='kitekraft')
-    ax.quiver(kite_pos_x[i], kite_pos_y[i], kite_pos_z[i], ex[0],  \
+    kite_pos[i] = Rz(azimuth_center[i])@kite_pos[i]
+    thrust_force_vector.append(ex*thrust_force[i])
+    ax.quiver(kite_pos[i][0], kite_pos[i][1],kite_pos[i][2], ex[0],  \
                 ex[1], ex[2],
             color='green', length=len_arrow)
     ax.quiver(kite_pos_x[i], kite_pos_y[i], kite_pos_z[i], ey[0],  \

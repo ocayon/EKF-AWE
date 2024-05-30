@@ -2,7 +2,7 @@
 import time as time
 from awes_ekf.ekf.initialize_and_update_ekf import initialize_ekf, propagate_state_EKF
 from awes_ekf.load_data.read_data import read_processed_flight_data
-from awes_ekf.load_data.load_kp_csv import create_input_from_KP_csv
+from awes_ekf.load_data.create_input_from_csv import create_input_from_KP_csv
 from awes_ekf.setup.settings import load_config, SimulationConfig, SystemParameters
 from awes_ekf.load_data.save_data import save_results
 

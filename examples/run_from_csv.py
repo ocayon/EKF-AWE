@@ -2,15 +2,15 @@
 import time as time
 from awes_ekf.ekf.initialize_and_update_ekf import initialize_ekf, propagate_state_EKF
 from awes_ekf.load_data.read_data import read_processed_flight_data
-from awes_ekf.load_data.load_kp_csv import create_input_from_KP_csv
+from awes_ekf.load_data.create_input_from_csv import create_input_from_csv
 from awes_ekf.setup.settings import load_config, SimulationConfig, SystemParameters
 from awes_ekf.load_data.save_data import save_results
 
 if __name__ == '__main__':
     #%% Load flight data and configuration settings
-    year = '2024'
-    month = '02'
-    day = '16'
+    year = '2023'
+    month = '11'
+    day = '27'
     kite_model = 'v9'
     flight_data = read_processed_flight_data(year,month,day,kite_model)
     flight_data = flight_data.iloc[:10000]
@@ -19,7 +19,7 @@ if __name__ == '__main__':
     simConfig = SimulationConfig(**config_data['simulation_parameters'])
     systemParams = SystemParameters(config_data['system_parameters'], simConfig)
     # Create input classes
-    ekf_input_list,x0 = create_input_from_KP_csv(flight_data, systemParams, simConfig,kite_sensor = 0, kcu_sensor = 1)
+    ekf_input_list,x0 = create_input_from_csv(flight_data, systemParams, simConfig,kite_sensor = 0, kcu_sensor = 1)
 
     ekf, dyn_model,kite, kcu, tether = initialize_ekf(ekf_input_list[0], simConfig, systemParams,x0)
     

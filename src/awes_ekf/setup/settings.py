@@ -25,6 +25,7 @@ class SimulationConfig:
         self.tether_offset = kwargs.get('tether_offset', True)
         self.enforce_z_wind = kwargs.get('enforce_z_wind', False)
         self.model_yaw = kwargs.get('model_yaw', False)
+        self.thrust_force = kwargs.get('thrust_force', False)
 
 class SystemParameters:
     def __init__(self, config, simConfig):
