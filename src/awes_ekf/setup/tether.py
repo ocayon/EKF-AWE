@@ -3,12 +3,27 @@ from awes_ekf.setup.settings import g, rho, z0
 from scipy.optimize import least_squares
 from awes_ekf.utils import project_onto_plane, calculate_angle_2vec
 import casadi as ca
-from awes_ekf.setup.model_definitions import tether_materials
 
+tether_materials = {
+    "Dyneema-SK78": {
+        "density": 970,
+        "cd": 1.1,
+        "Youngs_modulus": 132e9,
+    },
+    "Dyneema-SK75": {
+        "density": 970,
+        "cd": 1.1,
+        "Youngs_modulus": 109e9,
+        }
+}
 class Tether:
     """ Tether model class"""
-    def __init__(self,material_name,diameter, n_elements,elastic=True):
+    def __init__(self,elastic=True, **kwargs):
         """"Create tether model class from material name and diameter"""
+        material_name = kwargs.get('material_name')
+        diameter = kwargs.get('diameter')
+        n_elements = kwargs.get('n_elements')
+
         if material_name in tether_materials:
             material_params = tether_materials[material_name]
             for key, value in material_params.items():
@@ -36,7 +51,7 @@ class Tether:
         m_s = np.pi*tether.diameter**2/4 * l_unstrained * tether.density
 
         n_elements = tether.n_elements
-        if kite.KCU == True:
+        if kcu is not None:
             n_elements += 1
         
         wvel = ca.norm_2(vw)
@@ -74,7 +89,7 @@ class Tether:
         stretched_tether_length = l_s  # Stretched
         for j in range(n_elements):  # Iterate over point masses.
             last_element = j == n_elements - 1
-            kcu_element = kite.KCU and j == n_elements - 2
+            kcu_element = kcu is not None and j == n_elements - 2
 
             # Determine kinematics at point mass j.
             vj = ca.cross(omega_tether, positions[j+1, :].T)
@@ -119,7 +134,7 @@ class Tether:
             tether_drag_basis = rho*l_unstrained*tether.diameter*CD_tether*vaj_sq
             
             # Determine drag at point mass j.
-            if not kite.KCU:
+            if kcu is None:
                 if tether.n_elements == 1:
                     dj = -.125*tether_drag_basis
                 elif last_element:
@@ -163,7 +178,7 @@ class Tether:
                     D_t = 0.5*rho*ca.norm_2(vaj)**2*l_unstrained*tether.diameter*cd_t
                     dj = L_t*dir_L + D_t*dir_D
 
-            if not kite.KCU:
+            if kcu is None:
                 if last_element:
                     point_mass = m_s/2 + kite.mass + kcu.mass           
                 else:
@@ -186,7 +201,7 @@ class Tether:
 
             # Derive position of next point mass from former tension
             if kcu_element:
-                positions[j+2, :] = positions[j+1, :] + tensions[j+1, :]/ca.norm_2(tensions[j+1, :]) * kite.distance_kcu_kite
+                positions[j+2, :] = positions[j+1, :] + tensions[j+1, :]/ca.norm_2(tensions[j+1, :]) * kcu.distance_kcu_kite
                 
             elif not last_element:
                 if tether.elastic:
@@ -202,7 +217,7 @@ class Tether:
         
 
 
-    def calculate_tether_shape(self,x, n_tether_elements, r_kite, v_kite, vw, kite, kcu, tension_ground = None, tether_length = None,
+    def calculate_tether_shape(self,x, r_kite, v_kite, vw, kite, kcu, tension_ground = None, tether_length = None,
                                a_kite = None, a_kcu = None, v_kcu = None, return_values=False):
         """ Calculate the shape of the tether given the current state of the kite and the wind.
         Possible inputs:
@@ -220,11 +235,11 @@ class Tether:
         else:
             beta_n, phi_n, tension_ground = x
         
-        l_unstrained = tether_length/n_tether_elements
+        n_elements = self.n_elements
+        l_unstrained = tether_length/n_elements
         m_s = np.pi*self.diameter**2/4 * l_unstrained * self.density
 
-        n_elements = n_tether_elements
-        if kite.KCU == True:
+        if kcu is not None:
             n_elements += 1
         
         wvel = np.linalg.norm(vw)
@@ -266,7 +281,7 @@ class Tether:
         stretched_tether_length = l_s  # Stretched
         for j in range(n_elements):  # Iterate over point masses.
             last_element = j == n_elements - 1
-            kcu_element = kite.KCU and j == n_elements - 2
+            kcu_element = kcu is not None and j == n_elements - 2
 
             # Determine kinematics at point mass j.
             vj = np.cross(omega_tether, positions[j+1, :])
@@ -313,8 +328,8 @@ class Tether:
             tether_drag_basis = rho*l_unstrained*self.diameter*CD_tether*vaj_sq
             
             # Determine drag at point mass j.
-            if not kite.KCU:
-                if n_tether_elements == 1:
+            if kcu is None:
+                if n_elements == 1:
                     dj = -.125*tether_drag_basis
                 elif last_element:
                     dj = -.25*tether_drag_basis  # TODO: add bridle drag
@@ -325,7 +340,7 @@ class Tether:
                     # dj = -0.25*rho*L_blines*d_bridle*vaj_sq*cd_t # Bridle lines drag
                     dj = 0
                     
-                elif n_tether_elements == 1:
+                elif n_elements == 1:
                     dj = -.25*tether_drag_basis
                     dp= -.5*rho*np.linalg.norm(vajp)*vajp*kcu.cdp*kcu.Ap  # Adding kcu drag perpendicular to kcu
                     dt= -.5*rho*np.linalg.norm(vajn)*vajn*kcu.cdt*kcu.At  # Adding kcu drag parallel to kcu
@@ -359,7 +374,7 @@ class Tether:
                     
                     drag_tether += D_t
 
-            if not kite.KCU:
+            if kcu is None:
                 if last_element:
                     point_mass = m_s/2 + kite.mass + kcu.mass           
                 else:
@@ -389,7 +404,7 @@ class Tether:
 
             # Derive position of next point mass from former tension
             if kcu_element:
-                positions[j+2, :] = positions[j+1, :] + tensions[j+1, :]/np.linalg.norm(tensions[j+1, :]) * kite.distance_kcu_kite
+                positions[j+2, :] = positions[j+1, :] + tensions[j+1, :]/np.linalg.norm(tensions[j+1, :]) * kcu.distance_kcu_kite
                 
             elif not last_element:
                 if self.elastic:
@@ -446,7 +461,7 @@ class Tether:
             else:   
                 return (positions[-1, :] - r_kite) 
         
-    def solve_tether_shape(self, n_tether_elements, r_kite, v_kite, vw, kite, kcu, tension_ground = None, tether_length = None,
+    def solve_tether_shape(self, r_kite, v_kite, vw, kite, kcu, tension_ground = None, tether_length = None,
                             a_kite = None, a_kcu = None, v_kcu = None):
         
         if not hasattr(self, 'opt_guess'):
@@ -458,7 +473,7 @@ class Tether:
             else:
                 self.opt_guess = [elevation, azimuth, length]
             
-        args = (n_tether_elements, r_kite, v_kite, vw, kite, kcu, tension_ground, tether_length, a_kite, a_kcu, v_kcu)
+        args = (r_kite, v_kite, vw, kite, kcu, tension_ground, tether_length, a_kite, a_kcu, v_kcu)
         opt_res = least_squares(self.calculate_tether_shape, self.opt_guess, args=args, verbose=0,xtol = 1e-3,ftol = 1e-3)
         self.opt_guess = opt_res.x
         res = self.calculate_tether_shape(self.opt_guess, *args, return_values=True)

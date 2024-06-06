@@ -64,7 +64,7 @@ def create_ekf_output(x, u, kite, tether,kcu, model_specs):
         kcu_vel = None
         kite_acc = u[2:5]
 
-    args = (model_specs.n_tether_elements, kite_pos, kite_vel, vw, kite, kcu, tension_ground )
+    args = (kite_pos, kite_vel, vw, kite, kcu, tension_ground )
     opt_guess = [elevation_0, azimuth_0, tether_length]
     res = tether.calculate_tether_shape(opt_guess, *args, a_kite = kite_acc, a_kcu = kcu_acc, v_kcu = kcu_vel, return_values=True)
     dcm_b2w = res[2]
