@@ -27,7 +27,7 @@ kcu:
 tether:
   material_name: 'Dyneema-SK78'   # Material name of the tether
   diameter: 0.01               # Diameter of the tether in m
-  n_tether_elements: 5                # Number of tether elements
+  n_elements: 5                # Number of tether elements
 
 
 tuning_parameters:

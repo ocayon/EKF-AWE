@@ -16,15 +16,16 @@ file_name = '2023-11-27_13-37-48_ProtoLogger_lidar.csv'
 # file_name = '2021-10-07_19-38-15_ProtoLogger.csv'
 # file_name = '2023-12-11_13-15-42_ProtoLogger_lidar.csv'
 # file_name = '2024-01-09_12-28-51_ProtoLogger_lidar.csv'
+file_name = '2024-06-05_11-33-16_ProtoLogger_lidar.csv'
 
-file_path = './'+model+'/v9.60.F-different-bridle/'
-file_name = '2024-03-26_15-00-03_ProtoLogger_lidar.csv'
+# file_path = './'+model+'/v9.60.F-different-bridle/'
+# file_name = '2024-03-26_15-00-03_ProtoLogger_lidar.csv'
 
-file_path = './'+model+'/more-depowered-reelin/'
-file_name = '2024-03-25_14-08-47_ProtoLogger_lidar.csv'
-# file_name = '2024-03-12_13-36-02_ProtoLogger_lidar.csv'
-file_path = './'+model+'/front_stall/'
-file_name = '2024-04-11_12-51-46_ProtoLogger_lidar.csv'
+# file_path = './'+model+'/more-depowered-reelin/'
+# file_name = '2024-03-25_14-08-47_ProtoLogger_lidar.csv'
+# # file_name = '2024-03-12_13-36-02_ProtoLogger_lidar.csv'
+# file_path = './'+model+'/front_stall/'
+# file_name = '2024-04-11_12-51-46_ProtoLogger_lidar.csv'
 
 
 # Smooth radius
@@ -37,7 +38,7 @@ df = pd.read_csv(file_path+file_name,delimiter = ' ')
 
 #%%
 
-df = df[df['kite_height'] > 50] #Select the indexes where the kite is flying
+df = df[df['kite_height'] > 80] #Select the indexes where the kite is flying
 
 dt = df['time'].iloc[1] - df['time'].iloc[0]  # Time step
 df = df.reset_index() # Reset the index
