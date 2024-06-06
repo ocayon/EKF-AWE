@@ -6,23 +6,19 @@ from awes_ekf.setup.kite import Kite
 from awes_ekf.setup.kcu import KCU
 from awes_ekf.ekf.ekf_output import create_ekf_output
 
-def initialize_ekf(ekf_input, simConfig, systemParams,x0):
+def initialize_ekf(ekf_input, simConfig, tuningParams,x0,kite,kcu,tether):
     """
     Initialize the Extended Kalman Filter with system components and models.
 
     Args:
         ekf_input (EKFInput): Input parameters for the EKF.
         simConfig (SimulationConfig): Configuration settings for the simulation models.
-        systemParams (SystemParameters): Specifications of the system components.
+        tuningParams (SystemParameters): Specifications of the system components.
 
     Returns:
         tuple: Returns a tuple containing initialized components of the EKF including the filter itself,
                dynamic model, kite, KCU (Kite Control Unit), and tether.
     """
-    kite = Kite(systemParams.kite_model)
-    kcu = KCU(systemParams.kcu_model, data_available=simConfig.kcu_data)  
-        
-    tether = Tether(systemParams.tether_material,systemParams.tether_diameter,simConfig.n_tether_elements)
     
     # Create dynamic model and observation model
     dyn_model = DynamicModel(kite,tether,kcu,simConfig)
@@ -30,13 +26,13 @@ def initialize_ekf(ekf_input, simConfig, systemParams,x0):
         
         
     # Initialize EKF
-    ekf = ExtendedKalmanFilter(systemParams.stdv_dynamic_model, systemParams.stdv_measurements, simConfig.ts,dyn_model,obs_model, kite, tether, kcu, simConfig)
+    ekf = ExtendedKalmanFilter(tuningParams.stdv_dynamic_model, tuningParams.stdv_measurements, simConfig.ts,dyn_model,obs_model, kite, tether, kcu, simConfig)
     # Initialize input vector
     ekf.update_input_vector(ekf_input,kcu)
     # Initialize state vector
     ekf.x_k1_k1 = x0
 
-    return ekf, dyn_model,kite, kcu, tether
+    return ekf, dyn_model
 
 
 def update_state_ekf_tether(ekf, tether, kite, kcu, ekf_input, simConfig):

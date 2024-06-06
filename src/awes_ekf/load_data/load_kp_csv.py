@@ -6,9 +6,8 @@ from awes_ekf.setup.tether import Tether
 from awes_ekf.setup.kcu import KCU
 from awes_ekf.setup.settings import kappa,z0
 
-def create_input_from_KP_csv(flight_data, system_specs, model_specs, kite_sensor = 0, kcu_sensor = 1):
+def create_input_from_KP_csv(flight_data, kite, kcu, tether, model_specs, kite_sensor = 0, kcu_sensor = 1):
     """Create input classes and initial state vector from flight data"""
-    n_tether_elements = model_specs.n_tether_elements
     n_intervals = len(flight_data)
     # Kite measurements
     kite_pos = np.array([flight_data['kite_'+str(kite_sensor)+'_rx'],flight_data['kite_'+str(kite_sensor)+'_ry'],flight_data['kite_'+str(kite_sensor)+'_rz']]).T
@@ -71,20 +70,17 @@ def create_input_from_KP_csv(flight_data, system_specs, model_specs, kite_sensor
                                     kite_yaw = kite_yaw[i], 
                                     steering_input = us[i]))
 
-    kite = Kite(system_specs.kite_model)
-    kcu = KCU(system_specs.kcu_model)
-    tether = Tether(system_specs.tether_material,system_specs.tether_diameter,n_tether_elements)
 
     x0 = find_initial_state_vector(kite_pos[0], kite_vel[0], kite_acc[0], 
                                        init_wind_dir, init_wind_vel, tether_force[0], 
-                                       tether_length[0], n_tether_elements, kite_elevation[0], kite_azimuth[0], kite, kcu,tether, model_specs)
+                                       tether_length[0], kite_elevation[0], kite_azimuth[0], kite, kcu,tether, model_specs)
     if model_specs.model_yaw:
         x0 = np.append(x0,[kite_yaw[0],0])  # Initial wind velocity and direction
     if model_specs.tether_offset:
         x0 = np.append(x0,0)
     return ekf_input_list, x0
 
-def find_initial_state_vector(kite_pos, kite_vel, kite_acc, ground_winddir, ground_windspeed, tether_force, tether_length, n_tether_elements,
+def find_initial_state_vector(kite_pos, kite_vel, kite_acc, ground_winddir, ground_windspeed, tether_force, tether_length,
                               elevation, azimuth, kite, kcu,tether, model_specs):
 
     # Solve for the tether shape
@@ -94,7 +90,7 @@ def find_initial_state_vector(kite_pos, kite_vel, kite_acc, ground_winddir, grou
         raise ValueError('Initial wind velocity is NaN')
     vw = [wvel0*np.cos(ground_winddir),wvel0*np.sin(ground_winddir),0] # Initial wind velocity
 
-    tether.solve_tether_shape(n_tether_elements, kite_pos, kite_vel, vw, kite, kcu, tension_ground = tether_force, tether_length = tether_length,
+    tether.solve_tether_shape( kite_pos, kite_vel, vw, kite, kcu, tension_ground = tether_force, tether_length = tether_length,
                                 a_kite = kite_acc)
     x0 = np.vstack((kite_pos,kite_vel))
     

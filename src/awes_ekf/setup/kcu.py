@@ -1,4 +1,3 @@
-from awes_ekf.setup.model_definitions import kcu_cylinders
 import numpy as np
 from scipy.interpolate import splrep, splev
 
@@ -15,15 +14,15 @@ class KCU:
     spline_t = splrep(ldt_data, cdt_data, s=0)
     spline_p = splrep(ldp_data, cdp_data, s=0)
     
-    def __init__(self,model_name, data_available = False):
+    def __init__(self, data_available = False,**kwargs):
         
-        if model_name in kcu_cylinders:
-            model_params = kcu_cylinders[model_name]
-            for key, value in model_params.items():
-                # Set each key-value pair as an attribute of the instance
-                setattr(self, key, value)
-        else:
-            raise ValueError("Invalid KCU model, add it to model_definitions.py")
+        self.length = kwargs.get('length')
+        self.diameter = kwargs.get('diameter')
+        self.mass = kwargs.get('mass')
+        self.distance_kcu_kite = kwargs.get('distance_kcu_kite')
+        self.total_length_bridle_lines = kwargs.get('total_length_bridle_lines')
+        self.diameter_bridle_lines = kwargs.get('diameter_bridle_lines')
+
         self.data_available = data_available
 
         # Example: Interpolate Cd for tangential flow at a specific L/D
