@@ -195,7 +195,8 @@ plt.figure()
 plt.plot(abs(np.array(elevation_escape)))
 #%%
 fs = 10
-signal = np.array(results['wind_velocity'])#[results['z']<150]
+mask = range(len(results))#(results['kite_pos_z']>140)&(results['kite_pos_z']<180)
+signal = np.array(results['wind_velocity'][mask])
 from scipy.signal import detrend
 from scipy.stats import linregress
 
@@ -212,7 +213,7 @@ fft_result = np.fft.fft(signal_fluctuations)
 fft_freq = np.fft.fftfreq(signal_fluctuations.size, d=1/fs)
 
 # Compute energy spectrum (magnitude squared)
-energy_spectrum = np.abs(fft_result)**2
+energy_spectrum = np.abs(fft_result)**2/flight_data['time'].iloc[-1]
 
 # Select positive frequencies for plotting and analysis
 pos_freq = fft_freq > 0
@@ -223,13 +224,12 @@ pos_fft_freq = fft_freq[pos_freq]
 plt.figure(figsize=(10, 6))
 plt.loglog(pos_fft_freq, pos_energy_spectrum, label='Energy Spectrum')
 plt.xlabel('Frequency (Hz)')
-plt.ylabel('Energy')
-plt.title('Log-Log Plot of Energy Spectrum After Mean Subtraction')
+plt.ylabel('Power Spectral Density ($m^2/s^2$)')
 
 # Determine an appropriate subrange and calculate the slope
 # Adjust subrange_start and subrange_end based on your data
 subrange_start = 1e-2  # Example start frequency
-subrange_end = 1e-1   # Example end frequency
+subrange_end = 2e-1   # Example end frequency
 subrange_mask = (pos_fft_freq > subrange_start) & (pos_fft_freq < subrange_end)
 
 if np.any(subrange_mask):
@@ -240,7 +240,7 @@ else:
     print("No data in the specified subrange. Please adjust the subrange criteria.")
 
 slope = -5/3
-plt.plot(pos_fft_freq[subrange_mask], np.exp(intercept) * pos_fft_freq[subrange_mask] ** slope, 'g--', label=f'Fitted Slope: -5/3')
+plt.plot(pos_fft_freq[subrange_mask], np.exp(intercept) * pos_fft_freq[subrange_mask] ** slope, 'g--', label=f'Kolmogorov: -5/3')
 plt.legend()
 plt.show()
 
@@ -330,3 +330,29 @@ std_yaw_error = np.std(yaw_error)
 print(f'Mean pitch error: {mean_pitch_error:.2f} deg, std: {std_pitch_error:.2f} deg')
 print(f'Mean roll error: {mean_roll_error:.2f} deg, std: {std_roll_error:.2f} deg')
 print(f'Mean yaw error: {mean_yaw_error:.2f} deg, std: {std_yaw_error:.2f} deg')
+
+
+#%% Plot turbulence intensity
+mask = (results['kite_pos_z']>150)&(results['kite_pos_z']<170)
+TI_160m = []
+for i in range(len(results)):
+    if i<600:
+        std = np.std(results['wind_velocity'].iloc[0:i][mask])
+        mean = np.mean(results['wind_velocity'].iloc[0:i][mask])
+    else:
+        std = np.std(results['wind_velocity'].iloc[i-600:i][mask])
+        mean = np.mean(results['wind_velocity'].iloc[i-600:i][mask])
+
+    TI_160m.append(std/mean)
+#%%
+TI_160m_lidar = flight_data['160m Wind Speed Dispersion (m/s)']/flight_data['160m Wind Speed (m/s)']
+plt.figure()
+plt.plot(TI_160m)
+plt.plot(TI_160m_lidar)
+plt.legend(['EKF','Lidar'])
+plt.xlabel('Time (s)')
+plt.ylabel('Turbulence intensity')
+plt.title('Turbulence intensity at 160m altitude')
+
+
+
