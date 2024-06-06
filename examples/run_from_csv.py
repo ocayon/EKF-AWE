@@ -12,18 +12,18 @@ from awes_ekf.setup.kcu import KCU
 if __name__ == '__main__':
     #%% Load flight data and configuration settings
     year = '2024'
-    month = '02'
-    day = '16'
+    month = '06'
+    day = '05'
     kite_model = 'v9'
     flight_data = read_processed_flight_data(year,month,day,kite_model)
-    flight_data = flight_data.iloc[:10000]
+    # flight_data = flight_data.iloc[:10000]
     config_data = load_config('examples/v9_config.yaml')
     #%% Initialize EKF
     simConfig = SimulationConfig(**config_data['simulation_parameters'])
 
     kite = Kite(**config_data['kite'])
     if config_data['kcu'] is not None:
-        kcu = KCU(**config_data['kcu'])
+        kcu = KCU(**config_data['kcu'],data_available=simConfig.kcu_data)
     else:
         kcu = None
     tether = Tether(**config_data['tether'])

@@ -2,14 +2,15 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from awes_ekf.setup.kite import Kite
+from awes_ekf.setup.settings import load_config
 import seaborn as sns
 import awes_ekf.plotting.plot_utils as pu
 from awes_ekf.postprocess.postprocessing import  postprocess_results
 from awes_ekf.load_data.read_data import read_results
 #%%
 year = '2024'
-month = '02'
-day = '16'
+month = '06'
+day = '05'
 kite_model = 'v9'                   
 
 plt.close('all')
@@ -18,8 +19,9 @@ results,flight_data = read_results(year, month, day, kite_model)
 
 plot_lidar_heights= [100,160,200,250]
 
-kite = Kite(kite_model)
+config_data = load_config('examples/v9_config.yaml')
 
+kite = Kite(**config_data['kite'])
 imus = [0]
 
 # flight_data['kite_0_pitch'] = (flight_data['kite_0_pitch']+flight_data['kite_1_pitch'])/2
