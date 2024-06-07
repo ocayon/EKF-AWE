@@ -296,15 +296,19 @@ def plot_aero_coeff_vs_aoa_ss(results, flight_data, cycles_plotted, IMU_0=False,
         axs[4].plot(results[mask_cycle]['time'], results[mask_cycle]['ss_EKF_tether'], label='ss EKF tether')
 
     # Vane data
-    axs[3].plot(flight_data[mask_cycle]['time'], flight_data[mask_cycle]['kite_angle_of_attack'], label='aoa vane')
-    axs[4].plot(flight_data[mask_cycle]['time'], flight_data[mask_cycle]['kite_sideslip_angle'], label='ss vane')
+    if 'kite_angle_of_attack' in flight_data.columns:
+        axs[3].plot(flight_data[mask_cycle]['time'], flight_data[mask_cycle]['kite_angle_of_attack'], label='aoa vane')
+        axs[4].plot(flight_data[mask_cycle]['time'], flight_data[mask_cycle]['kite_sideslip_angle'], label='ss vane')
 
     # Highlight operational modes
     i = 0
     for ax in axs:
-        mask_straight = (flight_data['turn_straight'] == 'straight') & (flight_data['powered'] == 'powered') & mask_cycle
-        mask_turn = (flight_data['turn_straight'] == 'turn') & (flight_data['powered'] == 'powered') & mask_cycle
-        mask_depowered = (flight_data['powered'] == 'depowered') & mask_cycle
+        mask_straight = (flight_data['turn_straight'] == 'straight') & mask_cycle
+        mask_turn = (flight_data['turn_straight'] == 'turn') & mask_cycle
+        if 'powered' in flight_data.columns:
+            mask_depowered = (flight_data['powered'] == 'depowered') & mask_cycle
+        else:
+            mask_depowered = np.zeros(len(flight_data), dtype=bool)
         if i == 0:
             ax.fill_between(flight_data['time'], ax.get_ylim()[0], ax.get_ylim()[1], where=mask_straight, color='blue', alpha=0.2, label = 'Straight')
             ax.fill_between(flight_data['time'], ax.get_ylim()[0], ax.get_ylim()[1], where=mask_turn, color='red', alpha=0.2, label = 'Turn')
