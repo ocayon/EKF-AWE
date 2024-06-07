@@ -18,3 +18,7 @@ class EKFInput:
     azimuth: float = None        # Azimuth angle
     kite_yaw: float = None            # Yaw angle
     steering_input: float = None # Steering input
+    
+    def __post_init__(self):
+        if np.linalg.norm(self.kite_acc) < 1e-5:
+            self.kite_acc = np.full_like(self.kite_acc, 1e-5)
