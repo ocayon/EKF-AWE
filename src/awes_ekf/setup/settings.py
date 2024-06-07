@@ -15,7 +15,6 @@ def load_config(filepath):
 class SimulationConfig:
     def __init__(self, **kwargs):
         self.ts = kwargs.get('timestep')
-        self.n_tether_elements = kwargs.get('n_tether_elements')
         self.opt_measurements = kwargs.get('opt_measurements', [])
         self.kcu_data = kwargs.get('kcu_data', False)
         self.doIEKF = kwargs.get('doIEKF', True)
@@ -27,12 +26,8 @@ class SimulationConfig:
         self.model_yaw = kwargs.get('model_yaw', False)
         self.thrust_force = kwargs.get('thrust_force', False)
 
-class SystemParameters:
+class TuningParameters:
     def __init__(self, config, simConfig):
-        self.kite_model = config['kite_model']
-        self.kcu_model = config['kcu_model']
-        self.tether_material = config['tether_material']
-        self.tether_diameter = config['tether_diameter']
         model_stdv = config['model_stdv']
         meas_stdv = config['meas_stdv']
 

@@ -2,9 +2,12 @@
 import time as time
 from awes_ekf.ekf.initialize_and_update_ekf import initialize_ekf, propagate_state_EKF
 from awes_ekf.load_data.read_data import read_processed_flight_data
-from awes_ekf.load_data.create_input_from_csv import create_input_from_KP_csv
-from awes_ekf.setup.settings import load_config, SimulationConfig, SystemParameters
+from awes_ekf.load_data.create_input_from_csv import create_input_from_csv
+from awes_ekf.setup.settings import load_config, SimulationConfig, TuningParameters
 from awes_ekf.load_data.save_data import save_results
+from awes_ekf.setup.kite import Kite
+from awes_ekf.setup.tether import Tether
+from awes_ekf.setup.kcu import KCU
 
 if __name__ == '__main__':
     #%% Load flight data and configuration settings
@@ -17,11 +20,20 @@ if __name__ == '__main__':
     config_data = load_config('examples/v3_config.yaml')
     #%% Initialize EKF
     simConfig = SimulationConfig(**config_data['simulation_parameters'])
-    systemParams = SystemParameters(config_data['system_parameters'], simConfig)
-    # Create input classes
-    ekf_input_list,x0 = create_input_from_KP_csv(flight_data, systemParams, simConfig,kite_sensor = 0, kcu_sensor = 1)
 
-    ekf, dyn_model,kite, kcu, tether = initialize_ekf(ekf_input_list[0], simConfig, systemParams,x0)
+    kite = Kite(**config_data['kite'])
+    if config_data['kcu'] is not None:
+        kcu = KCU(**config_data['kcu'])
+    else:
+        kcu = None
+    tether = Tether(**config_data['tether'])
+
+    tuningParams = TuningParameters(config_data['tuning_parameters'], simConfig)
+
+    # Create input classes
+    ekf_input_list,x0 = create_input_from_csv(flight_data, kite,kcu,tether, simConfig, kite_sensor = 0)
+
+    ekf, dyn_model = initialize_ekf(ekf_input_list[0], simConfig, tuningParams,x0,kite,kcu,tether)
     
     #%% Main loop
     ekf_output_list = []    # List of instances of EKFOutput    

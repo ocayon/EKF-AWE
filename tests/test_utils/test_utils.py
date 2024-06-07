@@ -62,7 +62,7 @@ def test_calculate_airflow_angles():
     v_kite = np.array([1, 0, 0])
     vw = np.array([0, 1, 0])
     expected = (0, 45)
-    result = calculate_airflow_angles(dcm, v_kite, vw)
+    result = calculate_airflow_angles(dcm, vw-v_kite)
     assert np.allclose(result, expected, atol=1e-6)
 
 # Test for calculate_euler_from_reference_frame function
