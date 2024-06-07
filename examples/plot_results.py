@@ -2,16 +2,17 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from awes_ekf.setup.kite import Kite
+from awes_ekf.setup.kcu import KCU
 from awes_ekf.setup.settings import load_config
 import seaborn as sns
 import awes_ekf.plotting.plot_utils as pu
 from awes_ekf.postprocess.postprocessing import  postprocess_results
 from awes_ekf.load_data.read_data import read_results
 #%%
-year = '2024'
-month = '06'
-day = '05'
-kite_model = 'v9'                   
+year = '2019'
+month = '10'
+day = '08'
+kite_model = 'v3'                   
 
 plt.close('all')
 
@@ -22,6 +23,7 @@ plot_lidar_heights= [100,160,200,250]
 config_data = load_config('examples/v9_config.yaml')
 
 kite = Kite(**config_data['kite'])
+kcu = KCU(**config_data['kcu'])
 imus = [0]
 
 # flight_data['kite_0_pitch'] = (flight_data['kite_0_pitch']+flight_data['kite_1_pitch'])/2
@@ -157,7 +159,7 @@ for cycle in range(0,int(max(np.array(flight_data['cycle'])))):
 
     
     mask= mask&(flight_data['powered'] == 'depowered')
-    slack.append(np.max(results['tether_length'][mask]-r[mask]+kite.distance_kcu_kite))
+    slack.append(np.max(results['tether_length'][mask]-r[mask]+kcu.distance_kcu_kite))
 
 x = np.arange(0,max(np.array(flight_data['cycle'])))
 y1 = mechanic_power
