@@ -5,6 +5,7 @@ class Kite:
         self.area = kwargs.get('area')
         self.span = kwargs.get('span')
         self.model_name = kwargs.get('model_name')
+        self.thrust = kwargs.get('thrust', False)
         
 
 
