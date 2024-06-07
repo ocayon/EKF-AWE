@@ -66,7 +66,14 @@ def remove_offsets_IMU_data(results, flight_data, sensor=0):
 
     return flight_data
 
+def normalize_kcu_steering_inputs(flight_data):
+    """ Normalize the KCU steering inputs to the range [-1, 1] """
+    min_depower = min(flight_data['kcu_actual_depower'])
+    max_depower = max(flight_data['kcu_actual_depower'])
+    flight_data['us'] =  (flight_data['kcu_actual_steering'])/max(abs(flight_data['kcu_actual_steering'])) 
+    flight_data['up'] = (flight_data['kcu_actual_depower']-min_depower)/(max_depower-min_depower)
 
+    return flight_data
 
 def postprocess_results(results,flight_data, kite, kcu,imus = [0], remove_IMU_offsets=True, correct_IMU_deformation = False, remove_vane_offsets=False, estimate_kite_angle=False):
     """
@@ -78,17 +85,11 @@ def postprocess_results(results,flight_data, kite, kcu,imus = [0], remove_IMU_of
     :param EKF_tether: EKF data from the tether orientation and IMU yaw
     :return: results with aoa and ss va radius omega and slack
     """
+    if kcu is not None:
+        flight_data = normalize_kcu_steering_inputs(flight_data)
+        flight_data['powered'] = flight_data.apply(determine_powered_depowered, axis=1)
     
-    min_depower = min(flight_data['kcu_actual_depower'])
-    max_depower = max(flight_data['kcu_actual_depower'])
-    flight_data['us'] =  (flight_data['kcu_actual_steering'])/max(abs(flight_data['kcu_actual_steering'])) 
-    flight_data['up'] = (flight_data['kcu_actual_depower']-min_depower)/(max_depower-min_depower)
-    # Identify flight phases
-    flight_data['turn_straight'] = flight_data.apply(determine_turn_straight, axis=1)
-    flight_data['right_left'] = flight_data.apply(determine_turn_straight, axis=1)
-    flight_data['powered'] = flight_data.apply(determine_powered_depowered, axis=1)
-    
-        
+       
     
     # results['kite_roll'] = np.degrees(results['kite_roll'])
     # results['kite_pitch'] = np.degrees(results['kite_pitch'])
@@ -136,17 +137,17 @@ def postprocess_results(results,flight_data, kite, kcu,imus = [0], remove_IMU_of
         results['ss_IMU_'+str(imu)] = np.zeros(len(results))
  
         
-    
-    # Correct angle of attack for depowered phase on EKF mean pitch during depower
-    mask_turn = abs(flight_data['us'])>0.9
-    mask_dep = flight_data['up']>0.9
-    pitch_EKF = np.array(results['kite_pitch'])
-    pitch_IMU_0 = np.array(flight_data['kite_pitch_s0'])
-    offset_dep = np.mean(pitch_EKF[mask_dep]-pitch_IMU_0[mask_dep])
-    offset_turn = np.mean(pitch_EKF[mask_turn]-pitch_IMU_0[mask_turn])
-    offset_pitch = offset_dep*np.array(flight_data['up'])#-offset_turn*np.array(abs(flight_data['us']))
-    flight_data['offset_pitch'] = offset_pitch
-    print('Offset pitch depower: ', offset_dep, 'Offset pitch turn: ', offset_turn)  
+    if correct_IMU_deformation:
+        # Correct angle of attack for depowered phase on EKF mean pitch during depower
+        mask_turn = abs(flight_data['us'])>0.9
+        mask_dep = flight_data['up']>0.9
+        pitch_EKF = np.array(results['kite_pitch'])
+        pitch_IMU_0 = np.array(flight_data['kite_pitch_s0'])
+        offset_dep = np.mean(pitch_EKF[mask_dep]-pitch_IMU_0[mask_dep])
+        offset_turn = np.mean(pitch_EKF[mask_turn]-pitch_IMU_0[mask_turn])
+        offset_pitch = offset_dep*np.array(flight_data['up'])#-offset_turn*np.array(abs(flight_data['us']))
+        flight_data['offset_pitch'] = offset_pitch
+        print('Offset pitch depower: ', offset_dep, 'Offset pitch turn: ', offset_turn)  
     
     
         
@@ -157,7 +158,10 @@ def postprocess_results(results,flight_data, kite, kcu,imus = [0], remove_IMU_of
     ip = 0
     radius_turn = []
     omega = []
-    slack = flight_data['ground_tether_length']+kcu.distance_kcu_kite-np.linalg.norm(r_kite,axis=1)
+    if kcu is not None:
+        slack = flight_data['ground_tether_length']+kcu.distance_kcu_kite-np.linalg.norm(r_kite,axis=1)
+    else:
+        slack = flight_data['ground_tether_length']-np.linalg.norm(r_kite,axis=1)
     for i in range(len(results)):
         res = results.iloc[i]
         fd = flight_data.iloc[i]
@@ -179,23 +183,26 @@ def postprocess_results(results,flight_data, kite, kcu,imus = [0], remove_IMU_of
         
         radius_turn.append(np.linalg.norm(ICR))
         omega.append(np.linalg.norm(omega_kite))
-
-        if fd['powered']=='depowered' and not in_cycle:
-            flight_data.loc[ip:i, 'cycle'] = cycle_count
-            ip = i
-            # Entering a new cycle
-            cycle_count += 1
-            in_cycle = True
-        elif fd['powered']=='powered' and in_cycle:
-            # Exiting the current cycle
-            in_cycle = False
+        if kcu is not None:
+            if fd['powered']=='depowered' and not in_cycle:
+                flight_data.loc[ip:i, 'cycle'] = cycle_count
+                ip = i
+                # Entering a new cycle
+                cycle_count += 1
+                in_cycle = True
+            elif fd['powered']=='powered' and in_cycle:
+                # Exiting the current cycle
+                in_cycle = False
 
     print("Number of cycles:", cycle_count)
     # results['slack'] = slack
-    results['radius_turn'] = radius_turn
+    flight_data['radius_turn'] = radius_turn
     results['omega'] = omega
 
-        
+    # Identify turn - straight and left - right
+    flight_data['turn_straight'] = flight_data.apply(determine_turn_straight, axis=1)
+    flight_data['right_left'] = flight_data.apply(determine_turn_straight, axis=1)
+
     if remove_vane_offsets:
         flight_data = correct_aoa_ss_measurements(results, flight_data)
     
@@ -246,7 +253,7 @@ def calculate_wind_speed_airborne_sensors(results, flight_data, imus = [0]):
 
 def determine_turn_straight(row):
     
-    if (abs(row['us']) > 0.3):
+    if (abs(row['radius_turn']) < 50):
         return 'turn'
     else:
         return 'straight'
