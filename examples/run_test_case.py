@@ -1,4 +1,3 @@
-
 import time as time
 from awes_ekf.ekf.initialize_and_update_ekf import initialize_ekf, propagate_state_EKF
 from awes_ekf.load_data.read_data import read_processed_flight_data
@@ -8,6 +7,8 @@ from awes_ekf.load_data.save_data import save_results
 from awes_ekf.setup.kite import Kite
 from awes_ekf.setup.tether import Tether
 from awes_ekf.setup.kcu import KCU
+from awes_ekf.ekf.ekf_output import convert_ekf_output_to_df
+from awes_ekf.postprocess.postprocessing import postprocess_results
 
 if __name__ == '__main__':
     #%% Load flight data and configuration settings
@@ -18,6 +19,11 @@ if __name__ == '__main__':
     flight_data = read_processed_flight_data(year,month,day,kite_model)
     flight_data = flight_data.iloc[:10000]
     config_data = load_config('examples/v3_config.yaml')
+    # Posprocessing settings
+    remove_IMU_offsets = True  # Remove IMU offsets, only for soft wing with KCU
+    correct_IMU_deformation = True # Correct IMU deformation, only for soft wing with KCU
+    remove_vane_offsets = True # Remove vane offsets, only for soft wing with KCU
+    estimate_kite_angle = False # Estimate kite angle, only for soft wing with KCU
     #%% Initialize EKF
     simConfig = SimulationConfig(**config_data['simulation_parameters'])
 
@@ -54,5 +60,18 @@ if __name__ == '__main__':
             mins +=1
             print(f"Real time: {mins} minutes.  Elapsed time: {elapsed_time:.2f} seconds")
 
-    #%% Store results
-    save_results(ekf_output_list, flight_data, kite_model, year, month, day)
+    #%% Postprocess results
+    ekf_output_df = convert_ekf_output_to_df(ekf_output_list)
+    results, flight_data = postprocess_results(
+        ekf_output_df,
+        flight_data,
+        kite,
+        kcu,
+        imus=[],
+        remove_IMU_offsets=remove_IMU_offsets,
+        correct_IMU_deformation=correct_IMU_deformation,
+        remove_vane_offsets=remove_vane_offsets,
+        estimate_kite_angle=estimate_kite_angle,
+    )
+    # %% Store results
+    save_results(ekf_output_df, flight_data, kite_model, year, month, day)

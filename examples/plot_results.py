@@ -10,9 +10,15 @@ from awes_ekf.postprocess.postprocessing import  postprocess_results
 from awes_ekf.load_data.read_data import read_results
 #%%
 year = '2023'
-month = '11'
-day = '27'
-kite_model = 'v9'                   
+month = '10'
+day = '26'
+kite_model = 'v9'       
+# year = '2024'
+# month = '06'
+# day = '07'
+# kite_model = 'kitekraft'            
+
+config_data = load_config('examples/v9_config.yaml')
 
 plt.close('all')
 
@@ -20,16 +26,18 @@ results,flight_data = read_results(year, month, day, kite_model)
 
 plot_lidar_heights= [100,160,200,250]
 
-config_data = load_config('examples/v9_config.yaml')
+config_data = load_config('examples/kft_config.yaml')
 
 kite = Kite(**config_data['kite'])
-kcu = KCU(**config_data['kcu'])
+if config_data['kcu']:
+    kcu = KCU(**config_data['kcu'])
+else:
+    kcu = None
 imus = [0]
 
 # flight_data['kite_0_pitch'] = (flight_data['kite_0_pitch']+flight_data['kite_1_pitch'])/2
 #%%
-results, flight_data = postprocess_results(results,flight_data, kite,kcu, imus = [0], remove_IMU_offsets=True, 
-                                            correct_IMU_deformation = True,remove_vane_offsets=True,estimate_kite_angle=True)
+
 
 for column in results.columns:
     if 'pitch' in column or 'roll' in column or 'yaw' in column:
@@ -39,6 +47,7 @@ for column in flight_data.columns:
     if 'pitch' in column or 'roll' in column or 'yaw' in column:
         flight_data[column] = np.degrees(flight_data[column])
 
+flight_data['ground_wind_direction'] = np.degrees(flight_data['ground_wind_direction'])
 # # #%%
 # flight_data = calculate_wind_speed_airborne_sensors(results,flight_data, imus = [0])
 # Postprocess done
@@ -72,7 +81,7 @@ axs = pu.plot_wind_profile_bins(flight_data.iloc[2000:-2000], results.iloc[2000:
 
 # ################## Time series ##################
 cycles_plotted = np.arange(0,100,1)
-pu.plot_aero_coeff_vs_aoa_ss(results, flight_data, cycles_plotted,IMU_0=True,savefig=False) # Plot aero coeff vs aoa_ss
+pu.plot_aero_coeff_vs_aoa_ss(results, flight_data, cycles_plotted,IMU_0=False,savefig=False) # Plot aero coeff vs aoa_ss
 pu.plot_aero_coeff_vs_up_us(results, flight_data, cycles_plotted,IMU_0=False,savefig=False) # Plot aero coeff vs up_used
 #%%
 ################## Density plots ##################
