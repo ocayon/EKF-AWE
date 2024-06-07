@@ -1,6 +1,6 @@
 from awes_ekf.ekf.ekf_output import convert_ekf_output_to_df
-def save_results(ekf_output_list, flight_data, kite_model, year, month, day, addition=''):
-    ekf_output_df = convert_ekf_output_to_df(ekf_output_list)
+def save_results(ekf_output_df, flight_data, kite_model, year, month, day, addition=''):
+    
     file_name = f"{kite_model}_{year}-{month}-{day}"
     path = 'results/'+kite_model+'/'
 
