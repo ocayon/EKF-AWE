@@ -14,6 +14,11 @@ tether_materials = {
         "density": 970,
         "cd": 1.1,
         "Youngs_modulus": 109e9,
+        },
+    "Kitekraft": {
+        "density": 1500,
+        "cd": 1.1,
+        "Youngs_modulus": 109e9,
         }
 }
 class Tether:
@@ -180,7 +185,7 @@ class Tether:
 
             if kcu is None:
                 if last_element:
-                    point_mass = m_s/2 + kite.mass + kcu.mass           
+                    point_mass = m_s/2 + kite.mass           
                 else:
                     point_mass = m_s
             else:
@@ -374,7 +379,7 @@ class Tether:
 
             if kcu is None:
                 if last_element:
-                    point_mass = m_s/2 + kite.mass + kcu.mass           
+                    point_mass = m_s/2 + kite.mass        
                 else:
                     point_mass = m_s
             else:
@@ -448,7 +453,10 @@ class Tether:
             dir_S = np.cross(dir_L,dir_D)
             CS = np.dot(aerodynamic_force,dir_S)/(0.5*rho*kite.area*np.linalg.norm(va)**2)
 
-            cd_kcu = D_kcu/(0.5*rho*np.linalg.norm(vaj)**2*kite.area)
+            if kcu is not None:
+                cd_kcu = D_kcu/(0.5*rho*np.linalg.norm(vaj)**2*kite.area)
+            else:
+                cd_kcu = 0
             cd_tether = drag_tether/(0.5*rho*np.linalg.norm(vaj)**2*kite.area)
 
             return positions, stretched_tether_length, dcm_b2w, dcm_t2w, dcm_fa2w, \
