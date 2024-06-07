@@ -1,22 +1,32 @@
 simulation_parameters:
   timestep: 0.1                       # Timestep in seconds
-  n_tether_elements: 5                # Number of tether elements
+  n_tether_elements: 30                # Number of tether elements
   opt_measurements:                   # Optional measurements array
     - 
     # - 'apparent_windspeed'           # Example optional measurement
   doIEKF: true                        # Use iterated extended Kalman filter
   epsilon: 1e-6                       # Tolerance for the IEKF
   max_iterations: 200                 # Maximum number of iterations for the IEKF
-  log_profile: true                   # Model wind speed as logarithmic with height
+  log_profile: false                   # Model wind speed as logarithmic with height
   tether_offset: true                 # Use tether offset in the measurements
   enforce_z_wind: true               # Enforce the z wind speed to be zero
   model_yaw: false                   # Model the yaw angle in the state vector
   kcu_data: false                     # Boolean for KCU data availability
 
-system_parameters:
-  kite_model: 'kitekraft'
-  tether_material: 'Dyneema-SK78'
-  tether_diameter: 0.04
+kite:
+  model_name: 'kft'                # Kite model
+  mass: 28.96                        # Mass of the kite in kg
+  area: 1.03                    # Area of the kite in m^2
+  span: 2                      # Span of the kite in m
+  thrust: true                   # Thrust enabled  
+kcu: false
+tether:
+  material_name: 'Kitekraft'   # Material name of the tether
+  diameter: 0.005               # Diameter of the tether in m
+  n_elements: 5                # Number of tether elements
+
+
+tuning_parameters:
   meas_stdv:
     x: 2.5
     v: 1
@@ -24,20 +34,21 @@ system_parameters:
     elevation: 0.2
     azimuth: 0.2
     least_squares: 1e-5
-    yaw: 0.15  # 5 degrees in radians
+    yaw: 0.15  # 10 degrees in radians
     z_wind: 0.1
     va: 0.5
   model_stdv:
     x: 2.5
     v: 1
-    uf: 0.005
-    wdir: 0.00349  # 0.2 degrees in radians
-    vw: 0.06
-    vwz: 0.06
-    CL: 0.01
-    CD: 0.003
-    CS: 0.01
+    uf: 0.008
+    wdir: 0.01  # 0.2 degrees in radians
+    vw: 0.01
+    vwz: 0.01
+    CL: 0.1
+    CD: 0.1
+    CS: 0.1
     elevation: 0.3
     azimuth: 0.3
     tether_length: 0.1
     yaw: 0.0873
+
