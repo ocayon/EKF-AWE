@@ -56,7 +56,7 @@ class ObservationModel:
             h = ca.vertcat(h,self.x[12])
         h = ca.vertcat(h,self.x[13])
         h = ca.vertcat(h,self.x[14])
-        h = ca.vertcat(h,(self.x[0:3]-r_thether_model)**2)
+        h = ca.vertcat(h,(self.x[0:3]-r_thether_model))
         if self.model_specs.model_yaw:
             h = ca.vertcat(h,self.x[15])
         if self.model_specs.enforce_z_wind:

@@ -1,6 +1,5 @@
 simulation_parameters:
   timestep: 0.1                       # Timestep in seconds
-  n_tether_elements: 5                # Number of tether elements
   opt_measurements:                   # Optional measurements array
     - 
     # - 'apparent_windspeed'           # Example optional measurement
@@ -13,11 +12,25 @@ simulation_parameters:
   model_yaw: false                    # Model the yaw angle in the state vector
   kcu_data: false                      # Boolean for KCU data availability
 
-system_parameters:
-  kite_model: 'v3'
-  kcu_model: 'KP1'
-  tether_material: 'Dyneema-SK78'
-  tether_diameter: 0.01
+kite:
+  model_name: 'v3'                # Kite model
+  mass: 15                        # Mass of the kite in kg
+  area: 19.75                    # Area of the kite in m^2
+  span: 10                      # Span of the kite in m
+kcu:
+  length: 1                     # Length of the KCU in m
+  diameter: 0.48                      # Width of the KCU in m
+  mass: 27.6                       # Mass of the KCU in kg
+  distance_kcu_kite: 11.5        # Distance from the KCU cg to the kite cg in m
+  total_length_bridle_lines: 96  # Total length of the bridle lines in m
+  diameter_bridle_lines: 0.0025    # Diameter of the bridle lines in m
+tether:
+  material_name: 'Dyneema-SK78'   # Material name of the tether
+  diameter: 0.01               # Diameter of the tether in m
+  n_elements: 5                # Number of tether elements
+
+
+tuning_parameters:
   meas_stdv:
     x: 2.5
     v: 1
@@ -42,3 +55,4 @@ system_parameters:
     azimuth: 0.3
     tether_length: 0.1
     yaw: 0.0873
+
