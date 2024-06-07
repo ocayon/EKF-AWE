@@ -19,14 +19,20 @@ class ObservationModel:
         v_kite = self.x0[3:6]
         tension_ground = self.u[1]
 
-        if kcu.data_available:
-            a_kcu = self.u[2:5]
-            v_kcu = self.u[5:8]
-            a_kite = None
+        if kcu is not None:
+            if kcu.data_available:
+                a_kcu = self.u[2:5]
+                v_kcu = self.u[5:8]
+                a_kite = None
+            else:
+                a_kite = self.u[2:5]
+                a_kcu = None
+                v_kcu = None
         else:
-            a_kite = self.u[2:5]
+            a_kite = None
             a_kcu = None
             v_kcu = None
+            
         if self.model_specs.log_profile:
             wvel = self.x0[6]/kappa*np.log(self.x0[2]/z0)
             wdir = self.x0[7]

@@ -56,18 +56,23 @@ def create_ekf_output(x, u, kite, tether,kcu, model_specs):
     elevation_0 = x[13]
     azimuth_0 = x[14]
 
-    if kcu.data_available:
-        kcu_acc = u[2:5]
-        kcu_vel = u[5:8]
-        kite_acc = None
+    if kcu is not None:
+        if kcu.data_available:
+            a_kcu = u[2:5]
+            v_kcu = u[5:8]
+            a_kite = None
+        else:
+            a_kite = u[2:5]
+            a_kcu = None
+            v_kcu = None
     else:
-        kcu_acc = None
-        kcu_vel = None
-        kite_acc = u[2:5]
+        a_kite = None
+        a_kcu = None
+        v_kcu = None
 
     args = (kite_pos, kite_vel, vw, kite, kcu, tension_ground )
     opt_guess = [elevation_0, azimuth_0, tether_length]
-    res = tether.calculate_tether_shape(opt_guess, *args, a_kite = kite_acc, a_kcu = kcu_acc, v_kcu = kcu_vel, return_values=True)
+    res = tether.calculate_tether_shape(opt_guess, *args, a_kite = a_kite, a_kcu = a_kcu, v_kcu = v_kcu, return_values=True)
     dcm_b2w = res[2]
     dcm_t2w = res[3]
     dcm_b2w = rotate_ENU2NED(dcm_b2w)
