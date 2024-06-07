@@ -65,12 +65,14 @@ class DynamicModel:
             self.vw_state = self.vw
     
     def get_input(self,kcu,kite):
-        if kcu.data_available:
-            self.a_kcu =  ca.SX.sym('a_kcu',3)  # KCU acceleration
-            self.v_kcu =  ca.SX.sym('v_kcu',3)  # KCU acceleration
-            return ca.vertcat(self.reelout_speed,self.Ftg,self.a_kcu, self.v_kcu,self.us)
+        if kcu is not None:
+            if kcu.data_available:
+                self.a_kcu =  ca.SX.sym('a_kcu',3)  # KCU acceleration
+                self.v_kcu =  ca.SX.sym('v_kcu',3)  # KCU acceleration
+                return ca.vertcat(self.reelout_speed,self.Ftg,self.a_kcu, self.v_kcu,self.us)
         elif kite.thrust:
             self.thrust = ca.SX.sym('thrust', 3)    # Thrust force
+            self.a_kite =  ca.SX.sym('a_kite',3)  # Kite acceleration
             return ca.vertcat(self.reelout_speed,self.Ftg,self.a_kite,self.us,self.thrust)
         else:
             self.a_kite =  ca.SX.sym('a_kite',3)
@@ -88,12 +90,17 @@ class DynamicModel:
         v_kite = self.x0[3:6]
         tension_ground = self.u[1]
 
-        if kcu.data_available:
-            a_kcu = self.u[2:5]
-            v_kcu = self.u[5:8]
-            a_kite = None
+        if kcu is not None:
+            if kcu.data_available:
+                a_kcu = self.u[2:5]
+                v_kcu = self.u[5:8]
+                a_kite = None
+            else:
+                a_kite = self.u[2:5]
+                a_kcu = None
+                v_kcu = None
         else:
-            a_kite = self.u[2:5]
+            a_kite = None
             a_kcu = None
             v_kcu = None
 
