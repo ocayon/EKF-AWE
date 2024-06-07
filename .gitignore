@@ -6,7 +6,10 @@ cd_kcu.py
 data/v9/
 data/kitekraft/
 processed_data/flight_data/v9/
+processed_data/flight_data/kitekraft/
 results/
 build/
 src/awes_ekf.egg-info/
 examples/v9_config.yaml
+examples/kft_config.yaml
+
