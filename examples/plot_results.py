@@ -9,10 +9,10 @@ import awes_ekf.plotting.plot_utils as pu
 from awes_ekf.postprocess.postprocessing import  postprocess_results
 from awes_ekf.load_data.read_data import read_results
 #%%
-year = '2019'
-month = '10'
-day = '08'
-kite_model = 'v3'                   
+year = '2023'
+month = '11'
+day = '27'
+kite_model = 'v9'                   
 
 plt.close('all')
 
@@ -28,7 +28,7 @@ imus = [0]
 
 # flight_data['kite_0_pitch'] = (flight_data['kite_0_pitch']+flight_data['kite_1_pitch'])/2
 #%%
-results, flight_data = postprocess_results(results,flight_data, kite, imus = [0], remove_IMU_offsets=True, 
+results, flight_data = postprocess_results(results,flight_data, kite,kcu, imus = [0], remove_IMU_offsets=True, 
                                             correct_IMU_deformation = True,remove_vane_offsets=True,estimate_kite_angle=True)
 
 for column in results.columns:
