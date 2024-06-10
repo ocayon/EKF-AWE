@@ -70,13 +70,13 @@ class DynamicModel:
                 self.a_kcu =  ca.SX.sym('a_kcu',3)  # KCU acceleration
                 self.v_kcu =  ca.SX.sym('v_kcu',3)  # KCU acceleration
                 return ca.vertcat(self.reelout_speed,self.Ftg,self.a_kcu, self.v_kcu,self.us)
+            else:
+                self.a_kite =  ca.SX.sym('a_kite',3)
+                return ca.vertcat(self.reelout_speed,self.Ftg,self.a_kite,self.us)
         elif kite.thrust:
             self.thrust = ca.SX.sym('thrust', 3)    # Thrust force
             self.a_kite =  ca.SX.sym('a_kite',3)  # Kite acceleration
             return ca.vertcat(self.reelout_speed,self.Ftg,self.a_kite,self.us,self.thrust)
-        else:
-            self.a_kite =  ca.SX.sym('a_kite',3)
-            return ca.vertcat(self.reelout_speed,self.Ftg,self.a_kite,self.us)
         
         
     
@@ -90,20 +90,6 @@ class DynamicModel:
         v_kite = self.x0[3:6]
         tension_ground = self.u[1]
 
-        if kcu is not None:
-            if kcu.data_available:
-                a_kcu = self.u[2:5]
-                v_kcu = self.u[5:8]
-                a_kite = None
-            else:
-                a_kite = self.u[2:5]
-                a_kcu = None
-                v_kcu = None
-        else:
-            a_kite = None
-            a_kcu = None
-            v_kcu = None
-
         if self.model_specs.log_profile:
             wvel = self.x0[6]/kappa*np.log(self.x0[2]/z0)
             wdir = self.x0[7]
@@ -111,9 +97,18 @@ class DynamicModel:
         else:
             vw = self.x0[6:9]
 
-        tension_last_element = tether.calculate_tether_shape_symbolic(elevation_0, azimuth_0, tether_length,
-                                         tension_ground, r_kite, v_kite, vw, kite, kcu,tether,  
-                                        a_kite = a_kite, a_kcu = a_kcu, v_kcu = v_kcu, return_tether_force_kite = True)['tether_force_kite']
+        if kcu is not None:
+            if kcu.data_available:
+                a_kcu = self.u[2:5]
+                v_kcu = self.u[5:8]
+                args = (elevation_0, azimuth_0, tether_length, tension_ground, r_kite, v_kite, vw, a_kcu, v_kcu)
+            else:
+                a_kite = self.u[2:5]
+                args = (elevation_0, azimuth_0, tether_length, tension_ground, r_kite, v_kite, vw, a_kite)
+        else:
+            args = (elevation_0, azimuth_0, tether_length, tension_ground, r_kite, v_kite, vw)
+
+        tension_last_element = tether.tether_force_kite(*args)
         
         
         v_reelout = self.u[0]

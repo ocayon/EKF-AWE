@@ -18,20 +18,6 @@ class ObservationModel:
         r_kite = self.x0[0:3]
         v_kite = self.x0[3:6]
         tension_ground = self.u[1]
-
-        if kcu is not None:
-            if kcu.data_available:
-                a_kcu = self.u[2:5]
-                v_kcu = self.u[5:8]
-                a_kite = None
-            else:
-                a_kite = self.u[2:5]
-                a_kcu = None
-                v_kcu = None
-        else:
-            a_kite = None
-            a_kcu = None
-            v_kcu = None
             
         if self.model_specs.log_profile:
             wvel = self.x0[6]/kappa*np.log(self.x0[2]/z0)
@@ -40,9 +26,18 @@ class ObservationModel:
         else:
             vw = self.x0[6:9]
         
-        r_thether_model = tether.calculate_tether_shape_symbolic(elevation_0, azimuth_0, tether_length,
-                                         tension_ground, r_kite, v_kite, vw, kite, kcu,tether,  
-                                        a_kite = a_kite, a_kcu = a_kcu, v_kcu = v_kcu, return_end_position = True)['kite_position']
+        if kcu is not None:
+            if kcu.data_available:
+                a_kcu = self.u[2:5]
+                v_kcu = self.u[5:8]
+                args = (elevation_0, azimuth_0, tether_length, tension_ground, r_kite, v_kite, vw, a_kcu, v_kcu)
+            else:
+                a_kite = self.u[2:5]
+                args = (elevation_0, azimuth_0, tether_length, tension_ground, r_kite, v_kite, vw, a_kite)
+        else:
+            args = (elevation_0, azimuth_0, tether_length, tension_ground, r_kite, v_kite, vw)
+
+        r_tether_model = tether.kite_position(*args)
 
         if self.model_specs.log_profile:
             wvel = self.x[6]/kappa*np.log(self.x[2]/z0)
@@ -62,7 +57,7 @@ class ObservationModel:
             h = ca.vertcat(h,self.x[12])
         h = ca.vertcat(h,self.x[13])
         h = ca.vertcat(h,self.x[14])
-        h = ca.vertcat(h,(self.x[0:3]-r_thether_model))
+        h = ca.vertcat(h,(self.x[0:3]-r_tether_model))
         if self.model_specs.model_yaw:
             h = ca.vertcat(h,self.x[15])
         if self.model_specs.enforce_z_wind:

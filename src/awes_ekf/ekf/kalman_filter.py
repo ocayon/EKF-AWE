@@ -104,10 +104,11 @@ class ExtendedKalmanFilter:
         if kcu is not None:
             if kcu.data_available:   
                 self.u = np.concatenate((np.array([input_class.reelout_speed, input_class.tether_force]), input_class.kcu_acc, input_class.kcu_vel, np.array([input_class.steering_input])))
+            else:
+                self.u = np.concatenate((np.array([input_class.reelout_speed, input_class.tether_force]), input_class.kite_acc,np.array([input_class.steering_input])))
         elif kite.thrust:
             self.u = np.concatenate((np.array([input_class.reelout_speed, input_class.tether_force]), input_class.kite_acc, np.array([input_class.steering_input]), input_class.thrust_force))
-        else:
-            self.u = np.concatenate((np.array([input_class.reelout_speed, input_class.tether_force]), input_class.kite_acc,np.array([input_class.steering_input])))
+        
 
     def update_measurement_vector(self,input_class, model_specs):
         opt_measurements = model_specs.opt_measurements

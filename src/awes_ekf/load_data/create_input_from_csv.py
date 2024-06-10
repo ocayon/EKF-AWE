@@ -90,32 +90,47 @@ def create_input_from_csv(flight_data, kite,kcu,tether, model_specs, kite_sensor
 
     x0 = find_initial_state_vector(kite_pos[0], kite_vel[0], kite_acc[0], 
                                        init_wind_dir, init_wind_vel, tether_force[0], 
-                                       tether_length[0], kite_elevation[0], kite_azimuth[0], kite, kcu,tether, model_specs)
+                                       tether_length[0], kite_elevation[0], kite_azimuth[0], kite, kcu,tether, model_specs, a_kcu = kcu_acc[0], v_kcu = kcu_vel[0])
     if model_specs.model_yaw:
         x0 = np.append(x0,[kite_yaw[0],0])  # Initial wind velocity and direction
     if model_specs.tether_offset:
         x0 = np.append(x0,0)
     return ekf_input_list, x0
 
-def find_initial_state_vector(kite_pos, kite_vel, kite_acc, ground_winddir, ground_windspeed, tether_force, tether_length,
-                              elevation, azimuth, kite, kcu,tether, model_specs):
+def find_initial_state_vector(r_kite, v_kite, a_kite, ground_winddir, ground_windspeed, tension_ground, tether_length,
+                              elevation, azimuth, kite, kcu,tether, model_specs, a_kcu = None, v_kcu = None):
 
     # Solve for the tether shape
     uf = ground_windspeed*kappa/np.log(10/z0)
-    wvel0 = uf/kappa*np.log(kite_pos[2]/z0)
+    wvel0 = uf/kappa*np.log(r_kite[2]/z0)
     if np.isnan(wvel0):
         raise ValueError('Initial wind velocity is NaN')
     vw = [wvel0*np.cos(ground_winddir),wvel0*np.sin(ground_winddir),0] # Initial wind velocity
 
-    tether.solve_tether_shape( kite_pos, kite_vel, vw, kite, kcu, tension_ground = tether_force, tether_length = tether_length,
-                                a_kite = kite_acc)
-    x0 = np.vstack((kite_pos,kite_vel))
+    
+
+    opt_res = tether.solve_tether_shape( r_kite, v_kite, vw, kcu,tension_ground = tension_ground, tether_length = tether_length,
+                                a_kite = a_kite, a_kcu = a_kcu, v_kcu = v_kcu)
+    
+    if kcu is not None:
+        if kcu.data_available:
+            args = (opt_res[0],opt_res[1],opt_res[2], tension_ground, r_kite, v_kite, vw, a_kcu, v_kcu)
+        else:
+            args = (opt_res[0],opt_res[1],opt_res[2], tension_ground, r_kite, v_kite, vw, a_kite)
+            a_kcu
+    else:
+        args = (opt_res[0],opt_res[1],opt_res[2], tension_ground, r_kite, v_kite, vw)
+
+    CL = float(tether.CL( *args))
+    CD = float(tether.CD( *args))
+    CS = float(tether.CS(*args))
+    x0 = np.vstack((r_kite,v_kite))
     
     if model_specs.log_profile:
         x0 = np.append(x0,[uf,ground_winddir,0])  # Initial wind velocity and direction
     else:
         x0 = np.append(x0,vw)   # Initial wind velocity
-    x0 = np.append(x0,[tether.CL,tether.CD,tether.CS,tether_length, elevation, azimuth])     # Initial state vector (Last two elements are bias, used if needed)
+    x0 = np.append(x0,[CL,CD,CS,tether_length, elevation, azimuth])     # Initial state vector (Last two elements are bias, used if needed)
 
     return x0
 
