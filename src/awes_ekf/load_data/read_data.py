@@ -9,13 +9,13 @@ def read_processed_flight_data(year,month,day,kite_model):
     flight_data = flight_data.reset_index()
     return flight_data
 
-def read_results(year,month,day,kite_model,addition = ''):
+def read_results(year,month,day,kite_model,addition = '', path_to_main = ''):
     path = 'results/'+kite_model+'/'
     file_name = kite_model+'_'+year+'-'+month+'-'+day
     date = year+'-'+month+'-'+day
 
-    results = pd.read_csv(path+file_name+'_res'+addition+'.csv')
-    flight_data = pd.read_csv(path+file_name+'_fd.csv')
+    results = pd.read_csv(path_to_main+path+file_name+'_res'+addition+'.csv')
+    flight_data = pd.read_csv(path_to_main+path+file_name+'_fd.csv')
 
     # results = results.dropna()
     rows_to_keep = results.index

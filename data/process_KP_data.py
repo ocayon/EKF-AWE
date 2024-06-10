@@ -9,14 +9,14 @@ file_name = '2019-10-08_11.csv'
 model = 'v9'
 file_path = './'+model+'/'
 file_name = '2023-11-27_13-37-48_ProtoLogger_lidar.csv'
-# file_name = '2023-11-16_12-47-08_ProtoLogger_lidar.csv'
-# file_name = '2023-10-26_12-21-08_ProtoLogger_lidar.csv'
+file_name = '2023-11-16_12-47-08_ProtoLogger_lidar.csv'
+file_name = '2023-10-26_12-21-08_ProtoLogger_lidar.csv'
 # file_name = '2023-06-21_11-48-37_ProtoLogger.csv'
 # file_name = '2023-03-29_15-56-58_ProtoLogger.csv'
 # file_name = '2021-10-07_19-38-15_ProtoLogger.csv'
 # file_name = '2023-12-11_13-15-42_ProtoLogger_lidar.csv'
 # file_name = '2024-01-09_12-28-51_ProtoLogger_lidar.csv'
-file_name = '2024-06-05_11-33-16_ProtoLogger_lidar.csv'
+# file_name = '2024-06-05_11-33-16_ProtoLogger_lidar.csv'
 
 # file_path = './'+model+'/v9.60.F-different-bridle/'
 # file_name = '2024-03-26_15-00-03_ProtoLogger_lidar.csv'
@@ -27,8 +27,8 @@ file_name = '2024-06-05_11-33-16_ProtoLogger_lidar.csv'
 # file_path = './'+model+'/front_stall/'
 # file_name = '2024-04-11_12-51-46_ProtoLogger_lidar.csv'
 # file_path = './'+model+'/more-depowered-reelin/'
-# file_name = '2024-03-25_14-08-47_ProtoLogger_lidar.csv'
-# # file_name = '2024-03-12_13-36-02_ProtoLogger_lidar.csv'
+# # file_name = '2024-03-25_14-08-47_ProtoLogger_lidar.csv'
+# file_name = '2024-03-12_13-36-02_ProtoLogger_lidar.csv'
 # file_path = './'+model+'/front_stall/'
 # file_name = '2024-04-11_12-51-46_ProtoLogger_lidar.csv'
 
@@ -39,7 +39,7 @@ window_size = 20
 
 #%%
 
-df = pd.read_csv(file_path+file_name,delimiter = ' ')
+df = pd.read_csv(file_path+file_name,delimiter = ' ',low_memory=False)
 
 #%%
 
@@ -67,9 +67,9 @@ for sensor in sensors:
     flight_data['kite_velocity_north_s'+str(sensor)] = df['kite_'+str(sensor)+'_vx']
     flight_data['kite_velocity_up_s'+str(sensor)] = -df['kite_'+str(sensor)+'_vz'] 
     # Euler angles data
-    flight_data['kite_pitch_s'+str(sensor)] = df['kite_'+str(sensor)+'_pitch']
-    flight_data['kite_roll_s'+str(sensor)] = df['kite_'+str(sensor)+'_roll']
-    flight_data['kite_yaw_s'+str(sensor)] = df['kite_'+str(sensor)+'_yaw']
+    flight_data['kite_pitch_s'+str(sensor)] = np.deg2rad(df['kite_'+str(sensor)+'_pitch'])
+    flight_data['kite_roll_s'+str(sensor)] = np.deg2rad(df['kite_'+str(sensor)+'_roll'])
+    flight_data['kite_yaw_s'+str(sensor)] = np.deg2rad(df['kite_'+str(sensor)+'_yaw'])
     # Acceleration data
     if df['kite_'+str(sensor)+'_ax'].isnull().all():
         # Differentiate velocity to get acceleration
@@ -141,21 +141,20 @@ flight_data['kite_elevation'] = df['kite_elevation']
 flight_data['time_of_day'] = df['time_of_day']
 
 if 'lidar' in file_name:
+    columns_to_copy = []
 
     for column in df.columns:
         if 'Wind Direction' in column:
             # Use regular expression to extract a 3-digit number from the column name
             height = ''.join(filter(str.isdigit, column))
             
-            flight_data[column] = df[column]
+            columns_to_copy.append(column)
         if 'Wind' in column:
-            
-            flight_data[column] = df[column]
-            
+            columns_to_copy.append(column)
         if 'Z-wind' in column:
-            
-            flight_data[column] = df[column]
+            columns_to_copy.append(column)
 
+    flight_data = pd.concat([df[col] for col in columns_to_copy], axis=1)
 
 #%%
 csv_filepath = '../processed_data/flight_data/'+model+'/'

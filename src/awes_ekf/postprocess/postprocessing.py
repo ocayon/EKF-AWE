@@ -46,10 +46,7 @@ def construct_transformation_matrix(e_x_b, e_y_b, e_z_b):
 
 def remove_offsets_IMU_data(results, flight_data, sensor=0):
     """ Remove offsets of IMU euler angles based on EKF results"""
-    unwrapped_angles = np.unwrap(flight_data['kite_yaw_s'+str(sensor)])
-    flight_data['kite_yaw_s'+str(sensor)] = unwrapped_angles
-    unwrapped_angles = np.unwrap(results['kite_yaw'])
-    results['kite_yaw'] = unwrapped_angles
+    
     # Roll
     roll_offset = find_offset(results['kite_roll'], flight_data['kite_roll_s'+str(sensor)])
     flight_data['kite_roll_s'+str(sensor)] = flight_data['kite_roll_s'+str(sensor)] + roll_offset
@@ -60,6 +57,10 @@ def remove_offsets_IMU_data(results, flight_data, sensor=0):
     flight_data['kite_pitch_s'+str(sensor)] = flight_data['kite_pitch_s'+str(sensor)] + pitch_offset
     print('Pitch offset: ', pitch_offset)
     # Yaw
+    unwrapped_angles = np.unwrap(flight_data['kite_yaw_s'+str(sensor)])
+    flight_data['kite_yaw_s'+str(sensor)] = unwrapped_angles
+    unwrapped_angles = np.unwrap(results['kite_yaw'])
+    results['kite_yaw'] = unwrapped_angles
     yaw_offset = find_offset(results['kite_yaw'], flight_data['kite_yaw_s'+str(sensor)])
     flight_data['kite_yaw_s'+str(sensor)] = flight_data['kite_yaw_s'+str(sensor)] + yaw_offset
     print('Yaw offset: ', yaw_offset)
@@ -89,16 +90,10 @@ def postprocess_results(results,flight_data, kite, kcu,imus = [0], remove_IMU_of
         flight_data = normalize_kcu_steering_inputs(flight_data)
         flight_data['powered'] = flight_data.apply(determine_powered_depowered, axis=1)
     
-       
-    
-    # results['kite_roll'] = np.degrees(results['kite_roll'])
-    # results['kite_pitch'] = np.degrees(results['kite_pitch'])
-    # results['kite_yaw'] = np.degrees(results['kite_yaw'])
-    
     for imu in imus:
-        flight_data['kite_pitch_s'+str(imu)] = np.radians(flight_data['kite_pitch_s'+str(imu)])
-        flight_data['kite_roll_s'+str(imu)] = np.radians(flight_data['kite_roll_s'+str(imu)])
-        flight_data['kite_yaw_s'+str(imu)] = np.radians(flight_data['kite_yaw_s'+str(imu)])
+        flight_data['kite_pitch_s'+str(imu)] = flight_data['kite_pitch_s'+str(imu)]
+        flight_data['kite_roll_s'+str(imu)] = flight_data['kite_roll_s'+str(imu)]
+        flight_data['kite_yaw_s'+str(imu)] = flight_data['kite_yaw_s'+str(imu)]
         
         
     results['wind_direction'] = results['wind_direction']%(2*np.pi)
