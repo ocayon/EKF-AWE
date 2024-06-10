@@ -7,26 +7,20 @@ from awes_ekf.setup.settings import load_config
 import seaborn as sns
 import awes_ekf.plotting.plot_utils as pu
 from awes_ekf.postprocess.postprocessing import  postprocess_results
+from examples.run_from_csv import year, month, day, kite_model
 from awes_ekf.load_data.read_data import read_results
 #%%
-year = '2023'
-month = '10'
-day = '26'
-kite_model = 'v9'       
-# year = '2024'
-# month = '06'
-# day = '07'
-# kite_model = 'kitekraft'            
-
-config_data = load_config('examples/v9_config.yaml')
+# year = '2023'
+# month = '10'
+# day = '26'
+# kite_model = 'v9'       
 
 plt.close('all')
 
+# Load results and flight data and plot kite reference frame
 results,flight_data = read_results(year, month, day, kite_model)
-
+config_data = load_config('examples/v9_config.yaml')
 plot_lidar_heights= [100,160,200,250]
-
-config_data = load_config('examples/kft_config.yaml')
 
 kite = Kite(**config_data['kite'])
 if config_data['kcu']:
@@ -116,38 +110,24 @@ ax.grid()
 # pu.plot_time_series(flight_data, r_kite,'Kite radius', ax, color='blue', label='GPS radius',plot_phase=False)
 # pu.plot_time_series(flight_data,flight_data['ground_tether_length'],'Tether length', ax, color='red', label='Tether length',plot_phase=True)
 # ax.grid()
-fig,ax = plt.subplots()
-pu.plot_time_series(flight_data, flight_data['kite_0_rx'], ax, color='blue', label='Measured',plot_phase=False)
-pu.plot_time_series(flight_data,results['kite_pos_x'], ax, color='red', label='Estimated',plot_phase=False)
-ax.grid()
-ax.legend()
-fig,ax = plt.subplots()
-pu.plot_time_series(flight_data, flight_data['kite_0_ry'], ax, color='blue', label='Measured',plot_phase=False)
-pu.plot_time_series(flight_data,results['kite_pos_y'], ax, color='red', label='Estimated',plot_phase=False)
-ax.grid()
-ax.legend()
-fig,ax = plt.subplots()
-pu.plot_time_series(flight_data, flight_data['kite_0_rz'], ax, color='blue', label='Measured',plot_phase=False)
-pu.plot_time_series(flight_data,results['kite_pos_z'], ax, color='red', label='Estimated',plot_phase=False)
-ax.grid()
-ax.legend()
+
 #%%
 fig,ax = plt.subplots()
-pu.plot_time_series(flight_data, flight_data['kite_0_pitch'], ax, color='blue', label='Measured',plot_phase=False)
+pu.plot_time_series(flight_data, flight_data['kite_pitch_s0'], ax, color='blue', label='Measured',plot_phase=False)
 # pu.plot_time_series(flight_data, flight_data['kite_1_pitch'], ax, color='blue', label='Measured',plot_phase=False)
 pu.plot_time_series(flight_data,results['kite_pitch'], ax, color='red', label='Estimated',plot_phase=False)
 ax.grid()
 ax.legend()
 
 fig,ax = plt.subplots()
-pu.plot_time_series(flight_data, flight_data['kite_0_roll'], ax, color='blue', label='Measured',plot_phase=False)
+pu.plot_time_series(flight_data, flight_data['kite_roll_s0'], ax, color='blue', label='Measured',plot_phase=False)
 pu.plot_time_series(flight_data,results['kite_roll'], ax, color='red', label='Estimated',plot_phase=False)
 ax.grid()
 ax.legend()
 
 
 fig,ax = plt.subplots()
-pu.plot_time_series(flight_data, flight_data['kite_0_yaw'], ax, color='blue', label='Measured',plot_phase=False)
+pu.plot_time_series(flight_data, flight_data['kite_yaw_s0'], ax, color='blue', label='Measured',plot_phase=False)
 pu.plot_time_series(flight_data,results['kite_yaw'], ax, color='red', label='Estimated',plot_phase=False)
 ax.grid()
 ax.legend()

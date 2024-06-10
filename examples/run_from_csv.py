@@ -10,26 +10,32 @@ from awes_ekf.setup.kcu import KCU
 from awes_ekf.ekf.ekf_output import convert_ekf_output_to_df
 from awes_ekf.postprocess.postprocessing import postprocess_results
 
+
+# %% Load flight data and configuration settings
+year = "2023"
+month = "11"
+day = "27"
+kite_model = "v9"
+# year = '2024'
+# month = '06'
+# day = '07'
+# kite_model = 'kitekraft' 
+
+config_file_name = "v9_config.yaml"
+
+
+# Posprocessing settings
+remove_IMU_offsets = True  # Remove IMU offsets, only for soft wing with KCU
+correct_IMU_deformation = True # Correct IMU deformation, only for soft wing with KCU
+remove_vane_offsets = True # Remove vane offsets, only for soft wing with KCU
+estimate_kite_angle = False # Estimate kite angle, only for soft wing with KCU
+
 if __name__ == "__main__":
-    # %% Load flight data and configuration settings
-    year = "2023"
-    month = "10"
-    day = "26"
-    kite_model = "v9"
-    # year = '2024'
-    # month = '06'
-    # day = '07'
-    # kite_model = 'kitekraft' 
     flight_data = read_processed_flight_data(year, month, day, kite_model)
+
     flight_data = flight_data.iloc[:38000]
-    config_data = load_config("examples/v9_config.yaml")
 
-    # Posprocessing settings
-    remove_IMU_offsets = True  # Remove IMU offsets, only for soft wing with KCU
-    correct_IMU_deformation = True # Correct IMU deformation, only for soft wing with KCU
-    remove_vane_offsets = True # Remove vane offsets, only for soft wing with KCU
-    estimate_kite_angle = False # Estimate kite angle, only for soft wing with KCU
-
+    config_data = load_config("examples/"+config_file_name)
     # %% Initialize EKF
     simConfig = SimulationConfig(**config_data["simulation_parameters"])
 
@@ -81,7 +87,7 @@ if __name__ == "__main__":
         flight_data,
         kite,
         kcu,
-        imus=[],
+        imus=[0,1],
         remove_IMU_offsets=remove_IMU_offsets,
         correct_IMU_deformation=correct_IMU_deformation,
         remove_vane_offsets=remove_vane_offsets,
