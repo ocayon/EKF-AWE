@@ -44,11 +44,11 @@ def create_input_from_csv(flight_data, kite,kcu,tether, model_specs, kite_sensor
     except:
         thrust_force = np.zeros((n_intervals,3))
     try:
-        kite_yaw = np.unwrap(np.array(flight_data['kite_yaw_s'+str(kite_sensor)]-90)/180*np.pi)
+        kite_yaw = np.unwrap(np.array(flight_data['kite_yaw_s'+str(kite_sensor)]-np.pi/2))
     except:
         kite_yaw = np.zeros(n_intervals)
 
-    init_wind_dir = np.mean(ground_winddir[0:3000])/180*np.pi
+    init_wind_dir = np.mean(ground_winddir[0:3000])
     init_wind_vel = np.mean(ground_windspeed[0])
     
     if np.isnan(init_wind_dir):
