@@ -4,7 +4,7 @@ import numpy as np
 from typing import List
 from awes_ekf.setup.settings import z0, kappa
 from awes_ekf.utils import calculate_euler_from_reference_frame, calculate_airflow_angles, calculate_reference_frame_euler, rotate_ENU2NED
- 
+
 
 @dataclass
 class EKFOutput:
@@ -72,16 +72,31 @@ def create_ekf_output(x, u, kite, tether,kcu, model_specs):
 
     args = (kite_pos, kite_vel, vw, kite, kcu, tension_ground )
     opt_guess = [elevation_0, azimuth_0, tether_length]
-    res = tether.calculate_tether_shape(opt_guess, *args, a_kite = a_kite, a_kcu = a_kcu, v_kcu = v_kcu, return_values=True)
-    dcm_b2w = res[2]
-    dcm_t2w = res[3]
+    info_tether = tether.calculate_tether_shape_symbolic(elevation_0,
+        azimuth_0,
+        tether_length,
+        tension_ground,
+        kite_pos,
+        kite_vel,
+        vw,
+        kite,
+        kcu,
+        tether,
+        a_kite=a_kite,
+        a_kcu=a_kcu,
+        v_kcu=v_kcu,
+        return_results=True,
+    )
+    dcm_b2w = info_tether['bridle_frame_va']
+    dcm_b2vel = info_tether['bridle_frame_vk']
+    dcm_t2w = info_tether['tether_frame']
     dcm_b2w = rotate_ENU2NED(dcm_b2w)
     dcm_t2w = rotate_ENU2NED(dcm_t2w)
     euler_angles = calculate_euler_from_reference_frame(dcm_b2w)
     euler_angles1 = calculate_euler_from_reference_frame(dcm_t2w)
-    cd_kcu = res[-6]
-    cd_tether = res[-5]
-    dcm_b2vel = res[-1]
+    cd_kcu = info_tether['cd_kcu']
+    cd_tether = info_tether['cd_tether']
+    
     if model_specs.model_yaw:
         dcm = calculate_reference_frame_euler( euler_angles[0], 
                                                      euler_angles[1], 

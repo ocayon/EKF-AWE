@@ -40,9 +40,9 @@ class ObservationModel:
         else:
             vw = self.x0[6:9]
         
-        r_thether_model, tension_last_element = tether.calculate_tether_shape_symbolic(elevation_0, azimuth_0, tether_length,
+        r_thether_model = tether.calculate_tether_shape_symbolic(elevation_0, azimuth_0, tether_length,
                                          tension_ground, r_kite, v_kite, vw, kite, kcu,tether,  
-                                        a_kite = a_kite, a_kcu = a_kcu, v_kcu = v_kcu)
+                                        a_kite = a_kite, a_kcu = a_kcu, v_kcu = v_kcu, return_end_position = True)['kite_position']
 
         if self.model_specs.log_profile:
             wvel = self.x[6]/kappa*np.log(self.x[2]/z0)
