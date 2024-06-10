@@ -27,13 +27,13 @@ config_file_name = "v9_config.yaml"
 # Posprocessing settings
 remove_IMU_offsets = True  # Remove IMU offsets, only for soft wing with KCU
 correct_IMU_deformation = True # Correct IMU deformation, only for soft wing with KCU
-remove_vane_offsets = True # Remove vane offsets, only for soft wing with KCU
+remove_vane_offsets = False # Remove vane offsets, only for soft wing with KCU
 estimate_kite_angle = False # Estimate kite angle, only for soft wing with KCU
 
 if __name__ == "__main__":
     flight_data = read_processed_flight_data(year, month, day, kite_model)
 
-    flight_data = flight_data.iloc[:4000]
+    flight_data = flight_data.iloc[:32000]
 
     config_data = load_config("examples/"+config_file_name)
     # %% Initialize EKF
@@ -44,7 +44,7 @@ if __name__ == "__main__":
         kcu = KCU(**config_data["kcu"], data_available=simConfig.kcu_data)
     else:
         kcu = None
-    tether = Tether(**config_data["tether"])
+    tether = Tether(kite,kcu,simConfig,**config_data["tether"])
 
     tuningParams = TuningParameters(config_data["tuning_parameters"], simConfig)
 
@@ -87,7 +87,7 @@ if __name__ == "__main__":
         flight_data,
         kite,
         kcu,
-        imus=[0,1],
+        imus=[0],
         remove_IMU_offsets=remove_IMU_offsets,
         correct_IMU_deformation=correct_IMU_deformation,
         remove_vane_offsets=remove_vane_offsets,

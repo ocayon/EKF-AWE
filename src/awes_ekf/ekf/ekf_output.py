@@ -39,8 +39,8 @@ class EKFOutput:
 def create_ekf_output(x, u, kite, tether,kcu, model_specs):
     """Store results in a list of instances of the class EKFOutput"""
     # Store tether force and tether model results
-    kite_pos = x[0:3]
-    kite_vel = x[3:6]
+    r_kite = x[0:3]
+    v_kite = x[3:6]
     if model_specs.log_profile:
         wind_vel  = x[6]/kappa*np.log(x[2]/z0)
         wind_dir = x[7]
@@ -60,42 +60,22 @@ def create_ekf_output(x, u, kite, tether,kcu, model_specs):
         if kcu.data_available:
             a_kcu = u[2:5]
             v_kcu = u[5:8]
-            a_kite = None
+            args = (elevation_0, azimuth_0, tether_length, tension_ground, r_kite, v_kite, vw, a_kcu, v_kcu)
         else:
             a_kite = u[2:5]
-            a_kcu = None
-            v_kcu = None
+            args = (elevation_0, azimuth_0, tether_length, tension_ground, r_kite, v_kite, vw, a_kite)
     else:
-        a_kite = None
-        a_kcu = None
-        v_kcu = None
+        args = (elevation_0, azimuth_0, tether_length, tension_ground, r_kite, v_kite, vw)
 
-    args = (kite_pos, kite_vel, vw, kite, kcu, tension_ground )
-    opt_guess = [elevation_0, azimuth_0, tether_length]
-    info_tether = tether.calculate_tether_shape_symbolic(elevation_0,
-        azimuth_0,
-        tether_length,
-        tension_ground,
-        kite_pos,
-        kite_vel,
-        vw,
-        kite,
-        kcu,
-        tether,
-        a_kite=a_kite,
-        a_kcu=a_kcu,
-        v_kcu=v_kcu,
-        return_results=True,
-    )
-    dcm_b2w = info_tether['bridle_frame_va']
-    dcm_b2vel = info_tether['bridle_frame_vk']
-    dcm_t2w = info_tether['tether_frame']
+    dcm_b2w = np.array(tether.bridle_frame_va(*args))
+    dcm_b2vel = np.array(tether.bridle_frame_vk(*args))
+    dcm_t2w = np.array(tether.tether_frame(*args))
     dcm_b2w = rotate_ENU2NED(dcm_b2w)
     dcm_t2w = rotate_ENU2NED(dcm_t2w)
     euler_angles = calculate_euler_from_reference_frame(dcm_b2w)
     euler_angles1 = calculate_euler_from_reference_frame(dcm_t2w)
-    cd_kcu = info_tether['cd_kcu']
-    cd_tether = info_tether['cd_tether']
+    cd_kcu = tether.cd_kcu(*args)
+    cd_tether = tether.cd_tether(*args)
     
     if model_specs.model_yaw:
         dcm = calculate_reference_frame_euler( euler_angles[0], 
@@ -103,9 +83,9 @@ def create_ekf_output(x, u, kite, tether,kcu, model_specs):
                                                      x[15], 
                                                      eulerFrame='NED',
                                                      outputFrame='ENU')
-        airflow_angles = calculate_airflow_angles(dcm, vw-kite_vel)
+        airflow_angles = calculate_airflow_angles(dcm, vw-v_kite)
     else:
-        airflow_angles = calculate_airflow_angles(dcm_b2vel, vw-kite_vel)
+        airflow_angles = calculate_airflow_angles(dcm_b2vel, vw-v_kite)
 
     # Unpack position and velocity vectors
     kite_pos_x, kite_pos_y, kite_pos_z = x[0:3]
