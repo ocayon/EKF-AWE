@@ -1,5 +1,6 @@
 import yaml
 import numpy as np
+from dataclasses import dataclass
 
 #%% Define atmospheric parameters
 rho = 1.225                         # Air density [kg/m^3]
@@ -16,7 +17,6 @@ class SimulationConfig:
     def __init__(self, **kwargs):
         self.ts = kwargs.get('timestep')
         self.opt_measurements = kwargs.get('opt_measurements', [])
-        self.kcu_data = kwargs.get('kcu_data', False)
         self.doIEKF = kwargs.get('doIEKF', True)
         self.epsilon = float(kwargs.get('epsilon', 1e-6))
         self.max_iterations = kwargs.get('max_iterations', 200)
@@ -25,6 +25,26 @@ class SimulationConfig:
         self.enforce_z_wind = kwargs.get('enforce_z_wind', False)
         self.model_yaw = kwargs.get('model_yaw', False)
         self.thrust_force = kwargs.get('thrust_force', False)
+        measurements = kwargs.get('measurements', {})
+        self.obsData = ObservationData(**measurements)
+
+@dataclass
+class ObservationData:
+    tether_length: bool = True
+    tether_elevation: bool = True
+    tether_azimuth: bool = True
+    kite_pos: bool = True
+    kite_vel: bool = True
+    tether_force: bool = True
+    kite_acc: bool = False
+    kcu_pos: bool = False
+    kcu_acc: bool = False 
+    kcu_vel: bool = False
+    apparent_windspeed: bool = False 
+    angle_of_attack: bool = False
+    angle_of_sideslip: bool = False
+    yaw_angle: bool = False
+    thrust_force: bool = False
 
 class TuningParameters:
     def __init__(self, config, simConfig):
@@ -50,8 +70,7 @@ class TuningParameters:
             
         
         
-        for key in simConfig.opt_measurements:
-            if key == 'apparent_windspeed':
+        if simConfig.obsData.apparent_windspeed:
                 stdv_y.append(meas_stdv['va'])
 
         self.stdv_measurements = np.array(stdv_y)
