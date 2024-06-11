@@ -14,7 +14,7 @@ class KCU:
     spline_t = splrep(ldt_data, cdt_data, s=0)
     spline_p = splrep(ldp_data, cdp_data, s=0)
     
-    def __init__(self, data_available = False,**kwargs):
+    def __init__(self,**kwargs):
         
         self.length = kwargs.get('length')
         self.diameter = kwargs.get('diameter')
@@ -22,8 +22,6 @@ class KCU:
         self.distance_kcu_kite = kwargs.get('distance_kcu_kite')
         self.total_length_bridle_lines = kwargs.get('total_length_bridle_lines')
         self.diameter_bridle_lines = kwargs.get('diameter_bridle_lines')
-
-        self.data_available = data_available
 
         # Example: Interpolate Cd for tangential flow at a specific L/D
         self.cdt = splev(self.length/self.diameter, KCU.spline_t)
