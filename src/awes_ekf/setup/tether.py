@@ -3,6 +3,7 @@ from awes_ekf.setup.settings import g, rho, z0
 from scipy.optimize import least_squares
 from awes_ekf.utils import project_onto_plane, calculate_angle_2vec
 import casadi as ca
+from dataclasses import dataclass
 
 tether_materials = {
     "Dyneema-SK78": {
@@ -26,7 +27,7 @@ tether_materials = {
 class Tether:
     """Tether model class"""
 
-    def __init__(self, kite,kcu,simConfig, elastic=True, **kwargs):
+    def __init__(self, kite, kcu, obsData, elastic=True, **kwargs):
         """ "Create tether model class from material name and diameter"""
         material_name = kwargs.get("material_name")
         diameter = kwargs.get("diameter")
@@ -46,31 +47,23 @@ class Tether:
         self.elastic = elastic
         self.area = np.pi * (self.diameter / 2) ** 2
         self.EA = self.Youngs_modulus * self.area
-        if kcu is not None:
-            self.kcu = True
-        else:
-            self.kcu = False
+        self.kcu = kcu
+        self.kite = kite
+        self.obsData = obsData
 
+        res = self.calculate_tether_shape_symbolic()
+        self.kite_position = res["kite_position"]
+        self.tether_force_kite = res["tether_force_kite"]
+        self.bridle_frame_va = res["bridle_frame_va"]
+        self.bridle_frame_vk = res["bridle_frame_vk"]
+        self.tether_frame = res["tether_frame"]
+        self.cd_kcu = res["cd_kcu"]
+        self.cd_tether = res["cd_tether"]
+        self.CL = res["CL"]
+        self.CD = res["CD"]
+        self.CS = res["CS"]
 
-        res = self.calculate_tether_shape_symbolic(kite, kcu, simConfig)
-        self.kite_position = res['kite_position']
-        self.tether_force_kite = res['tether_force_kite']
-        self.bridle_frame_va = res['bridle_frame_va']
-        self.bridle_frame_vk = res['bridle_frame_vk']
-        self.tether_frame = res['tether_frame']
-        self.cd_kcu = res['cd_kcu']
-        self.cd_tether = res['cd_tether']
-        self.CL = res['CL']
-        self.CD = res['CD']
-        self.CS = res['CS']
-
-
-    def calculate_tether_shape_symbolic(
-        self,
-        kite,
-        kcu,
-        simConfig
-    ):
+    def calculate_tether_shape_symbolic(self):
         """Calculate tether shape using symbolic expressions"""
 
         elevation_0 = ca.SX.sym("elevation_0")
@@ -80,7 +73,8 @@ class Tether:
         r_kite = ca.SX.sym("r_kite", 3)
         v_kite = ca.SX.sym("v_kite", 3)
         vw = ca.SX.sym("vw", 3)
-
+        kcu = self.kcu
+        kite = self.kite
 
         l_unstrained = tether_length / self.n_elements
         m_s = np.pi * self.diameter**2 / 4 * l_unstrained * self.density
@@ -99,7 +93,7 @@ class Tether:
             ca.norm_2(r_kite) ** 2
         )  # Tether angular velocity, with respect to the tether attachment point
 
-        if kcu is not None and simConfig.kcu_data is False:
+        if self.obsData.kite_acc:
             a_kite = ca.SX.sym("a_kite", 3)
             # Find instantaneuous center of rotation and omega of the kite
             at = (
@@ -114,10 +108,6 @@ class Tether:
             alpha = (
                 ca.cross(at, ICR) / ca.norm_2(ICR) ** 2
             )  # Angular acceleration of the kite
-        else:
-            a_kite = None
-            omega_kite = None
-            alpha = None
 
         tensions = ca.SX.zeros((n_elements, 3))
         tensions[0, 0] = ca.cos(elevation_0) * ca.cos(azimuth_0) * tension_ground
@@ -154,19 +144,12 @@ class Tether:
                 wvel * ca.log(positions[j + 1, 2] / z0) / ca.log(r_kite[2] / z0) * wdir
             )  # Wind
 
-
             if kcu_element:
-                if simConfig.kcu_data:
-                    v_kcu = ca.SX.sym("v_kcu", 3)
+                # Determine kinematics at the KCU
+                if self.obsData.kcu_acc:
                     a_kcu = ca.SX.sym("a_kcu", 3)
                     aj = a_kcu
-                    vj = v_kcu
-                else:
-                    v_kcu = v_kite + ca.cross(
-                        omega_kite, positions[j + 1, :].T - r_kite
-                    )
-                    vj = v_kcu
-                    velocities[j + 1, :] = vj
+                elif self.obsData.kite_acc:
                     a_kcu = (
                         a_kite
                         + ca.cross(alpha, positions[j + 1, :].T - r_kite)
@@ -177,6 +160,21 @@ class Tether:
                     )
                     aj = a_kcu
                     accelerations[j + 1, :] = aj
+                else:
+                    a_kcu = aj
+                    accelerations[j + 1, :] = a_kcu
+
+                if self.obsData.kcu_vel:
+                    v_kcu = ca.SX.sym("v_kcu", 3)
+                    vj = v_kcu
+                elif self.obsData.kite_acc:
+                    v_kcu = v_kite + ca.cross(
+                        omega_kite, positions[j + 1, :].T - r_kite
+                    )
+                    vj = v_kcu
+                    velocities[j + 1, :] = vj
+                else:
+                    v_kcu = vj
 
                 ej = (r_kite - positions[j + 1, :].T) / ca.norm_2(
                     r_kite - positions[j + 1, :].T
@@ -196,9 +194,7 @@ class Tether:
             # vaj_sq = ca.norm_2(vajn)*vajn
             CD_tether = self.cd * ca.sin(theta) ** 3 + self.cf
             # CL_tether = self.cd*ca.sin(theta)**2*ca.cos(theta)
-            tether_drag_basis = (
-                rho * l_unstrained * self.diameter * CD_tether * vaj_sq
-            )
+            tether_drag_basis = rho * l_unstrained * self.diameter * CD_tether * vaj_sq
 
             # Determine drag at point mass j.
             if kcu is None:
@@ -311,71 +307,100 @@ class Tether:
                 )
             elif last_element:
                 next_tension = tensions[j, :].T - fgj - dj  # a_kite gave better fit
-                if a_kite is not None:
-                    next_tension += point_mass*aj
+                if self.obsData.kite_acc:
+                    next_tension += point_mass * aj
                 aerodynamic_force = next_tension
 
         va = vwj - vj
-        ez_bridle = -tensions[-1, :].T/ca.norm_2(tensions[-1, :])                # Bridle direction, pointing down
-        ey_bridle = ca.cross(ez_bridle, -va)/ca.norm_2(ca.cross(ez_bridle, -va)) # y-axis of bridle frame, perpendicular to va
-        ex_bridle = ca.cross(ey_bridle, ez_bridle)                                      # x-axis of bridle frame, perpendicular ex and ey
+        ez_bridle = -tensions[-1, :].T / ca.norm_2(
+            tensions[-1, :]
+        )  # Bridle direction, pointing down
+        ey_bridle = ca.cross(ez_bridle, -va) / ca.norm_2(
+            ca.cross(ez_bridle, -va)
+        )  # y-axis of bridle frame, perpendicular to va
+        ex_bridle = ca.cross(
+            ey_bridle, ez_bridle
+        )  # x-axis of bridle frame, perpendicular ex and ey
         dcm_b2w = ca.horzcat(ex_bridle, ey_bridle, ez_bridle)
 
-        ez_bridle = -tensions[-1, :].T/ca.norm_2(tensions[-1, :])                # Bridle direction, pointing down
-        ey_bridle = ca.cross(ez_bridle, v_kite)/ca.norm_2(ca.cross(ez_bridle, v_kite)) # y-axis of bridle frame, perpendicular to va
-        ex_bridle = ca.cross(ey_bridle, ez_bridle)                                      # x-axis of bridle frame, perpendicular ex and ey
+        ez_bridle = -tensions[-1, :].T / ca.norm_2(
+            tensions[-1, :]
+        )  # Bridle direction, pointing down
+        ey_bridle = ca.cross(ez_bridle, v_kite) / ca.norm_2(
+            ca.cross(ez_bridle, v_kite)
+        )  # y-axis of bridle frame, perpendicular to va
+        ex_bridle = ca.cross(
+            ey_bridle, ez_bridle
+        )  # x-axis of bridle frame, perpendicular ex and ey
         dcm_b2vel = ca.horzcat(ex_bridle, ey_bridle, ez_bridle)
 
         # Tether frame at the kite
-        ez_tether = -tensions[-2, :].T/ca.norm_2(tensions[-2, :])
-        ey_tether = ca.cross(ez_tether, -va)/ca.norm_2(ca.cross(ez_tether, -va))
+        ez_tether = -tensions[-2, :].T / ca.norm_2(tensions[-2, :])
+        ey_tether = ca.cross(ez_tether, -va) / ca.norm_2(ca.cross(ez_tether, -va))
         ex_tether = ca.cross(ey_tether, ez_tether)
         dcm_t2w = ca.horzcat(ex_tether, ey_tether, ez_tether)
 
         tension_kite = tensions[-1, :].T
         # Calculate aerodynamic coefficients
-        dir_D = va/ca.norm_2(va)
-        CD = ca.dot(aerodynamic_force,dir_D)/(0.5*rho*kite.area*ca.norm_2(va)**2)
-        dir_L = tension_kite/ca.norm_2(tension_kite) - ca.dot(tension_kite/ca.norm_2(tension_kite),dir_D)*dir_D
-        CL = ca.dot(aerodynamic_force,dir_L)/(0.5*rho*kite.area*ca.norm_2(va)**2)
-        dir_S = ca.cross(dir_L,dir_D)
-        CS = ca.dot(aerodynamic_force,dir_S)/(0.5*rho*kite.area*ca.norm_2(va)**2)
+        dir_D = va / ca.norm_2(va)
+        CD = ca.dot(aerodynamic_force, dir_D) / (
+            0.5 * rho * kite.area * ca.norm_2(va) ** 2
+        )
+        dir_L = (
+            tension_kite / ca.norm_2(tension_kite)
+            - ca.dot(tension_kite / ca.norm_2(tension_kite), dir_D) * dir_D
+        )
+        CL = ca.dot(aerodynamic_force, dir_L) / (
+            0.5 * rho * kite.area * ca.norm_2(va) ** 2
+        )
+        dir_S = ca.cross(dir_L, dir_D)
+        CS = ca.dot(aerodynamic_force, dir_S) / (
+            0.5 * rho * kite.area * ca.norm_2(va) ** 2
+        )
         # Parasitic drag of tether and KCU
         if kcu is not None:
-            cd_kcu = D_kcu/(0.5*rho*ca.norm_2(vaj)**2*kite.area)
+            cd_kcu = D_kcu / (0.5 * rho * ca.norm_2(vaj) ** 2 * kite.area)
         else:
             cd_kcu = 0
-        cd_tether = drag_tether/(0.5*rho*ca.norm_2(vaj)**2*kite.area)
+        cd_tether = drag_tether / (0.5 * rho * ca.norm_2(vaj) ** 2 * kite.area)
 
+        args = [
+            elevation_0,
+            azimuth_0,
+            tether_length,
+            tension_ground,
+            r_kite,
+            v_kite,
+            vw,
+        ]
 
-
-        if kcu is not None:
-            if simConfig.kcu_data:
-                args = [elevation_0, azimuth_0, tether_length, tension_ground, r_kite, v_kite, vw, a_kcu, v_kcu]
-                
-            else:
-                args = [elevation_0, azimuth_0, tether_length, tension_ground, r_kite, v_kite, vw, a_kite]
-        else:
-            args = [elevation_0, azimuth_0, tether_length, tension_ground, r_kite, v_kite, vw]
+        if self.obsData.kite_acc:
+            args.append(a_kite)
+        if self.obsData.kcu_acc:
+            args.append(a_kcu)
+        if self.obsData.kcu_vel:
+            args.append(v_kcu)
 
         res = {
-                    'kite_position': ca.Function('kite_position', args, [positions[-1, :].T]),
-                    'tether_force_kite': ca.Function('tether_force_kite', args, [tensions[-1, :].T]),
-                    'bridle_frame_va': ca.Function('bridle_frame_va', args, [dcm_b2w]),
-                    'bridle_frame_vk': ca.Function('bridle_frame_vk', args, [dcm_b2vel]),
-                    'tether_frame': ca.Function('tether_frame', args, [dcm_t2w]),
-                    'cd_kcu': ca.Function('cd_kcu', args, [cd_kcu]),
-                    'cd_tether': ca.Function('cd_tether', args, [cd_tether]),
-                    'CL': ca.Function('CL', args, [CL]),
-                    'CD': ca.Function('CD', args, [CD]),
-                    'CS': ca.Function('CS', args, [CS]),
-                }
-        
+            "kite_position": ca.Function("kite_position", args, [positions[-1, :].T]),
+            "tether_force_kite": ca.Function(
+                "tether_force_kite", args, [tensions[-1, :].T]
+            ),
+            "bridle_frame_va": ca.Function("bridle_frame_va", args, [dcm_b2w]),
+            "bridle_frame_vk": ca.Function("bridle_frame_vk", args, [dcm_b2vel]),
+            "tether_frame": ca.Function("tether_frame", args, [dcm_t2w]),
+            "cd_kcu": ca.Function("cd_kcu", args, [cd_kcu]),
+            "cd_tether": ca.Function("cd_tether", args, [cd_tether]),
+            "CL": ca.Function("CL", args, [CL]),
+            "CD": ca.Function("CD", args, [CD]),
+            "CS": ca.Function("CS", args, [CS]),
+        }
+
         return res
-    
-    def objective_function(self, x, *args, return_force=False, kcu = None):
+
+    def objective_function(self, x, *args, return_force=False, kcu=None):
         """Objective function for optimization"""
-        
+
         r_kite = np.array(args[1])
         if return_force:
             tension_ground = x[2]
@@ -384,38 +409,38 @@ class Tether:
             tether_length = x[2]
             tension_ground = args[0]
 
-        args = (x[0], x[1], tether_length, tension_ground)+args[1::]
+        args = (x[0], x[1], tether_length, tension_ground) + args[1::]
         r_tether_model = self.kite_position(*args)
 
         return r_kite - np.array(r_tether_model).flatten()
-    
-    def solve_tether_shape(
-        self,
-        r_kite,
-        v_kite,
-        vw,
-        kcu,
-        tension_ground=None,
-        tether_length=None,
-        a_kite=None,
-        a_kcu=None,
-        v_kcu=None,
-    ):
+
+    def solve_tether_shape(self,tetherInput):
+        """Solve for the tether shape"""
+        
+        r_kite = np.array(tetherInput.kite_pos)
+        v_kite = np.array(tetherInput.kite_vel)
+        vw = np.array(tetherInput.wind_vel)
+        a_kite = np.array(tetherInput.kite_acc)
+        a_kcu = np.array(tetherInput.kcu_acc)
+        v_kcu = np.array(tetherInput.kcu_vel)
+
+        tension_ground = tetherInput.tether_force
 
         if not hasattr(self, "opt_guess"):
             elevation = np.arctan2(r_kite[2], np.linalg.norm(r_kite[:2]))
             azimuth = np.arctan2(r_kite[1], r_kite[0])
             length = np.linalg.norm(r_kite)
-            
+
             self.opt_guess = [elevation, azimuth, length]
 
-        if kcu is not None:
-            if kcu.data_available:
-                args = ( tension_ground, r_kite, v_kite, vw, a_kcu, v_kcu)
-            else:
-                args = (tension_ground, r_kite, v_kite, vw, a_kite)
-        else:
-            args = ( tension_ground, r_kite, v_kite, vw)
+        args = (tension_ground, r_kite, v_kite, vw)
+
+        if self.obsData.kite_acc:
+            args += (a_kite,)
+        if self.obsData.kcu_acc:
+            args += (a_kcu,)
+        if self.obsData.kcu_vel:
+            args += (v_kcu,)
 
         opt_res = least_squares(
             self.objective_function,
@@ -429,4 +454,27 @@ class Tether:
 
         return opt_res.x
 
+@dataclass
+class TetherInput:
+    kite_pos: np.ndarray
+    kite_vel: np.ndarray
+    tether_force: float
+    tether_length: float
+    tether_elevation: float
+    tether_azimuth: float
+    wind_vel: np.ndarray
+    kite_acc: np.ndarray = None
+    kcu_acc: np.ndarray = None
+    kcu_vel: np.ndarray = None
 
+    def create_input_tuple(self,simConfig):
+        args = (self.tether_elevation,self.tether_azimuth,self.tether_length,self.tether_force,self.kite_pos,self.kite_vel,self.wind_vel)
+        if simConfig.obsData.kite_acc:
+            args = args + (self.kite_acc,)
+        if simConfig.obsData.kcu_acc:
+            args = args + (self.kcu_acc,)
+        if simConfig.obsData.kcu_vel:
+            args = args + (self.kcu_vel,)
+
+        return args
+    
