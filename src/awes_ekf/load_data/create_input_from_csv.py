@@ -142,9 +142,6 @@ def create_input_from_csv(
         0,
     ]  # Initial wind velocity
 
-
-    opt_res = tether.solve_tether_shape(tether_input)
-
     tether_input = TetherInput(
         kite_pos=kite_pos[0],
         kite_vel=kite_vel[0],
@@ -153,10 +150,14 @@ def create_input_from_csv(
         kcu_vel=kcu_vel[0],
         tether_force=tether_force[0],
         wind_vel=vw,
-        tether_elevation=opt_res[0],
-        tether_azimuth=opt_res[1],
-        tether_length=opt_res[2],
+        tether_elevation=kite_elevation[0],
+        tether_azimuth=kite_azimuth[0],
+        tether_length=tether_length[0],
     )
+
+    tether_input = tether.solve_tether_shape(tether_input)
+
+    
     #%% Find the initial state vector for the EKF
 
     args = tether_input.create_input_tuple(simConfig)
