@@ -101,17 +101,20 @@ class ExtendedKalmanFilter:
         return np.diag(np.array(stdv_y)**2)
     
     def update_input_vector(self,input_class,kcu,kite):
-        if kcu is not None:
-            if kcu.data_available:   
-                self.u = np.concatenate((np.array([input_class.reelout_speed, input_class.tether_force]), input_class.kcu_acc, input_class.kcu_vel, np.array([input_class.steering_input])))
-            else:
-                self.u = np.concatenate((np.array([input_class.reelout_speed, input_class.tether_force]), input_class.kite_acc,np.array([input_class.steering_input])))
-        elif kite.thrust:
-            self.u = np.concatenate((np.array([input_class.reelout_speed, input_class.tether_force]), input_class.kite_acc, np.array([input_class.steering_input]), input_class.thrust_force))
+        input = np.array([input_class.reelout_speed, input_class.tether_force])
+        if self.simConfig.obsData.kite_acc:
+            input = np.concatenate((input, input_class.kite_acc))
+        if self.simConfig.obsData.kcu_acc:
+            input = np.concatenate((input, input_class.kcu_acc))
+        if self.simConfig.obsData.kcu_vel:
+            input = np.concatenate((input, input_class.kcu_vel))
+        if self.simConfig.obsData.thrust_force:
+            input = np.concatenate((input, input_class.thrust_force))
         
+        self.u = input
 
-    def update_measurement_vector(self,input_class, model_specs):
-        opt_measurements = model_specs.opt_measurements
+    def update_measurement_vector(self,input_class, simConfig):
+        opt_measurements = simConfig.opt_measurements
         z = np.array([])  # Initialize an empty NumPy array
 
         # Append values to the NumPy array
@@ -121,11 +124,11 @@ class ExtendedKalmanFilter:
         z = np.append(z,input_class.elevation)
         z = np.append(z,input_class.azimuth)
         z = np.append(z, np.zeros(3))  # Add zeros for the least-squares problem
-        if model_specs.model_yaw:
+        if simConfig.model_yaw:
             z = np.append(z,input_class.kite_yaw)
-        if model_specs.enforce_z_wind:
+        if simConfig.enforce_z_wind:
             z = np.append(z,0)
-        if 'apparent_windspeed' in opt_measurements:
+        if simConfig.obsData.apparent_windspeed:
             z = np.append(z, input_class.apparent_windspeed)   
 
         self.z = z
