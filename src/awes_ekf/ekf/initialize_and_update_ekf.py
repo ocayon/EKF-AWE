@@ -69,7 +69,7 @@ def update_state_ekf_tether(ekf, tether, kite, kcu, ekf_input, simConfig):
         ekf.x_k1_k1 = ekf.x_k1_k
         print('EKF update returns Nan values, integration of current step ommited')
             
-    ekf_output = create_ekf_output(ekf.x_k1_k1, ekf.u, kite, tether, kcu, simConfig)
+    ekf_output = create_ekf_output(ekf.x_k1_k1, ekf.u, ekf_input, tether, kcu, simConfig)
 
     return ekf, ekf_output
 
