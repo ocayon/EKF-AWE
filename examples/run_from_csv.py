@@ -33,7 +33,7 @@ estimate_kite_angle = False # Estimate kite angle, only for soft wing with KCU
 if __name__ == "__main__":
     flight_data = read_processed_flight_data(year, month, day, kite_model)
 
-    flight_data = flight_data.iloc[:6000]
+    flight_data = flight_data.iloc[:32000]
 
     config_data = load_config("examples/"+config_file_name)
     # %% Initialize EKF
@@ -44,7 +44,7 @@ if __name__ == "__main__":
         kcu = KCU(**config_data["kcu"])
     else:
         kcu = None
-    tether = Tether(kite,kcu,simConfig,**config_data["tether"])
+    tether = Tether(kite,kcu,simConfig.obsData,**config_data["tether"])
 
     tuningParams = TuningParameters(config_data["tuning_parameters"], simConfig)
 
