@@ -80,6 +80,6 @@ in which [env_name] should be replaced by the chosen name (previously ```source 
 All the required Python packages (listed in requirements.yml) are installed when creating the environment. Make sure that the new environment is active every time you run any of the Python scripts. Alternatively, linux-64 users may use [environment_linux-64.yml](environment_linux-64.yml) which lists all dependencies explicitly including version and build numbers. 
 
 ### Waiver
-Technische Universiteit Delft hereby disclaims all copyright interest in the program "awes-ekf" written by Oriol Cayon.
+Technische Universiteit Delft hereby disclaims all copyright interest in the program "EKF-AWE" written by Oriol Cayon.
 
 Prof.dr. H.G.C. (Henri) Werij, Dean of Faculty of Aerospace Engineering
