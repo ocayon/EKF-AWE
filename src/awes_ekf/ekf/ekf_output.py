@@ -35,13 +35,14 @@ class EKFOutput:
     kcu_roll: float = None
     kcu_pitch: float = None
     kcu_yaw: float = None
+    tether_offset: float = None
     
-def create_ekf_output(x, u, kite, tether,kcu, model_specs):
+def create_ekf_output(x, u, ekf_input, tether,kcu, simConfig):
     """Store results in a list of instances of the class EKFOutput"""
     # Store tether force and tether model results
     r_kite = x[0:3]
     v_kite = x[3:6]
-    if model_specs.log_profile:
+    if simConfig.log_profile:
         wind_vel  = x[6]/kappa*np.log(x[2]/z0)
         wind_dir = x[7]
         z_wind = x[8]
@@ -55,17 +56,15 @@ def create_ekf_output(x, u, kite, tether,kcu, model_specs):
     tether_length = x[12]
     elevation_0 = x[13]
     azimuth_0 = x[14]
+    args = (elevation_0, azimuth_0, tether_length, tension_ground, r_kite, v_kite, vw)
 
-    if kcu is not None:
-        if kcu.data_available:
-            a_kcu = u[2:5]
-            v_kcu = u[5:8]
-            args = (elevation_0, azimuth_0, tether_length, tension_ground, r_kite, v_kite, vw, a_kcu, v_kcu)
-        else:
-            a_kite = u[2:5]
-            args = (elevation_0, azimuth_0, tether_length, tension_ground, r_kite, v_kite, vw, a_kite)
-    else:
-        args = (elevation_0, azimuth_0, tether_length, tension_ground, r_kite, v_kite, vw)
+    if simConfig.obsData.kite_acc:
+        args += (ekf_input.kite_acc,)
+    if simConfig.obsData.kcu_acc:
+        args += (ekf_input.kcu_acc,)
+    if simConfig.obsData.kcu_vel:
+        args += (ekf_input.kcu_vel,)
+
 
     dcm_b2w = np.array(tether.bridle_frame_va(*args))
     dcm_b2vel = np.array(tether.bridle_frame_vk(*args))
@@ -77,7 +76,7 @@ def create_ekf_output(x, u, kite, tether,kcu, model_specs):
     cd_kcu = tether.cd_kcu(*args)
     cd_tether = tether.cd_tether(*args)
     
-    if model_specs.model_yaw:
+    if simConfig.model_yaw:
         dcm = calculate_reference_frame_euler( euler_angles[0], 
                                                      euler_angles[1], 
                                                      x[15], 
@@ -91,6 +90,11 @@ def create_ekf_output(x, u, kite, tether,kcu, model_specs):
     kite_pos_x, kite_pos_y, kite_pos_z = x[0:3]
     kite_vel_x, kite_vel_y, kite_vel_z = x[3:6]
 
+    if simConfig.tether_offset:
+        tether_offset = x[15]
+    else:
+        tether_offset = None
+    
     # Create an instance of EKFOutput with unpacked vectors
     ekf_output = EKFOutput(
         kite_pos_x = kite_pos_x,
@@ -117,10 +121,11 @@ def create_ekf_output(x, u, kite, tether,kcu, model_specs):
         z_wind = z_wind,
         kcu_roll = euler_angles1[0],
         kcu_pitch = euler_angles1[1],
-        kcu_yaw = euler_angles1[2]
+        kcu_yaw = euler_angles1[2],
+        tether_offset = tether_offset
     )
     
-    if model_specs.model_yaw:
+    if simConfig.model_yaw:
         ekf_output.k_steering_law = x[16]
         ekf_output.yaw = x[15]
                             
