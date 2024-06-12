@@ -4,42 +4,60 @@ from awes_ekf.setup.settings import kappa, z0
 
 class ObservationModel:
 
-    def __init__(self,x,u,model_specs,kite,tether,kcu):
+    def __init__(self,x,u,simConfig,kite,tether,kcu):
         self.x = x
         self.u = u
         self.x0 = ca.SX.sym('x0',self.x.shape[0])    # Kite position
-        self.model_specs = model_specs
+        self.simConfig = simConfig
     
     def get_hx(self,kite,tether,kcu):
         
-        elevation_0 = self.x[13]
-        azimuth_0 = self.x[14]
-        tether_length = self.x[12]
+        # Split the CasADi matrix into individual symbolic variables
+        state_variables = ca.vertsplit(self.x)
+        # Create a dictionary to map variable names to their symbolic variables
+        state_map = {var.name(): var for var in state_variables}
+        
+        input_variables = ca.vertsplit(self.u)
+        input_map = {var.name(): var for var in input_variables}
+
+        elevation_0 = state_map['elevation_first_tether_element']
+        azimuth_0 = state_map['azimuth_first_tether_element']
+        tether_length = state_map['tether_length']
         r_kite = self.x0[0:3]
         v_kite = self.x0[3:6]
-        tension_ground = self.u[1]
-            
-        if self.model_specs.log_profile:
+        tension_ground = input_map['ground_tether_force']
+
+
+        if self.simConfig.log_profile:
             wvel = self.x0[6]/kappa*np.log(self.x0[2]/z0)
             wdir = self.x0[7]
             vw = np.array([wvel*np.cos(wdir),wvel*np.sin(wdir),self.x0[8]])
         else:
             vw = self.x0[6:9]
         
-        if kcu is not None:
-            if kcu.data_available:
-                a_kcu = self.u[2:5]
-                v_kcu = self.u[5:8]
-                args = (elevation_0, azimuth_0, tether_length, tension_ground, r_kite, v_kite, vw, a_kcu, v_kcu)
+        args = (elevation_0, azimuth_0, tether_length, tension_ground, r_kite, v_kite, vw)
+        if self.simConfig.obsData.kite_acc:
+            a_kite = self.u[2:5]
+            args += (a_kite,)
+        if self.simConfig.obsData.kcu_acc:
+            if self.simConfig.obsData.kite_acc:
+                a_kcu = self.u[5:8]
+                args += (a_kcu,)
             else:
-                a_kite = self.u[2:5]
-                args = (elevation_0, azimuth_0, tether_length, tension_ground, r_kite, v_kite, vw, a_kite)
-        else:
-            args = (elevation_0, azimuth_0, tether_length, tension_ground, r_kite, v_kite, vw)
+                a_kcu = self.u[2:5]
+                args += (a_kcu,)
+
+        if self.simConfig.obsData.kcu_vel:
+            if self.simConfig.obsData.kite_acc:
+                v_kcu = self.u[8:11]
+                args += (v_kcu,)
+            else:
+                v_kcu = self.u[5:8]
+                args += (v_kcu,)
 
         r_tether_model = tether.kite_position(*args)
 
-        if self.model_specs.log_profile:
+        if self.simConfig.log_profile:
             wvel = self.x[6]/kappa*np.log(self.x[2]/z0)
             wdir = self.x[7]
             vw = np.array([wvel*np.cos(wdir),wvel*np.sin(wdir),self.x[8]])
@@ -51,22 +69,22 @@ class ObservationModel:
         h = ca.SX()
         h = ca.vertcat(self.x[0:3])
         h = ca.vertcat(h,self.x[3:6])
-        if self.model_specs.tether_offset:
+        if self.simConfig.tether_offset:
             h = ca.vertcat(h,self.x[12]-self.x[-1])
         else:
             h = ca.vertcat(h,self.x[12])
         h = ca.vertcat(h,self.x[13])
         h = ca.vertcat(h,self.x[14])
         h = ca.vertcat(h,(self.x[0:3]-r_tether_model))
-        if self.model_specs.model_yaw:
+        if self.simConfig.model_yaw:
             h = ca.vertcat(h,self.x[15])
-        if self.model_specs.enforce_z_wind:
+        if self.simConfig.enforce_z_wind:
             h = ca.vertcat(h,self.x[8])
         
-            
-        for key in self.model_specs.opt_measurements:
-            if key == 'apparent_windspeed':
+
+        if self.simConfig.obsData.apparent_windspeed:
                 h = ca.vertcat(h,ca.norm_2(va))
+        
         
         return h
 
