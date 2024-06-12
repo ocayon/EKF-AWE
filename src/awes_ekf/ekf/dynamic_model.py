@@ -3,9 +3,9 @@ import casadi as ca
 from awes_ekf.setup.settings import kappa, z0, rho, g
 
 class DynamicModel:
-    def __init__(self,kite,tether,kcu,model_specs):
+    def __init__(self,kite,tether,kcu,simConfig):
         
-        self.model_specs = model_specs
+        self.simConfig = simConfig
 
         self.r = ca.SX.sym('r',3)    # Kite position
         self.r_tether_model = ca.SX.sym('r_tether_model',3) # Tether attachment point
@@ -25,23 +25,23 @@ class DynamicModel:
         
 
 
-        self.get_wind_velocity(model_specs.log_profile)
+        self.get_wind_velocity(simConfig.log_profile)
         self.va = self.vw - self.v
 
         self.u = self.get_input(kcu,kite)
         self.x = self.get_state(kite,tether,kcu)
-        if model_specs.model_yaw:
+        if simConfig.model_yaw:
             self.x = ca.vertcat(self.x, self.yaw, self.k_yaw_rate)
-        if model_specs.tether_offset:
+        if simConfig.tether_offset:
             self.x = ca.vertcat(self.x, self.tether_offset)
         self.x0 = ca.SX.sym('x0',self.x.shape[0])  
         self.fx = self.get_fx(kite,tether,kcu)
         
         
-        if model_specs.model_yaw:
+        if simConfig.model_yaw:
             yaw_rate = self.k_yaw_rate*self.us*ca.norm_2(self.va)
             self.fx = ca.vertcat(self.fx,yaw_rate,0)
-        if model_specs.tether_offset:
+        if simConfig.tether_offset:
             self.fx = ca.vertcat(self.fx,0)
         
           # Kite position
@@ -65,48 +65,50 @@ class DynamicModel:
             self.vw_state = self.vw
     
     def get_input(self,kcu,kite):
-        if kcu is not None:
-            if kcu.data_available:
-                self.a_kcu =  ca.SX.sym('a_kcu',3)  # KCU acceleration
-                self.v_kcu =  ca.SX.sym('v_kcu',3)  # KCU acceleration
-                return ca.vertcat(self.reelout_speed,self.Ftg,self.a_kcu, self.v_kcu,self.us)
-            else:
-                self.a_kite =  ca.SX.sym('a_kite',3)
-                return ca.vertcat(self.reelout_speed,self.Ftg,self.a_kite,self.us)
-        elif kite.thrust:
-            self.thrust = ca.SX.sym('thrust', 3)    # Thrust force
+        input = ca.vertcat(self.reelout_speed,self.Ftg)
+        if self.simConfig.obsData.kite_acc:
             self.a_kite =  ca.SX.sym('a_kite',3)  # Kite acceleration
-            return ca.vertcat(self.reelout_speed,self.Ftg,self.a_kite,self.us,self.thrust)
+            input = ca.vertcat(input,self.a_kite)
+        if self.simConfig.obsData.kcu_acc:
+            self.a_kcu =  ca.SX.sym('a_kcu',3)  # KCU acceleration
+            input = ca.vertcat(input,self.a_kcu) 
+        if self.simConfig.obsData.kcu_vel:
+            self.v_kcu =  ca.SX.sym('v_kcu',3) # KCU velocity
+            input = ca.vertcat(input,self.v_kcu)
+        if self.simConfig.obsData.thrust_force:
+            self.thrust = ca.SX.sym('thrust', 3)    # Thrust force
+            input =  ca.vertcat(input,self.thrust)
+        
+        return input
         
         
     
     def get_fx(self,kite,tether,kcu):
         
         
-        elevation_0 = self.x[13]
-        azimuth_0 = self.x[14]
-        tether_length = self.x[12]
+        elevation_0 = self.elevation_0
+        azimuth_0 = self.azimuth_0
+        tether_length = self.tether_length
         r_kite = self.x0[0:3]
         v_kite = self.x0[3:6]
-        tension_ground = self.u[1]
+        tension_ground = self.Ftg
 
-        if self.model_specs.log_profile:
+        if self.simConfig.log_profile:
             wvel = self.x0[6]/kappa*np.log(self.x0[2]/z0)
             wdir = self.x0[7]
             vw = np.array([wvel*np.cos(wdir),wvel*np.sin(wdir),self.x0[8]])
         else:
             vw = self.x0[6:9]
 
-        if kcu is not None:
-            if kcu.data_available:
-                a_kcu = self.u[2:5]
-                v_kcu = self.u[5:8]
-                args = (elevation_0, azimuth_0, tether_length, tension_ground, r_kite, v_kite, vw, a_kcu, v_kcu)
-            else:
-                a_kite = self.u[2:5]
-                args = (elevation_0, azimuth_0, tether_length, tension_ground, r_kite, v_kite, vw, a_kite)
-        else:
-            args = (elevation_0, azimuth_0, tether_length, tension_ground, r_kite, v_kite, vw)
+
+        args = (elevation_0, azimuth_0, tether_length, tension_ground, r_kite, v_kite, vw)
+        if self.simConfig.obsData.kite_acc:
+            args += (self.a_kite,)
+        if self.simConfig.obsData.kcu_acc:
+            args += (self.a_kcu,)
+        if self.simConfig.obsData.kcu_vel:
+            args += (self.v_kcu,)
+
 
         tension_last_element = tether.tether_force_kite(*args)
         
