@@ -451,8 +451,10 @@ class Tether:
             ftol=1e-3,
         )
         self.opt_guess = opt_res.x
-
-        return opt_res.x
+        tetherInput.tether_length = opt_res.x[2]
+        tetherInput.tether_elevation = opt_res.x[0]
+        tetherInput.tether_azimuth = opt_res.x[1]
+        return tetherInput
 
 @dataclass
 class TetherInput:
