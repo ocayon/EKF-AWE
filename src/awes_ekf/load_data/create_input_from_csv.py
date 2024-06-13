@@ -107,6 +107,18 @@ def create_input_from_csv(
     except:
         us = np.zeros(n_intervals)
     timestep = flight_data["time"].iloc[1] - flight_data["time"].iloc[0]
+
+    # Find initial wind velocity
+    uf = init_wind_vel * kappa / np.log(10 / z0)
+    wvel0 = uf / kappa * np.log(kite_pos[0][2] / z0)
+    if np.isnan(wvel0):
+        raise ValueError("Initial wind velocity is NaN")
+    vw = [
+        wvel0 * np.cos(init_wind_dir),
+        wvel0 * np.sin(init_wind_dir),
+        0,
+    ]  # Initial wind velocity
+
     ekf_input_list = []
     for i in range(len(flight_data)):
 
@@ -131,35 +143,30 @@ def create_input_from_csv(
             )
         )
 
-    # Solve for the tether shape
-    uf = init_wind_vel * kappa / np.log(10 / z0)
-    wvel0 = uf / kappa * np.log(kite_pos[0][2] / z0)
-    if np.isnan(wvel0):
-        raise ValueError("Initial wind velocity is NaN")
-    vw = [
-        wvel0 * np.cos(init_wind_dir),
-        wvel0 * np.sin(init_wind_dir),
-        0,
-    ]  # Initial wind velocity
+    ekf_input_list[0].wind_vel = vw
+    x0 = find_initial_state_vector(tether,ekf_input_list[0],simConfig)
 
+    return ekf_input_list, x0
+
+def find_initial_state_vector(tether,ekf_input,simConfig):
     tether_input = TetherInput(
-        kite_pos=kite_pos[0],
-        kite_vel=kite_vel[0],
-        kite_acc=kite_acc[0],
-        kcu_acc=kcu_acc[0],
-        kcu_vel=kcu_vel[0],
-        tether_force=tether_force[0],
-        wind_vel=vw,
-        tether_elevation=kite_elevation[0],
-        tether_azimuth=kite_azimuth[0],
-        tether_length=tether_length[0],
+        kite_pos=ekf_input.kite_pos,
+        kite_vel=ekf_input.kite_vel,
+        kite_acc=ekf_input.kite_acc,
+        kcu_acc=ekf_input.kcu_acc,
+        kcu_vel=ekf_input.kcu_vel,
+        tether_force=ekf_input.tether_force,
+        wind_vel=ekf_input.wind_vel,
+        tether_elevation=ekf_input.elevation,
+        tether_azimuth=ekf_input.azimuth,
+        tether_length=ekf_input.tether_length,
     )
 
     tether_input = tether.solve_tether_shape(tether_input)
 
     
     #%% Find the initial state vector for the EKF
-    args = tether_input.create_input_tuple(simConfig)
+    args = tether_input.create_input_tuple(simConfig.obsData)
 
     CL = float(tether.CL(*args))
     CD = float(tether.CD(*args))
@@ -178,8 +185,8 @@ def create_input_from_csv(
         x0, [CL, CD, CS, tether_input.tether_length, tether_input.tether_elevation, tether_input.tether_azimuth]
     )  # Initial state vector (Last two elements are bias, used if needed)
     if simConfig.model_yaw:
-        x0 = np.append(x0, [kite_yaw[0], 0])  # Initial wind velocity and direction
+        x0 = np.append(x0, [ekf_input.kite_yaw, 0])  # Initial wind velocity and direction
     if simConfig.tether_offset:
         x0 = np.append(x0, 0)  # Initial tether offset
 
-    return ekf_input_list, x0
+    return x0
