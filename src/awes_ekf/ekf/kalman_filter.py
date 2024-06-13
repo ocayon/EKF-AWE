@@ -100,7 +100,7 @@ class ExtendedKalmanFilter:
     def get_observation_noise_covariance(self, stdv_y):
         return np.diag(np.array(stdv_y)**2)
     
-    def update_input_vector(self,input_class,kcu,kite):
+    def update_input_vector(self,input_class):
         input = np.array([input_class.reelout_speed, input_class.tether_force])
         if self.simConfig.obsData.kite_acc:
             input = np.concatenate((input, input_class.kite_acc))
