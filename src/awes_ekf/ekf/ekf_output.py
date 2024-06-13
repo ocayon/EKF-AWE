@@ -8,25 +8,25 @@ from awes_ekf.utils import calculate_euler_from_reference_frame, calculate_airfl
 
 @dataclass
 class EKFOutput:
-    kite_pos_x: float
-    kite_pos_y: float
-    kite_pos_z: float
-    kite_vel_x: float
-    kite_vel_y: float
-    kite_vel_z: float
-    wind_velocity: float
-    wind_direction: float
-    kite_roll: float
-    kite_pitch: float
-    kite_yaw: float
-    tether_length: float
-    kite_aoa: float
-    kite_sideslip: float
-    CL: float
-    CD: float
-    CS: float
-    elevation_first_element: float
-    azimuth_first_element: float
+    kite_pos_x: float = None
+    kite_pos_y: float = None
+    kite_pos_z: float = None
+    kite_vel_x: float = None
+    kite_vel_y: float = None
+    kite_vel_z: float = None
+    wind_velocity: float = None
+    wind_direction: float = None
+    kite_roll: float = None
+    kite_pitch: float = None
+    kite_yaw: float = None
+    tether_length: float = None
+    kite_aoa: float = None
+    kite_sideslip: float = None
+    CL: float = None
+    CD: float = None
+    CS: float = None   
+    elevation_first_element: float = None
+    azimuth_first_element: float = None
     thrust_force: float = None
     cd_tether: float = None
     cd_kcu: float = None
@@ -73,8 +73,8 @@ def create_ekf_output(x, u, ekf_input, tether,kcu, simConfig):
     dcm_t2w = rotate_ENU2NED(dcm_t2w)
     euler_angles = calculate_euler_from_reference_frame(dcm_b2w)
     euler_angles1 = calculate_euler_from_reference_frame(dcm_t2w)
-    cd_kcu = tether.cd_kcu(*args)
-    cd_tether = tether.cd_tether(*args)
+    cd_kcu = float(tether.cd_kcu(*args))
+    cd_tether = float(tether.cd_tether(*args))
     
     if simConfig.model_yaw:
         dcm = calculate_reference_frame_euler( euler_angles[0], 

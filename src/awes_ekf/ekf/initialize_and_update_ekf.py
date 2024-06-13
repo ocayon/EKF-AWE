@@ -64,10 +64,6 @@ def update_state_ekf_tether(ekf, tether, kite, kcu, ekf_input, simConfig):
     ekf.predict()
     # Update next step
     ekf.update()
-
-    if np.isnan(ekf.x_k1_k1).any():
-        ekf.x_k1_k1 = ekf.x_k1_k
-        print('EKF update returns Nan values, integration of current step ommited')
             
     ekf_output = create_ekf_output(ekf.x_k1_k1, ekf.u, ekf_input, tether, kcu, simConfig)
 

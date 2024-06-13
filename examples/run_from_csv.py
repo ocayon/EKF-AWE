@@ -1,20 +1,20 @@
 import time as time
 from awes_ekf.ekf.initialize_and_update_ekf import initialize_ekf, propagate_state_EKF
 from awes_ekf.load_data.read_data import read_processed_flight_data
-from awes_ekf.load_data.create_input_from_csv import create_input_from_csv
+from awes_ekf.load_data.create_input_from_csv import create_input_from_csv, find_initial_state_vector
 from awes_ekf.setup.settings import load_config, SimulationConfig, TuningParameters
 from awes_ekf.load_data.save_data import save_results
 from awes_ekf.setup.kite import Kite
 from awes_ekf.setup.tether import Tether
 from awes_ekf.setup.kcu import KCU
-from awes_ekf.ekf.ekf_output import convert_ekf_output_to_df
+from awes_ekf.ekf.ekf_output import convert_ekf_output_to_df, EKFOutput
 from awes_ekf.postprocess.postprocessing import postprocess_results
 
 
 # %% Load flight data and configuration settings
 year = "2023"
-month = "11"
-day = "27"
+month = "10"
+day = "26"
 kite_model = "v9"
 # year = '2024'
 # month = '06'
@@ -33,7 +33,8 @@ estimate_kite_angle = False # Estimate kite angle, only for soft wing with KCU
 if __name__ == "__main__":
     flight_data = read_processed_flight_data(year, month, day, kite_model)
 
-    flight_data = flight_data.iloc[:32000]
+    # flight_data = flight_data.iloc[:10000]
+    # flight_data.reset_index(drop=True, inplace=True)
 
     config_data = load_config("examples/"+config_file_name)
     # %% Initialize EKF
@@ -49,9 +50,10 @@ if __name__ == "__main__":
     tuningParams = TuningParameters(config_data["tuning_parameters"], simConfig)
 
     # Create input classes
-    ekf_input_list, x0 = create_input_from_csv(
+    ekf_input_list = create_input_from_csv(
         flight_data, kite, kcu, tether, simConfig, kite_sensor=0
     )
+    x0 = find_initial_state_vector(tether,ekf_input_list[0],simConfig)
 
     ekf, dyn_model = initialize_ekf(
         ekf_input_list[0], simConfig, tuningParams, x0, kite, kcu, tether
@@ -64,12 +66,29 @@ if __name__ == "__main__":
     for k, ekf_input in enumerate(ekf_input_list):
 
         # Propagate state EKF
-        ekf, ekf_ouput = propagate_state_EKF(
-            ekf, dyn_model, ekf_input, simConfig, tether, kite, kcu
-        )
+        try :
+            ekf, ekf_ouput = propagate_state_EKF(
+                ekf, dyn_model, ekf_input, simConfig, tether, kite, kcu
+            )
+            # Store results
+            ekf_output_list.append(ekf_ouput)
+        except Exception as e:  
+            try:
+                print('Integration error at iteration: ', k)
+                x0 = find_initial_state_vector(tether, ekf_input, simConfig)
+            except:
+                print('Tether model error at iteration: ', k)
+                continue    
+            ekf, dyn_model = initialize_ekf(
+                ekf_input, simConfig, tuningParams, x0, kite, kcu, tether
+            )
+            flight_data.drop(k, inplace=True)                        
 
+        # ekf, ekf_ouput = propagate_state_EKF(
+        #         ekf, dyn_model, ekf_input, simConfig, tether, kite, kcu
+        #     )
         # Store results
-        ekf_output_list.append(ekf_ouput)
+        # ekf_output_list.append(ekf_ouput)
 
         # Print progress
         if k % 600 == 0:
@@ -80,8 +99,11 @@ if __name__ == "__main__":
                 f"Real time: {mins} minutes.  Elapsed time: {elapsed_time:.2f} seconds"
             )
 
+    flight_data.reset_index(drop=True, inplace=True)
     # Postprocess results
     ekf_output_df = convert_ekf_output_to_df(ekf_output_list)
+    indices = ekf_output_df.index
+    flight_data = flight_data.iloc[indices]
     results, flight_data = postprocess_results(
         ekf_output_df,
         flight_data,
