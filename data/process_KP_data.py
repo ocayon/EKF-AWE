@@ -43,7 +43,8 @@ df = pd.read_csv(file_path+file_name,delimiter = ' ',low_memory=False)
 
 #%%
 
-df = df[df['kite_height'] > 80] #Select the indexes where the kite is flying
+kite_velocity = np.sqrt(df['kite_0_vx']**2 + df['kite_0_vy']**2 + df['kite_0_vz']**2)
+df = df[kite_velocity > 5] #Select the indexes where the kite is flying
 
 dt = df['time'].iloc[1] - df['time'].iloc[0]  # Time step
 df = df.reset_index() # Reset the index
