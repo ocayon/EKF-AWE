@@ -159,7 +159,6 @@ def create_input_from_csv(
 
     
     #%% Find the initial state vector for the EKF
-
     args = tether_input.create_input_tuple(simConfig)
 
     CL = float(tether.CL(*args))
@@ -174,7 +173,7 @@ def create_input_from_csv(
             x0, [uf, ground_winddir, 0]
         )  # Initial wind velocity and direction
     else:
-        x0 = np.append(x0, tether.wind_vel)  # Initial wind velocity
+        x0 = np.append(x0, tether_input.wind_vel)  # Initial wind velocity
     x0 = np.append(
         x0, [CL, CD, CS, tether_input.tether_length, tether_input.tether_elevation, tether_input.tether_azimuth]
     )  # Initial state vector (Last two elements are bias, used if needed)
