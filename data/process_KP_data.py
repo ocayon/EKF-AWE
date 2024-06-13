@@ -154,8 +154,9 @@ if 'lidar' in file_name:
         if 'Z-wind' in column:
             columns_to_copy.append(column)
 
-    flight_data = pd.concat([df[col] for col in columns_to_copy], axis=1)
+    flight_data_wind = pd.concat([df[col] for col in columns_to_copy], axis=1)
 
+flight_data = pd.concat([flight_data, flight_data_wind], axis=1)
 #%%
 csv_filepath = '../processed_data/flight_data/'+model+'/'
 csv_filename = model +'_'+date+'.csv'
