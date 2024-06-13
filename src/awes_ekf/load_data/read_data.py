@@ -16,8 +16,7 @@ def read_results(year,month,day,kite_model,addition = '', path_to_main = ''):
 
     results = pd.read_csv(path_to_main+path+file_name+'_res'+addition+'.csv')
     flight_data = pd.read_csv(path_to_main+path+file_name+'_fd.csv')
-
-    # results = results.dropna()
+    
     rows_to_keep = results.index
     flight_data = flight_data.loc[rows_to_keep]
     return results, flight_data

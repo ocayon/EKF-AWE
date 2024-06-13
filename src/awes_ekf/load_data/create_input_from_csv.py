@@ -113,7 +113,7 @@ def create_input_from_csv(
     wvel0 = uf / kappa * np.log(kite_pos[0][2] / z0)
     if np.isnan(wvel0):
         raise ValueError("Initial wind velocity is NaN")
-    vw = [
+    vw0 = [
         wvel0 * np.cos(init_wind_dir),
         wvel0 * np.sin(init_wind_dir),
         0,
@@ -121,7 +121,6 @@ def create_input_from_csv(
 
     ekf_input_list = []
     for i in range(len(flight_data)):
-
         ekf_input_list.append(
             EKFInput(
                 kite_pos=kite_pos[i],
@@ -140,13 +139,13 @@ def create_input_from_csv(
                 kite_yaw=kite_yaw[i],
                 steering_input=us[i],
                 thrust_force=thrust_force[i],
+                wind_vel=np.array(vw0),
             )
         )
 
-    ekf_input_list[0].wind_vel = vw
-    x0 = find_initial_state_vector(tether,ekf_input_list[0],simConfig)
+    
 
-    return ekf_input_list, x0
+    return ekf_input_list
 
 def find_initial_state_vector(tether,ekf_input,simConfig):
     tether_input = TetherInput(
