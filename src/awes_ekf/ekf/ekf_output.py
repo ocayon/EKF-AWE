@@ -36,6 +36,7 @@ class EKFOutput:
     kcu_pitch: float = None
     kcu_yaw: float = None
     tether_offset: float = None
+    tether_force_kite: float = None
     
 def create_ekf_output(x, u, ekf_input, tether,kcu, simConfig):
     """Store results in a list of instances of the class EKFOutput"""
@@ -75,6 +76,7 @@ def create_ekf_output(x, u, ekf_input, tether,kcu, simConfig):
     euler_angles1 = calculate_euler_from_reference_frame(dcm_t2w)
     cd_kcu = float(tether.cd_kcu(*args))
     cd_tether = float(tether.cd_tether(*args))
+    tether_force_kite = np.linalg.norm(tether.tether_force_kite(*args))
     
     if simConfig.model_yaw:
         dcm = calculate_reference_frame_euler( euler_angles[0], 
@@ -122,7 +124,8 @@ def create_ekf_output(x, u, ekf_input, tether,kcu, simConfig):
         kcu_roll = euler_angles1[0],
         kcu_pitch = euler_angles1[1],
         kcu_yaw = euler_angles1[2],
-        tether_offset = tether_offset
+        tether_offset = tether_offset,
+        tether_force_kite = tether_force_kite,
     )
     
     if simConfig.model_yaw:
