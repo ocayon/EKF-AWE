@@ -7,24 +7,22 @@ from awes_ekf.setup.settings import load_config
 import seaborn as sns
 import awes_ekf.plotting.plot_utils as pu
 from awes_ekf.postprocess.postprocessing import  postprocess_results
-from examples.run_from_csv import year, month, day, kite_model
+
 from awes_ekf.load_data.read_data import read_results
 #%%
-# year = '2023'
-# month = '10'
-# day = '26'
-# kite_model = 'v9'       
 
 plt.close('all')
 
-# Load results and flight data and plot kite reference frame
-results,flight_data = read_results(year, month, day, kite_model)
-config_data = load_config('examples/v9_config.yaml')
+config_file_name = "v9_config.yaml"
+config = load_config("examples/"+config_file_name)
+
+# Load results
+results,flight_data = read_results(str(config['year']),str(config['month']),str(config['day']),config['kite']['model_name'])
 plot_lidar_heights= [100,160,200,250]
 
-kite = Kite(**config_data['kite'])
-if config_data['kcu']:
-    kcu = KCU(**config_data['kcu'])
+kite = Kite(**config['kite'])
+if config['kcu']:
+    kcu = KCU(**config['kcu'])
 else:
     kcu = None
 imus = [0]
@@ -41,7 +39,6 @@ for column in flight_data.columns:
     if 'pitch' in column or 'roll' in column or 'yaw' in column:
         flight_data[column] = np.degrees(flight_data[column])
 
-flight_data['ground_wind_direction'] = np.degrees(flight_data['ground_wind_direction'])
 # # #%%
 # flight_data = calculate_wind_speed_airborne_sensors(results,flight_data, imus = [0])
 # Postprocess done
@@ -55,7 +52,7 @@ pu.plot_wind_speed_height_bins(results,flight_data, plot_lidar_heights, savefig=
 #%%
 # pu.plot_wind_profile(flight_data, results, savefig=False) # Plot wind profile
 
-axs = pu.plot_wind_profile_bins(flight_data.iloc[2000:-2000], results.iloc[2000:-2000], step = 10, savefig = False)
+axs = pu.plot_wind_profile_bins(flight_data, results, step = 10, savefig = False)
 
 # windpath = '../processed_data/era5_data/'
 # windfile = 'era5_data_'+year+'_'+month+'_'+day+'.npy'
@@ -74,7 +71,7 @@ axs = pu.plot_wind_profile_bins(flight_data.iloc[2000:-2000], results.iloc[2000:
 # %% Plot results aerodynamic coefficients
 
 # ################## Time series ##################
-cycles_plotted = np.arange(0,100,1)
+cycles_plotted = np.arange(0,50,1)
 pu.plot_aero_coeff_vs_aoa_ss(results, flight_data, cycles_plotted,IMU_0=False,savefig=False) # Plot aero coeff vs aoa_ss
 pu.plot_aero_coeff_vs_up_us(results, flight_data, cycles_plotted,IMU_0=False,savefig=False) # Plot aero coeff vs up_used
 #%%
@@ -99,8 +96,8 @@ pu.plot_time_series(flight_data,results['va_kite'], ax, color='red', label='Esti
 ax.grid()
 
 fig,ax = plt.subplots()
-pu.plot_time_series(flight_data, flight_data['kite_apparent_windspeed'], ax, color='blue', label='Measured',plot_phase=False)
-pu.plot_time_series(flight_data,results['va_kite'], ax, color='red', label='Estimated',plot_phase=True)
+pu.plot_time_series(flight_data, flight_data['kite_position_up'], ax, color='blue', label='Measured',plot_phase=False)
+pu.plot_time_series(flight_data,results['kite_pos_z'], ax, color='red', label='Estimated',plot_phase=True)
 ax.grid()
 
 
@@ -131,11 +128,19 @@ pu.plot_time_series(flight_data, flight_data['kite_yaw_s0'], ax, color='blue', l
 pu.plot_time_series(flight_data,results['kite_yaw'], ax, color='red', label='Estimated',plot_phase=False)
 ax.grid()
 ax.legend()
+
 #%%
-
-mask = range(3600,4000)
-pu.plot_kite_reference_frame(results.iloc[mask], flight_data.iloc[mask], imus)
-
+plt.figure()
+plt.plot(flight_data['time'],flight_data['ground_tether_force'],label = 'Measured ground')
+plt.plot(results['time'],results['tether_force_kite'],label = 'Estimated at kite')
+for column in flight_data.columns:
+    if 'load_cell' in column:
+        plt.plot(flight_data['time'],flight_data[column]*9.81,label = column)
+plt.xlabel('Time (s)')
+plt.ylabel('Force (N)')
+plt.legend()
+plt.title('Tether force comparison')
+plt.show()
 
 #%%
 r = np.sqrt(results.kite_pos_x**2+results.kite_pos_y**2+results.kite_pos_z**2)
@@ -347,5 +352,6 @@ plt.xlabel('Time (s)')
 plt.ylabel('Turbulence intensity')
 plt.title('Turbulence intensity at 160m altitude')
 
+#%%Plot force comparison
 
 

@@ -62,6 +62,8 @@ class Tether:
         self.CL = res["CL"]
         self.CD = res["CD"]
         self.CS = res["CS"]
+        self.tether_length = res["tether_length"]
+        self.positions = res["positions"]
 
     def calculate_tether_shape_symbolic(self):
         """Calculate tether shape using symbolic expressions"""
@@ -394,6 +396,8 @@ class Tether:
             "CL": ca.Function("CL", args, [CL]),
             "CD": ca.Function("CD", args, [CD]),
             "CS": ca.Function("CS", args, [CS]),
+            "tether_length": ca.Function("tether_length", args, [stretched_tether_length]),
+            "positions": ca.Function("positions", args, [positions]),
         }
 
         return res
@@ -454,6 +458,7 @@ class Tether:
         tetherInput.tether_length = opt_res.x[2]
         tetherInput.tether_elevation = opt_res.x[0]
         tetherInput.tether_azimuth = opt_res.x[1]
+        
         return tetherInput
 
 @dataclass
@@ -464,18 +469,19 @@ class TetherInput:
     tether_length: float
     tether_elevation: float
     tether_azimuth: float
-    wind_vel: np.ndarray
+    wind_vel: np.ndarray = np.array([0,0,0])
     kite_acc: np.ndarray = None
     kcu_acc: np.ndarray = None
     kcu_vel: np.ndarray = None
 
-    def create_input_tuple(self,simConfig):
+    def create_input_tuple(self,obsData):
+        
         args = (self.tether_elevation,self.tether_azimuth,self.tether_length,self.tether_force,self.kite_pos,self.kite_vel,self.wind_vel)
-        if simConfig.obsData.kite_acc:
+        if obsData.kite_acc:
             args = args + (self.kite_acc,)
-        if simConfig.obsData.kcu_acc:
+        if obsData.kcu_acc:
             args = args + (self.kcu_acc,)
-        if simConfig.obsData.kcu_vel:
+        if obsData.kcu_vel:
             args = args + (self.kcu_vel,)
 
         return args
