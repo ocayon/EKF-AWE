@@ -40,7 +40,6 @@ if __name__ == "__main__":
     else:
         kcu = None
     tether = Tether(kite,kcu,simConfig.obsData,**config_data["tether"])
-    kite.get_fx(tether)
 
     tuningParams = TuningParameters(config_data["tuning_parameters"], simConfig)
 
@@ -59,12 +58,6 @@ if __name__ == "__main__":
     start_time = time.time()
     mins = -1
     for k, ekf_input in enumerate(ekf_input_list):
-        # Propagate state EKF
-        ekf, ekf_ouput = propagate_state_EKF(
-            ekf, dyn_model, ekf_input, simConfig, tether, kite, kcu
-        )
-        # Store results
-        ekf_output_list.append(ekf_ouput)
         try :
             ekf, ekf_ouput = propagate_state_EKF(
                 ekf, dyn_model, ekf_input, simConfig, tether, kite, kcu
