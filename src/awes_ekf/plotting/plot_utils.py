@@ -1041,7 +1041,7 @@ def plot_wind_profile_bins(flight_data, results, step=20, savefig=False):
     return axs
 
 
-def plot_kite_reference_frame(results, flight_data, imus):
+def plot_kite_reference_frame(results, flight_data, imus,frame_axis = 'xyz'):
     ## Create 3d plot of kite reference frame
     from mpl_toolkits.mplot3d import Axes3D
 
@@ -1050,7 +1050,7 @@ def plot_kite_reference_frame(results, flight_data, imus):
     ax.set_xlabel("X_N")
     ax.set_ylabel("Y_E")
     ax.set_zlabel("Z_U")
-    spacing = 20
+    spacing = 40
     for i in np.arange(0, len(flight_data), spacing):
         len_arrow = 30
         # Calculate EKF tether orientation based on euler angles and plot it
@@ -1064,36 +1064,39 @@ def plot_kite_reference_frame(results, flight_data, imus):
         ex = dcm[:, 0]
         ey = dcm[:, 1]
         ez = dcm[:, 2]
-        ax.quiver(
-            results["kite_pos_x"].iloc[i],
-            results["kite_pos_y"].iloc[i],
-            results["kite_pos_z"].iloc[i],
-            ex[0],
-            ex[1],
-            ex[2],
-            color="green",
-            length=len_arrow,
-        )
-        ax.quiver(
-            results["kite_pos_x"].iloc[i],
-            results["kite_pos_y"].iloc[i],
-            results["kite_pos_z"].iloc[i],
-            ey[0],
-            ey[1],
-            ey[2],
-            color="green",
-            length=len_arrow,
-        )
-        ax.quiver(
-            results["kite_pos_x"].iloc[i],
-            results["kite_pos_y"].iloc[i],
-            results["kite_pos_z"].iloc[i],
-            ez[0],
-            ez[1],
-            ez[2],
-            color="green",
-            length=len_arrow,
-        )
+        if 'x' in frame_axis:
+            ax.quiver(
+                results["kite_pos_x"].iloc[i],
+                results["kite_pos_y"].iloc[i],
+                results["kite_pos_z"].iloc[i],
+                ex[0],
+                ex[1],
+                ex[2],
+                color="green",
+                length=len_arrow,
+            )
+        if 'y' in frame_axis:
+            ax.quiver(
+                results["kite_pos_x"].iloc[i],
+                results["kite_pos_y"].iloc[i],
+                results["kite_pos_z"].iloc[i],
+                ey[0],
+                ey[1],
+                ey[2],
+                color="green",
+                length=len_arrow,
+            )
+        if 'z' in frame_axis:
+            ax.quiver(
+                results["kite_pos_x"].iloc[i],
+                results["kite_pos_y"].iloc[i],
+                results["kite_pos_z"].iloc[i],
+                ez[0],
+                ez[1],
+                ez[2],
+                color="green",
+                length=len_arrow,
+            )
         # Calculate IMU tether orientation based on euler angles and plot it
         for imu in imus:
             ex, ey, ez = calculate_reference_frame_euler(
@@ -1147,7 +1150,7 @@ def plot_kite_reference_frame(results, flight_data, imus):
     ax.quiver(0, 0, 0, 0, 1, 0, color="black", length=len_arrow)
     ax.quiver(0, 0, 0, 1, 0, 0, color="black", length=len_arrow)
     ax.set_box_aspect([1, 1, 1])
-
+    plt.show()
 
 def plot_cl_curve(cl, cd, aoa, mask, axs, label=None, savefig=False):
     CL = cl[mask]
