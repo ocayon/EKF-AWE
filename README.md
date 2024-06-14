@@ -7,12 +7,12 @@ This script processes flight data and applies an Extended Kalman Filter (EKF) to
 ### Developer
 Create a new venv with the following command:
 ```bash
-python -m venv venv
+python -m venv myenv
 ```
 
 Activate the venv with the following command:
 ```bash
-source venv/bin/activate
+.\myenv\Scripts\activate
 ```
 
 Execute the following command in the root directory of the repository:
