@@ -11,32 +11,26 @@ from awes_ekf.ekf.ekf_output import convert_ekf_output_to_df, EKFOutput
 from awes_ekf.postprocess.postprocessing import postprocess_results
 
 
-# %% Load flight data and configuration settings
-year = "2023"
-month = "10"
-day = "26"
-kite_model = "v9"
-# year = '2024'
-# month = '06'
-# day = '07'
-# kite_model = 'kitekraft' 
-
 config_file_name = "v9_config.yaml"
 
-
-# Posprocessing settings
-remove_IMU_offsets = True  # Remove IMU offsets, only for soft wing with KCU
-correct_IMU_deformation = True # Correct IMU deformation, only for soft wing with KCU
-remove_vane_offsets = False # Remove vane offsets, only for soft wing with KCU
-estimate_kite_angle = False # Estimate kite angle, only for soft wing with KCU
-
 if __name__ == "__main__":
+    
+    config_data = load_config("examples/"+config_file_name)
+    #%% Load data
+    year = str(config_data["year"])
+    month = str(config_data["month"])
+    day = str(config_data["day"])
+    kite_model = config_data["kite"]["model_name"]
+    remove_IMU_offsets = config_data['postprocess']["remove_IMU_offsets"]
+    correct_IMU_deformation = config_data['postprocess']["correct_IMU_deformation"]
+    remove_vane_offsets = config_data['postprocess']["remove_vane_offsets"]
+    estimate_kite_angle = config_data['postprocess']["estimate_kite_angle"]
+    
     flight_data = read_processed_flight_data(year, month, day, kite_model)
 
-    # flight_data = flight_data.iloc[:10000]
+    # flight_data = flight_data.iloc[:100]
     # flight_data.reset_index(drop=True, inplace=True)
 
-    config_data = load_config("examples/"+config_file_name)
     # %% Initialize EKF
     simConfig = SimulationConfig(**config_data["simulation_parameters"])
 
@@ -54,7 +48,7 @@ if __name__ == "__main__":
         flight_data, kite, kcu, tether, simConfig, kite_sensor=0
     )
     x0 = find_initial_state_vector(tether,ekf_input_list[0],simConfig)
-
+    print(x0)
     ekf, dyn_model = initialize_ekf(
         ekf_input_list[0], simConfig, tuningParams, x0, kite, kcu, tether
     )
@@ -72,7 +66,7 @@ if __name__ == "__main__":
             )
             # Store results
             ekf_output_list.append(ekf_ouput)
-        except Exception as e:  
+        except:  
             try:
                 print('Integration error at iteration: ', k)
                 x0 = find_initial_state_vector(tether, ekf_input, simConfig)
@@ -82,13 +76,8 @@ if __name__ == "__main__":
             ekf, dyn_model = initialize_ekf(
                 ekf_input, simConfig, tuningParams, x0, kite, kcu, tether
             )
-            flight_data.drop(k, inplace=True)                        
-
-        # ekf, ekf_ouput = propagate_state_EKF(
-        #         ekf, dyn_model, ekf_input, simConfig, tether, kite, kcu
-        #     )
-        # Store results
-        # ekf_output_list.append(ekf_ouput)
+            flight_data.drop(k, inplace=True)  
+            # continue                      
 
         # Print progress
         if k % 600 == 0:
@@ -99,9 +88,14 @@ if __name__ == "__main__":
                 f"Real time: {mins} minutes.  Elapsed time: {elapsed_time:.2f} seconds"
             )
 
-    flight_data.reset_index(drop=True, inplace=True)
+    
     # Postprocess results
     ekf_output_df = convert_ekf_output_to_df(ekf_output_list)
+    ekf_output_df.dropna(subset=["kite_pos_x"], inplace=True)
+    ekf_output_df.reset_index(drop=True, inplace=True)
+    rows_to_keep = ekf_output_df.index
+    flight_data = flight_data.iloc[rows_to_keep]
+    flight_data.reset_index(drop=True, inplace=True)
     indices = ekf_output_df.index
     flight_data = flight_data.iloc[indices]
     results, flight_data = postprocess_results(
