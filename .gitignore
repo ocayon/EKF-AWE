@@ -12,4 +12,4 @@ build/
 src/awes_ekf.egg-info/
 examples/v9_config.yaml
 examples/kft_config.yaml
-
+.awes_ekf/
