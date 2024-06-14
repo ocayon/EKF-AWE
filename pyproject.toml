@@ -4,7 +4,18 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "awes_ekf"
-version = "0.0.2"
+version = "1.0.0"
 description = "Read the latest Real Python tutorials"
 readme = "README.md"
-authors = [{ name = "Real Python", email = "info@realpython.com" }]
+authors = [{ name = "Oriol Cayon", email = "o.cayon@tudelft.nl" }]
+requires-python = ">=3.6"
+dependencies = [
+    "numpy",
+    "matplotlib",
+    "casadi>3.6.0",
+    "pandas",
+    "pytest",
+    "pyyaml",
+    "control",
+    "scipy",
+]
