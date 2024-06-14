@@ -1,16 +1,33 @@
+year: '2019'                       # Year of the flight
+month: '10'                         # Month of the flight
+day: '08'                           # Day of the flight
+
 simulation_parameters:
   timestep: 0.1                       # Timestep in seconds
-  opt_measurements:                   # Optional measurements array
-    - 
-    # - 'apparent_windspeed'           # Example optional measurement
+  n_tether_elements: 10                # Number of tether elements
   doIEKF: true                        # Use iterated extended Kalman filter
   epsilon: 1e-6                       # Tolerance for the IEKF
   max_iterations: 200                 # Maximum number of iterations for the IEKF
-  log_profile: true                   # Model wind speed as logarithmic with height
+  log_profile: false                   # Model wind speed as logarithmic with height
   tether_offset: true                 # Use tether offset in the measurements
   enforce_z_wind: true               # Enforce the z wind speed to be zero
-  model_yaw: false                    # Model the yaw angle in the state vector
-  kcu_data: false                      # Boolean for KCU data availability
+  model_yaw: false                   # Model the yaw angle in the state vector
+
+  measurements:
+    kite_pos: true                   # Kite position measurement
+    kite_vel: true                   # Kite velocity measurement
+    kite_acc: true                   # Kite acceleration measurement
+    tether_force: true               # Tether force measurement
+    tether_length: true              # Tether length measurement
+    tether_elevation: true           # Tether elevation angle measurement
+    tether_azimuth: true             # Tether azimuth angle measurement
+    kcu_pos: false                    # KCU position measurement
+    kcu_vel: false                    # KCU velocity measurement
+    kcu_acc: false                    # KCU acceleration measurement
+    apparent_windspeed: false         # Apparent wind speed measurement
+    angle_of_attack: false            # Angle of attack measurement
+    angle_of_sideslip: false             # Sideslip angle measurement
+    yaw_angle: false                  # Yaw angle measurement
 
 kite:
   model_name: 'v3'                # Kite model
@@ -56,3 +73,9 @@ tuning_parameters:
     tether_length: 0.1
     yaw: 0.0873
 
+postprocess:
+  # Posprocessing settings
+  remove_IMU_offsets: true  # Remove IMU offsets, only for soft wing with KCU
+  correct_IMU_deformation: true # Correct IMU deformation, only for soft wing with KCU
+  remove_vane_offsets: true # Remove vane offsets, only for soft wing with KCU
+  estimate_kite_angle: false # Estimate kite angle, only for soft wing with KCU
