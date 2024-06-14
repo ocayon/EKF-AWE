@@ -4,10 +4,10 @@ from awes_ekf.load_data.read_data import read_processed_flight_data
 from awes_ekf.load_data.create_input_from_csv import create_input_from_csv, find_initial_state_vector
 from awes_ekf.setup.settings import load_config, SimulationConfig, TuningParameters
 from awes_ekf.load_data.save_data import save_results
-from awes_ekf.setup.kite import Kite
+from awes_ekf.setup.kite import PointMassEKF
 from awes_ekf.setup.tether import Tether
 from awes_ekf.setup.kcu import KCU
-from awes_ekf.ekf.ekf_output import convert_ekf_output_to_df, EKFOutput
+from awes_ekf.ekf.ekf_output import convert_ekf_output_to_df
 from awes_ekf.postprocess.postprocessing import postprocess_results
 
 
@@ -34,12 +34,13 @@ if __name__ == "__main__":
     # %% Initialize EKF
     simConfig = SimulationConfig(**config_data["simulation_parameters"])
 
-    kite = Kite(**config_data["kite"])
+    kite = PointMassEKF(simConfig,**config_data["kite"])
     if config_data["kcu"]:
         kcu = KCU(**config_data["kcu"])
     else:
         kcu = None
     tether = Tether(kite,kcu,simConfig.obsData,**config_data["tether"])
+    kite.get_fx(tether)
 
     tuningParams = TuningParameters(config_data["tuning_parameters"], simConfig)
 
@@ -58,8 +59,12 @@ if __name__ == "__main__":
     start_time = time.time()
     mins = -1
     for k, ekf_input in enumerate(ekf_input_list):
-
         # Propagate state EKF
+        ekf, ekf_ouput = propagate_state_EKF(
+            ekf, dyn_model, ekf_input, simConfig, tether, kite, kcu
+        )
+        # Store results
+        ekf_output_list.append(ekf_ouput)
         try :
             ekf, ekf_ouput = propagate_state_EKF(
                 ekf, dyn_model, ekf_input, simConfig, tether, kite, kcu
@@ -72,7 +77,7 @@ if __name__ == "__main__":
                 x0 = find_initial_state_vector(tether, ekf_input, simConfig)
             except:
                 print('Tether model error at iteration: ', k)
-                continue    
+                # continue    
             ekf, dyn_model = initialize_ekf(
                 ekf_input, simConfig, tuningParams, x0, kite, kcu, tether
             )
