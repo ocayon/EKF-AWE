@@ -1,4 +1,3 @@
-
 import numpy as np
 from awes_ekf.setup.tether import Tether
 from awes_ekf.ekf import ExtendedKalmanFilter, DynamicModel, ObservationModel
@@ -6,7 +5,8 @@ from awes_ekf.setup.kite import Kite
 from awes_ekf.setup.kcu import KCU
 from awes_ekf.ekf.ekf_output import create_ekf_output
 
-def initialize_ekf(ekf_input, simConfig, tuningParams,x0,kite,kcu,tether):
+
+def initialize_ekf(ekf_input, simConfig, tuningParams, x0, kite, kcu, tether):
     """
     Initialize the Extended Kalman Filter with system components and models.
 
@@ -19,20 +19,29 @@ def initialize_ekf(ekf_input, simConfig, tuningParams,x0,kite,kcu,tether):
         tuple: Returns a tuple containing initialized components of the EKF including the filter itself,
                dynamic model, kite, KCU (Kite Control Unit), and tether.
     """
-    
+
     # Create dynamic model and observation model
-    dyn_model = DynamicModel(kite,tether,kcu,simConfig)
-    obs_model = ObservationModel(dyn_model.x,dyn_model.u,simConfig,kite,tether,kcu)
-        
-        
+    dyn_model = DynamicModel(kite, tether, simConfig)
+    obs_model = ObservationModel(dyn_model.x, dyn_model.u, simConfig, kite, tether, kcu)
+
     # Initialize EKF
-    ekf = ExtendedKalmanFilter(tuningParams.stdv_dynamic_model, tuningParams.stdv_measurements, simConfig.ts,dyn_model,obs_model, kite, tether, kcu, simConfig)
+    ekf = ExtendedKalmanFilter(
+        tuningParams.stdv_dynamic_model,
+        tuningParams.stdv_measurements,
+        simConfig.ts,
+        dyn_model,
+        obs_model,
+        kite,
+        tether,
+        kcu,
+        simConfig,
+    )
     # Initialize input vector
     ekf.update_input_vector(ekf_input)
     # Initialize state vector
     ekf.x_k1_k1 = x0
 
-    return ekf, dyn_model
+    return ekf
 
 
 def update_state_ekf_tether(ekf, tether, kite, kcu, ekf_input, simConfig):
@@ -64,18 +73,21 @@ def update_state_ekf_tether(ekf, tether, kite, kcu, ekf_input, simConfig):
     ekf.predict()
     # Update next step
     ekf.update()
-            
-    ekf_output = create_ekf_output(ekf.x_k1_k1, ekf.u, ekf_input, tether, kcu, simConfig)
+
+    ekf_output = create_ekf_output(
+        ekf.x_k1_k1, ekf.u, ekf_input, tether, kcu, simConfig
+    )
 
     return ekf, ekf_output
 
-def propagate_state_EKF(ekf, dyn_model, ekf_input, simConfig, tether, kite, kcu):
+
+def propagate_state_EKF(ekf, ekf_input, simConfig, tether, kite, kcu):
     # Predict step
-    ekf.x_k1_k = dyn_model.propagate(ekf.x_k1_k1,ekf.u, kite, tether, kcu, ekf_input.ts)
+    ekf.x_k1_k = kite.propagate(ekf.x_k1_k1, ekf.u, ekf_input.ts)
 
     ## Update step
-    ekf, ekf_ouput = update_state_ekf_tether(ekf, tether, kite, kcu, ekf_input, simConfig)
+    ekf, ekf_ouput = update_state_ekf_tether(
+        ekf, tether, kite, kcu, ekf_input, simConfig
+    )
 
     return ekf, ekf_ouput
-
-    
