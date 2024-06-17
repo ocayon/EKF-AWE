@@ -29,7 +29,7 @@ def process_KP_data(df):
         # Euler angles data
         flight_data['kite_pitch_s'+str(sensor)] = np.deg2rad(df['kite_'+str(sensor)+'_pitch'])
         flight_data['kite_roll_s'+str(sensor)] = np.deg2rad(df['kite_'+str(sensor)+'_roll'])
-        flight_data['kite_yaw_s'+str(sensor)] = np.deg2rad(df['kite_'+str(sensor)+'_yaw'])
+        flight_data['kite_yaw_s'+str(sensor)] = np.unwrap(np.deg2rad(df['kite_'+str(sensor)+'_yaw']))
         # Acceleration data
         if df['kite_'+str(sensor)+'_ax'].isnull().all():
             # Differentiate velocity to get acceleration

@@ -63,8 +63,18 @@ def create_input_from_csv(
     except:
         apparent_windspeed = np.zeros(n_intervals)
 
+    up = np.array(flight_data["kcu_actual_depower"]) / max(
+        abs(flight_data["kcu_actual_depower"])
+    )
     try:
         kite_aoa = np.array(flight_data["kite_angle_of_attack"])
+        kite_aoa_mean_v9 = 10
+        offset_aoa = -0.590496147373921
+        ########!!!!!!! ADD automation to calculate offset_aoa
+        offset_dep = -0.89
+        offset_dep += -0.4
+        kite_aoa = kite_aoa + offset_aoa + up * offset_dep
+
     except:
         kite_aoa = np.zeros(n_intervals)
     relout_speed = np.array(flight_data["ground_tether_reelout_speed"])
@@ -140,14 +150,14 @@ def create_input_from_csv(
                 steering_input=us[i],
                 thrust_force=thrust_force[i],
                 wind_vel=np.array(vw0),
+                up=up[i],
             )
         )
 
-    
-
     return ekf_input_list
 
-def find_initial_state_vector(tether,ekf_input,simConfig):
+
+def find_initial_state_vector(tether, ekf_input, simConfig, offset_aoa=0):
     tether_input = TetherInput(
         kite_pos=ekf_input.kite_pos,
         kite_vel=ekf_input.kite_vel,
@@ -163,8 +173,7 @@ def find_initial_state_vector(tether,ekf_input,simConfig):
 
     tether_input = tether.solve_tether_shape(tether_input)
 
-    
-    #%% Find the initial state vector for the EKF
+    # %% Find the initial state vector for the EKF
     args = tether_input.create_input_tuple(simConfig.obsData)
 
     CL = float(tether.CL(*args))
@@ -173,18 +182,28 @@ def find_initial_state_vector(tether,ekf_input,simConfig):
     x0 = np.vstack((tether_input.kite_pos, tether_input.kite_vel))
 
     if simConfig.log_profile:
-        uf = np.linalg.norm(tether_input.wind_vel)*kappa/np.log(10/z0)
-        ground_winddir = np.arctan2(tether_input.wind_vel[1],tether_input.wind_vel[0])
+        uf = np.linalg.norm(tether_input.wind_vel) * kappa / np.log(10 / z0)
+        ground_winddir = np.arctan2(tether_input.wind_vel[1], tether_input.wind_vel[0])
         x0 = np.append(
             x0, [uf, ground_winddir, 0]
         )  # Initial wind velocity and direction
     else:
         x0 = np.append(x0, tether_input.wind_vel)  # Initial wind velocity
     x0 = np.append(
-        x0, [CL, CD, CS, tether_input.tether_length, tether_input.tether_elevation, tether_input.tether_azimuth]
+        x0,
+        [
+            CL,
+            CD,
+            CS,
+            tether_input.tether_length,
+            tether_input.tether_elevation,
+            tether_input.tether_azimuth,
+        ],
     )  # Initial state vector (Last two elements are bias, used if needed)
     if simConfig.model_yaw:
-        x0 = np.append(x0, [ekf_input.kite_yaw, 0])  # Initial wind velocity and direction
+        x0 = np.append(
+            x0, [ekf_input.kite_yaw, 0]
+        )  # Initial wind velocity and direction
     if simConfig.tether_offset:
         x0 = np.append(x0, 0)  # Initial tether offset
 

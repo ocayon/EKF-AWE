@@ -4,6 +4,7 @@ from awes_ekf.setup.settings import load_config
 from awes_ekf.load_data.read_data import read_results
 from awes_ekf.utils import calculate_reference_frame_euler
 from awes_ekf.plotting import plot_kite_trajectory
+import awes_ekf.plotting.plot_utils as pu
 
 # Example usage
 plt.close('all')
@@ -43,3 +44,21 @@ variables = [
 
 # Plot kite trajectory
 plot_kite_trajectory(t, x, y, z, variables=variables, labels=label_variables, vecs=[ex])
+
+# Plot kite trajectory
+fig,ax = plt.subplots()
+pu.plot_time_series(flight_data, flight_data['kite_position_up'], ax, color='blue',ylabel='Height', label='Measured',plot_phase=False)
+pu.plot_time_series(flight_data,results['kite_pos_z'], ax, color='red', label='Estimated',plot_phase=True)
+ax.grid()
+
+fig,ax = plt.subplots()
+pu.plot_time_series(flight_data, flight_data['kite_position_east'], ax, color='blue', ylabel='x-east', label='Measured',plot_phase=False)
+pu.plot_time_series(flight_data,results['kite_pos_x'], ax, color='red', label='Estimated',plot_phase=True)
+ax.grid()
+
+fig,ax = plt.subplots()
+pu.plot_time_series(flight_data, flight_data['kite_position_north'], ax, color='blue', ylabel='y-north', label='Measured',plot_phase=False)
+pu.plot_time_series(flight_data,results['kite_pos_y'], ax, color='red', label='Estimated',plot_phase=True)
+ax.grid()
+
+plt.show()

@@ -396,7 +396,9 @@ class Tether:
             "CL": ca.Function("CL", args, [CL]),
             "CD": ca.Function("CD", args, [CD]),
             "CS": ca.Function("CS", args, [CS]),
-            "tether_length": ca.Function("tether_length", args, [stretched_tether_length]),
+            "tether_length": ca.Function(
+                "tether_length", args, [stretched_tether_length]
+            ),
             "positions": ca.Function("positions", args, [positions]),
         }
 
@@ -418,9 +420,9 @@ class Tether:
 
         return r_kite - np.array(r_tether_model).flatten()
 
-    def solve_tether_shape(self,tetherInput):
+    def solve_tether_shape(self, tetherInput):
         """Solve for the tether shape"""
-        
+
         r_kite = np.array(tetherInput.kite_pos)
         v_kite = np.array(tetherInput.kite_vel)
         vw = np.array(tetherInput.wind_vel)
@@ -458,8 +460,9 @@ class Tether:
         tetherInput.tether_length = opt_res.x[2]
         tetherInput.tether_elevation = opt_res.x[0]
         tetherInput.tether_azimuth = opt_res.x[1]
-        
+
         return tetherInput
+
 
 @dataclass
 class TetherInput:
@@ -469,14 +472,22 @@ class TetherInput:
     tether_length: float
     tether_elevation: float
     tether_azimuth: float
-    wind_vel: np.ndarray = np.array([0,0,0])
+    wind_vel: np.ndarray = np.array([0, 0, 0])
     kite_acc: np.ndarray = None
     kcu_acc: np.ndarray = None
     kcu_vel: np.ndarray = None
 
-    def create_input_tuple(self,obsData):
-        
-        args = (self.tether_elevation,self.tether_azimuth,self.tether_length,self.tether_force,self.kite_pos,self.kite_vel,self.wind_vel)
+    def create_input_tuple(self, obsData):
+
+        args = (
+            self.tether_elevation,
+            self.tether_azimuth,
+            self.tether_length,
+            self.tether_force,
+            self.kite_pos,
+            self.kite_vel,
+            self.wind_vel,
+        )
         if obsData.kite_acc:
             args = args + (self.kite_acc,)
         if obsData.kcu_acc:
@@ -485,4 +496,3 @@ class TetherInput:
             args = args + (self.kcu_vel,)
 
         return args
-    

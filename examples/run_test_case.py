@@ -4,7 +4,7 @@ from awes_ekf.load_data.read_data import read_processed_flight_data
 from awes_ekf.load_data.create_input_from_csv import create_input_from_csv, find_initial_state_vector
 from awes_ekf.setup.settings import load_config, SimulationConfig, TuningParameters
 from awes_ekf.load_data.save_data import save_results
-from awes_ekf.setup.kite import Kite
+from awes_ekf.setup.kite import PointMassEKF
 from awes_ekf.setup.tether import Tether
 from awes_ekf.setup.kcu import KCU
 from awes_ekf.ekf.ekf_output import convert_ekf_output_to_df, EKFOutput
@@ -34,7 +34,7 @@ if __name__ == "__main__":
     # %% Initialize EKF
     simConfig = SimulationConfig(**config_data["simulation_parameters"])
 
-    kite = Kite(**config_data["kite"])
+    kite = PointMassEKF(simConfig,**config_data["kite"])
     if config_data["kcu"]:
         kcu = KCU(**config_data["kcu"])
     else:
