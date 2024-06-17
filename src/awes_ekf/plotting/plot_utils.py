@@ -51,7 +51,7 @@ def find_turn_law(flight_data):
 def plot_wind_speed(
     results,
     flight_data,
-    lidar_heights,
+    lidar_heights=[],
     IMU_0=False,
     IMU_1=False,
     EKF_tether=False,
@@ -75,19 +75,19 @@ def plot_wind_speed(
             label = "Lidar " + height + "m height"
             height = int(height)
 
-            if height in lidar_heights:
+            if height in lidar_heights or lidar_heights == []:
 
                 axs[0].fill_between(
                     flight_data["time"],
                     flight_data[vw_min_col],
                     flight_data[vw_max_col],
-                    color=palette[i],
+                    color=palette[i % len(palette)],
                     alpha=0.3,
                 )
                 axs[0].plot(
                     flight_data["time"],
                     flight_data[column],
-                    color=palette[i],
+                    color=palette[i % len(palette)],
                     label=label,
                 )
 
@@ -95,11 +95,11 @@ def plot_wind_speed(
             height = "".join(filter(str.isdigit, column))
             label = "Lidar " + height + "m height"
             height = int(height)
-            if height in lidar_heights:
+            if height in lidar_heights or lidar_heights == []:
                 axs[1].plot(
                     flight_data["time"],
                     360 - 90 - flight_data[column],
-                    color=palette[i],
+                    color=palette[i % len(palette)],
                     label=label,
                 )
 
@@ -107,11 +107,11 @@ def plot_wind_speed(
             height = "".join(filter(str.isdigit, column))
             label = "Lidar " + height + "m height"
             height = int(height)
-            if height in lidar_heights:
+            if height in lidar_heights or lidar_heights == []:
                 axs[2].plot(
                     flight_data["time"],
                     -flight_data[column],
-                    color=palette[i],
+                    color=palette[i % len(palette)],
                     label=label,
                 )
                 i += 1
@@ -224,7 +224,7 @@ def plot_wind_speed(
         plt.savefig("wind_speed.png", dpi=300)
 
 
-def plot_wind_speed_height_bins(results, flight_data, lidar_heights, savefig=False):
+def plot_wind_speed_height_bins(results, flight_data, lidar_heights = [], savefig=False):
     """
     Plot wind speed based on kite and KCU IMU data
     :param flight_data: flight data
@@ -282,10 +282,10 @@ def plot_wind_speed_height_bins(results, flight_data, lidar_heights, savefig=Fal
             label = "Lidar " + height + "m height"
             height = int(height)
             col_save = column
-            if height in lidar_heights:
+            if height in lidar_heights or lidar_heights == []:
                 selected_values = [flight_data.iloc[j][column] for j in i_change]
-                # axs[0].fill_between(flight_data['time'], flight_data[vw_min_col], flight_data[vw_max_col], color=palette[i], alpha=0.3)
-                axs[0].plot(t_lidar, selected_values, color=palette[i], label=label)
+                # axs[0].fill_between(flight_data['time'], flight_data[vw_min_col], flight_data[vw_max_col], color=palette[i % len(palette)], alpha=0.3)
+                axs[0].plot(t_lidar, selected_values, color=palette[i % len(palette)], label=label)
 
                 i += 1
     i = 0
@@ -294,13 +294,13 @@ def plot_wind_speed_height_bins(results, flight_data, lidar_heights, savefig=Fal
             height = "".join(filter(str.isdigit, column))
             label = "Lidar " + height + "m height"
             height = int(height)
-            if height in lidar_heights:
+            if height in lidar_heights or lidar_heights == []:
                 selected_values = [flight_data.iloc[j][column] for j in i_change]
-                # axs[0].fill_between(flight_data['time'], flight_data[vw_min_col], flight_data[vw_max_col], color=palette[i], alpha=0.3)
+                # axs[0].fill_between(flight_data['time'], flight_data[vw_min_col], flight_data[vw_max_col], color=palette[i % len(palette)], alpha=0.3)
                 axs[1].plot(
                     t_lidar,
                     360 - 90 - np.array(selected_values),
-                    color=palette[i],
+                    color=palette[i % len(palette)],
                     label=label,
                 )
                 i += 1
@@ -310,11 +310,11 @@ def plot_wind_speed_height_bins(results, flight_data, lidar_heights, savefig=Fal
             height = "".join(filter(str.isdigit, column))
             label = "Lidar " + height + "m height"
             height = int(height)
-            if height in lidar_heights:
+            if height in lidar_heights or lidar_heights == []:
                 axs[2].plot(
                     flight_data["time"],
                     flight_data[column],
-                    color=palette[i],
+                    color=palette[i % len(palette)],
                     label=label,
                 )
                 i += 1
@@ -727,7 +727,7 @@ def plot_hexbin_density(x, y, xlabel=None, ylabel=None):
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     ax.grid(True)
-    plt.show()
+    #plt.show()
 
 
 def plot_CL_CD_aoa(results, flight_data, mask, aoa_method, savefig=False):
@@ -803,7 +803,7 @@ def plot_prob_coeff_vs_aoa_ss(results, coeff, mask, aoa_method):
 
 
 def plot_time_series(
-    flight_data, y, ax, color="blue", ylabel=None, label=None, plot_phase=False
+    flight_data, y, ax, color=None, ylabel=None, label=None, plot_phase=False
 ):
     t = flight_data.time
     ax.plot(t, y, color=color, label=label)
@@ -1034,7 +1034,7 @@ def plot_wind_profile_bins(flight_data, results, step=20, savefig=False):
         ax.set_axisbelow(True)
 
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])  # Adjust layout to make room for title
-    plt.show()
+    #plt.show()
     if savefig:
         plt.savefig("wind_profile_bins.png", dpi=300)
 
@@ -1150,7 +1150,7 @@ def plot_kite_reference_frame(results, flight_data, imus,frame_axis = 'xyz'):
     ax.quiver(0, 0, 0, 0, 1, 0, color="black", length=len_arrow)
     ax.quiver(0, 0, 0, 1, 0, 0, color="black", length=len_arrow)
     ax.set_box_aspect([1, 1, 1])
-    plt.show()
+    #plt.show()
 
 def plot_cl_curve(cl, cd, aoa, mask, axs, label=None, savefig=False):
     CL = cl[mask]
