@@ -72,6 +72,8 @@ class TuningParameters:
         
         if simConfig.obsData.apparent_windspeed:
                 stdv_y.append(meas_stdv['va'])
+        if simConfig.obsData.angle_of_attack:
+            stdv_y.append(meas_stdv['aoa'])
 
         self.stdv_measurements = np.array(stdv_y)
 

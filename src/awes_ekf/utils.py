@@ -58,6 +58,18 @@ def rotate_vector_around_axis(vector, rotation_axis, theta):
     return v_rot
 
 def calculate_angle(vector_a, vector_b, deg=True):
+    if type(vector_a) == ca.SX:
+        dot_product = ca.dot(vector_a, vector_b)
+        magnitude_a = ca.norm_2(vector_a)
+        magnitude_b = ca.norm_2(vector_b)
+        
+        cos_theta = dot_product / (magnitude_a * magnitude_b)
+        angle_rad = ca.arccos(cos_theta)
+        
+        if deg:
+            return angle_rad*180/np.pi
+        else:
+            return angle_rad
     dot_product = np.dot(vector_a, vector_b)
     magnitude_a = np.linalg.norm(vector_a)
     magnitude_b = np.linalg.norm(vector_b)
