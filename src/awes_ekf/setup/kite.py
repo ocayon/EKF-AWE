@@ -69,18 +69,18 @@ class PointMassEKF(Kite):
 
         self.u = self.get_input()
         self.x = self.get_state()
-        if simConfig.model_yaw:
-            self.x = ca.vertcat(self.x, self.yaw, self.k_yaw_rate)
-        if simConfig.tether_offset:
-            self.x = ca.vertcat(self.x, self.tether_offset)
         self.x0 = ca.SX.sym('x0',self.x.shape[0])  # Initial state vector
-        
-
         super().__init__(**kwargs)
 
     def get_state(self):    
+        self.x = ca.vertcat(self.r,self.v,self.vw_state,self.CL,self.CD,self.CS,self.tether_length, self.elevation_0, self.azimuth_0)
+        if self.simConfig.model_yaw:
+            self.x = ca.vertcat(self.x, self.yaw, self.k_yaw_rate)
+        if self.simConfig.tether_offset:
+            self.x = ca.vertcat(self.x, self.tether_offset)
+
         
-        return ca.vertcat(self.r,self.v,self.vw_state,self.CL,self.CD,self.CS,self.tether_length, self.elevation_0, self.azimuth_0)
+        return self.x
     
     def get_wind_velocity(self, log_profile):
         if log_profile is True:
@@ -108,6 +108,8 @@ class PointMassEKF(Kite):
         if self.simConfig.obsData.thrust_force:
             self.thrust = ca.SX.sym('thrust', 3)    # Thrust force
             input =  ca.vertcat(input,self.thrust)
+        if self.simConfig.model_yaw:
+            input = ca.vertcat(input,self.us)
         
         return input
         
@@ -156,11 +158,19 @@ class PointMassEKF(Kite):
             vp = (-tension_last_element+L+D+S+Fg+self.thrust)/self.mass
         else:
             vp = (-tension_last_element+L+D+S+Fg)/self.mass
+        
+        fx = ca.vertcat(rp,vp,0,0,0,0,0,0,self.reelout_speed,0,0)
+        if self.simConfig.model_yaw:
+            yaw_rate = self.k_yaw_rate*self.us*ca.norm_2(self.va)
+            fx = ca.vertcat(fx,yaw_rate,0)
+        if self.simConfig.tether_offset:
+            fx = ca.vertcat(fx,0)
 
-        return ca.vertcat(rp,vp)
+
+        return fx
     
-    def get_fx_fun(self,kite,tether,kcu):
-        return ca.Function('calc_Fx', [self.x,self.u,self.x0],[self.get_fx(kite,tether,kcu)])
+    def get_fx_fun(self,tether):
+        return ca.Function('calc_Fx', [self.x,self.u,self.x0],[self.get_fx(tether)])
 
     def get_fx_jac(self,kite,tether,kcu):
   
@@ -169,13 +179,13 @@ class PointMassEKF(Kite):
     def get_fx_jac_fun(self,kite,tether,kcu):
         return ca.Function('calc_Fx', [self.x,self.u,self.x0],[self.get_fx_jac(kite,tether,kcu)])
     
-    def propagate(self,x,u, kite,tether,kcu,ts):
+    def propagate(self,x,u,ts):
         
         
-        self.fx = self.calc_fx(self.x,self.u,x)
+        fx = self.calc_fx(self.x,self.u,x)
         
         # Define ODE system
-        dae = {'x': self.x, 'p': self.u, 'ode': self.fx}                       # Define ODE system
+        dae = {'x': self.x, 'p': self.u, 'ode': fx}                       # Define ODE system
         integrator = ca.integrator('intg', 'cvodes', dae, 0,ts)    # Define integrator
         
         return np.array(integrator(x0=x,p=u)['xf'].T)
