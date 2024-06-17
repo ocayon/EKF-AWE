@@ -22,6 +22,7 @@ def plot_kite_trajectory(time, x, y, z, variables=[], vecs=[], labels=None):
 
     # Time series plots
     ax_vars = []
+    index_notnan_data = 0
     for i, var_group in enumerate(variables):
         if var_group is not None:
             ax = fig.add_subplot(gs[i, 1:])
@@ -29,10 +30,14 @@ def plot_kite_trajectory(time, x, y, z, variables=[], vecs=[], labels=None):
             if not isinstance(var_group, list):
                 var_group = [var_group]
             for j, var in enumerate(var_group):
+                if np.all(np.isnan(var)):
+                    continue
+                else:
+                    index_notnan_data = j
                 label = f'Variable {i+1}' if labels is None or labels[i] is None else labels[i][j]
                 line, = ax.plot(time, var, label=label)
                 lines.append(line)
-            red_point, = ax.plot([time[0]], [var_group[0][0]], 'ro')
+            red_point, = ax.plot([time[0]], [var_group[index_notnan_data][0]], 'ro')
             ax.set_ylabel(f'Variable {i+1}' if labels is None or labels[i] is None else labels[i][0])
             if i == len(variables) - 1:
                 ax.set_xlabel('Time')

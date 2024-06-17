@@ -12,8 +12,10 @@ config = load_config("examples/" + config_file_name)
 # Initialize EKF
 # Load results and flight data and plot kite reference frame
 results, flight_data = read_results(str(config['year']), str(config['month']), str(config['day']), config['kite']['model_name'])
+
 mask = (flight_data.cycle == 2)
 mask = (flight_data.index > 1000)
+mask = (flight_data.time > 550)
 flight_data = flight_data[mask]
 results = results[mask]
 # Calculate variables and vectors for plotting
