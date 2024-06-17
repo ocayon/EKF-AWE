@@ -1,6 +1,7 @@
 import numpy as np
 import casadi as ca
 from awes_ekf.setup.settings import kappa, z0
+from awes_ekf.utils import calculate_airflow_angles
 
 class ObservationModel:
 
@@ -65,6 +66,10 @@ class ObservationModel:
             vw = self.x[6:9]
             
         va = vw -self.x[3:6]
+
+        dcm_b2vel = tether.bridle_frame_va(*args)
+        
+        airflow_angles = calculate_airflow_angles(dcm_b2vel, vw-v_kite)
         
         h = ca.SX()
         h = ca.vertcat(self.x[0:3])
@@ -84,6 +89,8 @@ class ObservationModel:
 
         if self.simConfig.obsData.apparent_windspeed:
                 h = ca.vertcat(h,ca.norm_2(va))
+        if self.simConfig.obsData.angle_of_attack:
+            h = ca.vertcat(h, airflow_angles[0])
         
         
         return h
