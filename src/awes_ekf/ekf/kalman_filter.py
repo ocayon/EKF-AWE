@@ -22,7 +22,7 @@ class ExtendedKalmanFilter:
         self.tether = tether
         self.obs_model = obs_model
         self.dyn_model = dyn_model
-        self.calc_Fx = self.dyn_model.get_fx_jac_fun(kite,tether,kcu)
+        self.calc_Fx = self.dyn_model.get_fx_jac_fun()
         self.calc_Hx = self.obs_model.get_hx_jac_fun(kite,tether,kcu)
         self.calc_hx = self.obs_model.get_hx_fun(kite,tether,kcu)
         
@@ -39,7 +39,6 @@ class ExtendedKalmanFilter:
         sys_dt = control.sample_system(sys_ct, self.ts, method='zoh')
         self.Phi = sys_dt.A
         # self.Gamma = sys_dt.B
-    
         # Calculate covariance prediction error
         self.P_k1_k = self.Phi @ self.P_k1_k1 @ self.Phi.T + self.Q
 
@@ -130,6 +129,8 @@ class ExtendedKalmanFilter:
             z = np.append(z,0)
         if simConfig.obsData.apparent_windspeed:
             z = np.append(z, input_class.apparent_windspeed)   
+        if simConfig.obsData.angle_of_attack:
+            z = np.append(z, input_class.kite_aoa)
 
         self.z = z
 

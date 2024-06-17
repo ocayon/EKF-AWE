@@ -21,7 +21,7 @@ def initialize_ekf(ekf_input, simConfig, tuningParams,x0,kite,kcu,tether):
     """
     
     # Create dynamic model and observation model
-    dyn_model = DynamicModel(kite,tether,kcu,simConfig)
+    dyn_model = DynamicModel(kite,tether,simConfig)
     obs_model = ObservationModel(dyn_model.x,dyn_model.u,simConfig,kite,tether,kcu)
         
         
@@ -32,7 +32,7 @@ def initialize_ekf(ekf_input, simConfig, tuningParams,x0,kite,kcu,tether):
     # Initialize state vector
     ekf.x_k1_k1 = x0
 
-    return ekf, dyn_model
+    return ekf
 
 
 def update_state_ekf_tether(ekf, tether, kite, kcu, ekf_input, simConfig):
@@ -69,9 +69,9 @@ def update_state_ekf_tether(ekf, tether, kite, kcu, ekf_input, simConfig):
 
     return ekf, ekf_output
 
-def propagate_state_EKF(ekf, dyn_model, ekf_input, simConfig, tether, kite, kcu):
+def propagate_state_EKF(ekf, ekf_input, simConfig, tether, kite, kcu):
     # Predict step
-    ekf.x_k1_k = dyn_model.propagate(ekf.x_k1_k1,ekf.u, kite, tether, kcu, ekf_input.ts)
+    ekf.x_k1_k = kite.propagate(ekf.x_k1_k1,ekf.u, ekf_input.ts)
 
     ## Update step
     ekf, ekf_ouput = update_state_ekf_tether(ekf, tether, kite, kcu, ekf_input, simConfig)

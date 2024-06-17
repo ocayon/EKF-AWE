@@ -63,8 +63,16 @@ def create_input_from_csv(
     except:
         apparent_windspeed = np.zeros(n_intervals)
 
+    up = np.array(flight_data["kcu_actual_depower"])/max(abs(flight_data["kcu_actual_depower"]))    
     try:
         kite_aoa = np.array(flight_data["kite_angle_of_attack"])
+        kite_aoa_mean_v9 = 10
+        offset_aoa =  -0.590496147373921
+        ########!!!!!!! ADD automation to calculate offset_aoa
+        offset_dep = -0.89
+        offset_dep += -0.4
+        kite_aoa = kite_aoa + offset_aoa+up*offset_dep
+        
     except:
         kite_aoa = np.zeros(n_intervals)
     relout_speed = np.array(flight_data["ground_tether_reelout_speed"])
@@ -140,6 +148,7 @@ def create_input_from_csv(
                 steering_input=us[i],
                 thrust_force=thrust_force[i],
                 wind_vel=np.array(vw0),
+                up=up[i],
             )
         )
 
@@ -147,7 +156,7 @@ def create_input_from_csv(
 
     return ekf_input_list
 
-def find_initial_state_vector(tether,ekf_input,simConfig):
+def find_initial_state_vector(tether,ekf_input,simConfig, offset_aoa = 0):
     tether_input = TetherInput(
         kite_pos=ekf_input.kite_pos,
         kite_vel=ekf_input.kite_vel,
