@@ -25,7 +25,7 @@ simulation_parameters:
     kcu_vel: false                    # KCU velocity measurement
     kcu_acc: false                    # KCU acceleration measurement
     apparent_windspeed: false         # Apparent wind speed measurement
-    angle_of_attack: false            # Angle of attack measurement
+    angle_of_attack: true            # Angle of attack measurement
     angle_of_sideslip: false             # Sideslip angle measurement
     yaw_angle: false                  # Yaw angle measurement
 
@@ -56,8 +56,9 @@ tuning_parameters:
     azimuth: 0.2
     least_squares: 1e-5
     yaw: 0.15  # 10 degrees in radians
-    z_wind: 0.1
+    z_wind: 2
     va: 0.5
+    aoa: 4
   model_stdv:
     x: 2.5
     v: 1
@@ -78,4 +79,4 @@ postprocess:
   remove_IMU_offsets: true  # Remove IMU offsets, only for soft wing with KCU
   correct_IMU_deformation: true # Correct IMU deformation, only for soft wing with KCU
   remove_vane_offsets: true # Remove vane offsets, only for soft wing with KCU
-  estimate_kite_angle: false # Estimate kite angle, only for soft wing with KCU
+  estimate_kite_angle: true # Estimate kite angle, only for soft wing with KCU
