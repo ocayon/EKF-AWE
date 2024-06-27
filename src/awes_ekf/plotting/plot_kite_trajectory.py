@@ -7,8 +7,9 @@ import numpy as np
 
 def plot_kite_trajectory(time, x, y, z, variables=[], vecs=[], labels=None):
     # Create the figure
+    n = len(variables)
     fig = plt.figure(figsize=(14, 8))
-    gs = gridspec.GridSpec(4, 2, width_ratios=[1, 1], height_ratios=[1, 1, 1, 1])
+    gs = gridspec.GridSpec(int(n), 2, width_ratios=[1, 1], height_ratios=[0.5 for _ in range(n)])
 
     # 3D plot of the trajectory
     ax_3d = fig.add_subplot(gs[0:3, 0], projection="3d")

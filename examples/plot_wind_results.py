@@ -95,4 +95,4 @@ plt.legend()
 # plt.title('Turbulence intensity at 160m altitude')
 
 
-# plt.show()
+plt.show()
