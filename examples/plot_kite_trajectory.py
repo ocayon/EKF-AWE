@@ -8,15 +8,15 @@ import awes_ekf.plotting.plot_utils as pu
 
 # Example usage
 plt.close('all')
-config_file_name = "v9_config.yaml"
+config_file_name = "v3_config.yaml"
 config = load_config("examples/" + config_file_name)
 # Initialize EKF
 # Load results and flight data and plot kite reference frame
 results, flight_data = read_results(str(config['year']), str(config['month']), str(config['day']), config['kite']['model_name'])
 
-mask = (flight_data.cycle == 2)
-mask = (flight_data.index > 1000)
-mask = (flight_data.time > 550)
+mask = (flight_data.cycle == 65)
+# mask = (flight_data.index > 1000)
+# mask = (flight_data.time > 550)
 flight_data = flight_data[mask]
 results = results[mask]
 # Calculate variables and vectors for plotting
@@ -31,7 +31,7 @@ for i in np.arange(0, len(flight_data)):
     )
     ex.append(dcm[:, 0])
 
-label_variables = [['kite_velocity'], ['CD'], ['kite_aoa', 'meas_aoa'], ['kite_sideslip','meas_sideslip']]
+label_variables = [['kite_velocity'], ['CL'], ['Tether_force'], ["Mechanic power"],['Kite yaw']]
 t = flight_data['time'].values
 x = results['kite_pos_x'].values
 y = results['kite_pos_y'].values
@@ -39,9 +39,26 @@ z = results['kite_pos_z'].values
 kite_velocity = np.sqrt(results['kite_vel_x']**2 + results['kite_vel_y']**2 + results['kite_vel_z']**2)
 variables = [
     kite_velocity.values,
-    results['CD'].values,
-    [results['kite_aoa'].values, flight_data['kite_angle_of_attack'].values],
-    [results['kite_sideslip'].values, flight_data['kite_sideslip_angle'].values],
+    results['CL'].values,
+    [flight_data['ground_tether_force'].values],
+    [flight_data['ground_tether_force'].values*flight_data['ground_tether_reelout_speed'].values],
+    np.degrees(flight_data['kite_yaw_s0'].values)%360,
+]
+
+# Plot kite trajectory
+plot_kite_trajectory(t, x, y, z, variables=variables, labels=label_variables, vecs=[ex])
+
+label_variables = [['kite_elevation'], ['kite_azimuth'], ['Reelout_speed'], ["Wind speed"]]
+t = flight_data['time'].values
+x = results['kite_pos_x'].values
+y = results['kite_pos_y'].values
+z = results['kite_pos_z'].values
+kite_velocity = np.sqrt(results['kite_vel_x']**2 + results['kite_vel_y']**2 + results['kite_vel_z']**2)
+variables = [
+    np.degrees(flight_data['kite_elevation'].values),
+    np.degrees(flight_data['kite_azimuth'].values),
+    flight_data['ground_tether_reelout_speed'].values,
+    results['wind_velocity'].values,
 ]
 
 # Plot kite trajectory
