@@ -418,7 +418,7 @@ class Tether:
         args = (x[0], x[1], tether_length, tension_ground) + args[1::]
         r_tether_model = self.kite_position(*args)
 
-        return r_kite - np.array(r_tether_model).flatten()
+        return r_kite - np.array(r_tether_model).reshape(-1)
 
     def solve_tether_shape(self, tetherInput):
         """Solve for the tether shape"""
@@ -433,7 +433,7 @@ class Tether:
         tension_ground = tetherInput.tether_force
 
         if not hasattr(self, "opt_guess"):
-            elevation = np.arctan2(r_kite[2], np.linalg.norm(r_kite[:2]))
+            elevation = np.arctan2(r_kite[2], np.linalg.norm(r_kite))
             azimuth = np.arctan2(r_kite[1], r_kite[0])
             length = np.linalg.norm(r_kite)
 
@@ -453,9 +453,10 @@ class Tether:
             self.opt_guess,
             args=args,
             verbose=0,
-            xtol=1e-3,
-            ftol=1e-3,
+            xtol=1e-5,
+            ftol=1e-5,
         )
+        print(opt_res.success)
         self.opt_guess = opt_res.x
         tetherInput.tether_length = opt_res.x[2]
         tetherInput.tether_elevation = opt_res.x[0]
