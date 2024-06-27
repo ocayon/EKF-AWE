@@ -29,7 +29,7 @@ def process_KP_data(df):
         # Euler angles data
         flight_data['kite_pitch_s'+str(sensor)] = np.deg2rad(df['kite_'+str(sensor)+'_pitch'])
         flight_data['kite_roll_s'+str(sensor)] = np.deg2rad(df['kite_'+str(sensor)+'_roll'])
-        flight_data['kite_yaw_s'+str(sensor)] = np.unwrap(np.deg2rad(df['kite_'+str(sensor)+'_yaw']))
+        flight_data['kite_yaw_s'+str(sensor)] = np.deg2rad(df['kite_'+str(sensor)+'_yaw'])
         # Acceleration data
         if df['kite_'+str(sensor)+'_ax'].isnull().all():
             # Differentiate velocity to get acceleration
@@ -87,6 +87,7 @@ def process_KP_data(df):
     kite_radius = np.linalg.norm(flight_data[['kite_position_east','kite_position_north','kite_position_up']],axis=1)
     offset_tether_length = np.mean(kite_radius-flight_data['ground_tether_length'])
     flight_data['ground_tether_length'] = flight_data['ground_tether_length'] + offset_tether_length
+    print('Date: ',df['date'].iloc[0], 'Flight length: ',round(len(flight_data)/10/60, 1), 'min')
     print('Offset tether length: ',offset_tether_length)
     # Add the time data
     flight_data['time'] = df['time'] - df['time'].iloc[0]
@@ -128,15 +129,15 @@ file_name = []
 model = 'v9'
 file_path = './data/'+model+'/'
 
-# file_name.append('2023-11-27_13-37-48_ProtoLogger_lidar.csv')
-# file_name.append('2023-11-16_12-47-08_ProtoLogger_lidar.csv')
-# file_name.append('2023-10-26_12-21-08_ProtoLogger_lidar.csv')
-# file_name.append('2023-06-21_11-48-37_ProtoLogger.csv')
-# file_name.append('2023-03-29_15-56-58_ProtoLogger.csv')
-# file_name.append('2021-10-07_19-38-15_ProtoLogger.csv')
-# file_name.append('2023-12-11_13-15-42_ProtoLogger_lidar.csv')
-# file_name.append('2024-01-09_12-28-51_ProtoLogger_lidar.csv')
-# file_name.append('2024-06-05_11-33-16_ProtoLogger_lidar.csv')
+file_name.append('2023-11-27_13-37-48_ProtoLogger_lidar.csv')
+file_name.append('2023-11-16_12-47-08_ProtoLogger_lidar.csv')
+file_name.append('2023-10-26_12-21-08_ProtoLogger_lidar.csv')
+file_name.append('2023-06-21_11-48-37_ProtoLogger.csv')
+file_name.append('2023-03-29_15-56-58_ProtoLogger.csv')
+file_name.append('2021-10-07_19-38-15_ProtoLogger.csv')
+file_name.append('2023-12-11_13-15-42_ProtoLogger_lidar.csv')
+file_name.append('2024-01-09_12-28-51_ProtoLogger_lidar.csv')
+file_name.append('2024-06-05_11-33-16_ProtoLogger_lidar.csv')
 
 # file_name.append('tether_force_kite/2021-06-03_10-19-52_ProtoLogger.csv')
 
@@ -153,16 +154,16 @@ file_path = './data/'+model+'/'
 # file_path = './'+model+'/more-depowered-reelin/'
 # # file_name.append('2024-03-25_14-08-47_ProtoLogger_lidar.csv)'
 # file_name.append('2024-03-12_13-36-02_ProtoLogger_lidar.csv')
-file_path = './data/'+model+'/front_stall/'
-# file_name.append('2024-04-11_12-51-46_ProtoLogger_lidar.csv')
-file_name.append('2024-05-01_11-04-02_ProtoLogger_lidar.csv')
+# file_path = './data/'+model+'/front_stall/'
+# # file_name.append('2024-04-11_12-51-46_ProtoLogger_lidar.csv')
+# file_name.append('2024-05-01_11-04-02_ProtoLogger_lidar.csv')
 
 
 
 for file in file_name:
     #%%
     df = pd.read_csv(file_path+file,delimiter = ' ',low_memory=False)
-    df = df[df['kite_height'] >50] #Select the indexes where the kite is flying
+    df = df[df['kite_height'] >80] #Select the indexes where the kite is flying
 
     flight_data = process_KP_data(df)
     date = str(df['date'].iloc[0])

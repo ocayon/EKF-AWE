@@ -60,6 +60,7 @@ plt.plot(results['time'],results['tether_force_kite'],label = 'Estimated at kite
 for column in flight_data.columns:
     if 'load_cell' in column:
         plt.plot(flight_data['time'],flight_data[column]*9.81,label = column)
+plt.plot(flight_data['time'],flight_data['ground_tether_reelout_speed'],label = 'Reelout speed')
 plt.xlabel('Time (s)')
 plt.ylabel('Force (N)')
 plt.legend()
@@ -111,4 +112,16 @@ axs[2].legend()
 axs[2].set_title('Cross-correlation')
 
 plt.tight_layout()
+
+#%% Plot kite velocity
+plt.figure()
+kite_speed = np.sqrt(results['kite_vel_x']**2+results['kite_vel_y']**2+results['kite_vel_z']**2)
+meas_kite_speed = np.sqrt(flight_data['kite_vel_x_s0']**2+flight_data['kite_vel_y_s0']**2+flight_data['kite_vel_z_s0']**2)
+plt.plot(results['time'],kite_speed,label = 'Estimated')
+plt.plot(flight_data['time'],meas_kite_speed,label = 'Measured')
+plt.xlabel('Time (s)')
+plt.ylabel('Speed (m/s)')
+plt.legend()
+plt.title('Kite speed comparison')
+plt.show()
 

@@ -233,6 +233,8 @@ def postprocess_results(
     ip = 0
     radius_turn = []
     omega = []
+
+    
     if kcu is not None:
         slack = (
             flight_data["ground_tether_length"]
@@ -241,6 +243,10 @@ def postprocess_results(
         )
     else:
         slack = flight_data["ground_tether_length"] - np.linalg.norm(r_kite, axis=1)
+    
+    omega_p = []
+    omega_q = []
+    omega_r = []
     for i in range(len(results)):
         res = results.iloc[i]
         fd = flight_data.iloc[i]
@@ -275,6 +281,11 @@ def postprocess_results(
 
         radius_turn.append(sign_radius * np.linalg.norm(ICR))
         omega.append(np.linalg.norm(omega_kite))
+
+        omega_p.append(np.dot(dcm[:, 0], omega_kite))
+        omega_q.append(np.dot(dcm[:, 1], omega_kite))
+        omega_r.append(np.dot(dcm[:, 2], omega_kite))
+
         if kcu is not None:
             if fd["powered"] == "depowered" and not in_cycle:
                 flight_data.loc[ip:i, "cycle"] = cycle_count
@@ -290,6 +301,9 @@ def postprocess_results(
     # results['slack'] = slack
     flight_data["radius_turn"] = radius_turn
     results["omega"] = omega
+    results["omega_p"] = omega_p
+    results["omega_q"] = omega_q
+    results["omega_r"] = omega_r
 
     # Identify turn - straight and left - right
     flight_data["turn_straight"] = flight_data.apply(determine_turn_straight, axis=1)

@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 import casadi as ca
 from awes_ekf.setup.settings import kappa, z0, rho, g
 import numpy as np
+from dataclasses import dataclass
 
 
 class Kite(ABC):
@@ -27,15 +28,6 @@ class Kite(ABC):
     @abstractmethod
     def get_fx_fun(self, kite, tether, kcu):
         pass
-
-    @abstractmethod
-    def get_fx_jac(self, kite, tether, kcu):
-        pass
-
-    @abstractmethod
-    def get_fx_jac_fun(self, kite, tether, kcu):
-        pass
-
     @abstractmethod
     def propagate(self, x, u, kite, tether, kcu, ts):
         pass
@@ -67,12 +59,13 @@ class PointMassEKF(Kite):
         self.us = ca.SX.sym("us")  # Steering input
         self.k_yaw_rate = ca.SX.sym("k_yaw_rate")  # Yaw rate constant
 
-        self.get_wind_velocity(simConfig.log_profile)
+        self.get_wind_velocity()
         self.va = self.vw - self.v
 
         self.u = self.get_input()
         self.x = self.get_state()
         self.x0 = ca.SX.sym("x0", self.x.shape[0])  # Initial state vector
+
         super().__init__(**kwargs)
 
     def get_state(self):
@@ -94,8 +87,8 @@ class PointMassEKF(Kite):
 
         return self.x
 
-    def get_wind_velocity(self, log_profile):
-        if log_profile is True:
+    def get_wind_velocity(self):
+        if self.simConfig.log_profile is True:
             self.uf = ca.SX.sym("uf")  # Friction velocity
             self.wdir = ca.SX.sym("wdir")  # Ground wind direction
             self.vwz = ca.SX.sym("vwz")  # Vertical wind velocity
@@ -159,12 +152,12 @@ class PointMassEKF(Kite):
         if self.simConfig.obsData.kcu_vel:
             args += (self.v_kcu,)
 
-        tension_last_element = tether.tether_force_kite(*args)
+        tether_force = tether.tether_force_kite(*args)
 
         dir_D = self.va / ca.norm_2(self.va)
         dir_L = (
-            tension_last_element / ca.norm_2(tension_last_element)
-            - ca.dot(tension_last_element / ca.norm_2(tension_last_element), dir_D)
+            tether_force / ca.norm_2(tether_force)
+            - ca.dot(tether_force / ca.norm_2(tether_force), dir_D)
             * dir_D
         )
         dir_S = ca.cross(dir_L, dir_D)
@@ -176,9 +169,9 @@ class PointMassEKF(Kite):
         Fg = ca.vertcat(0, 0, -self.mass * g)
         rp = self.v
         if self.thrust:
-            vp = (-tension_last_element + L + D + S + Fg + self.thrust) / self.mass
+            vp = (-tether_force + L + D + S + Fg + self.thrust) / self.mass
         else:
-            vp = (-tension_last_element + L + D + S + Fg) / self.mass
+            vp = (-tether_force + L + D + S + Fg) / self.mass
 
         fx = ca.vertcat(rp, vp, 0, 0, 0, 0, 0, 0, self.reelout_speed, 0, 0)
         if self.simConfig.model_yaw:
@@ -210,3 +203,97 @@ class PointMassEKF(Kite):
         integrator = ca.integrator("intg", "cvodes", dae, 0, ts)  # Define integrator
 
         return np.array(integrator(x0=x, p=u)["xf"].T)
+
+class PointMass(Kite):
+
+    def __init__(self, simConfig, **kwargs):
+
+        self.simConfig = simConfig
+
+        
+        self.r = ca.SX.sym("r", 3)  # Kite position
+        self.v = ca.SX.sym("v", 3)  # Kite velocity
+        self.CL = 0.9  # Lift coefficient
+        self.CD = 0.1  # Drag coefficient
+        self.CS = 0.1  # Side force coefficient
+        self.k1_yaw_rate = 0.1  # Yaw rate constant
+        self.yaw = ca.SX.sym("yaw")  # Bias angle of attack
+        self.us = ca.SX.sym("us")  # Steering input
+        self.wind_velocity = ca.SX.sym("wind_velocity", 3)  # Wind velocity
+        self.va = self.wind_velocity - self.v  # Apparent wind velocity
+        self.up = ca.SX.sym("up")  # Pitch input
+        self.tether_force = ca.SX.sym("tether_force", 3)  # Tether force
+
+        self.u = self.get_input()
+        self.x = self.get_state()
+        self.x0 = ca.SX.sym("x0", self.x.shape[0])  # Initial state vector
+
+        super().__init__(**kwargs)
+
+    def get_state(self):
+        self.x = ca.vertcat(
+            self.r,
+            self.v,
+            self.yaw,
+        )
+
+        return self.x
+
+    def get_input(self):
+        input = ca.vertcat(self.wind_velocity, self.us, self.up, self.tether_force)
+
+        return input
+
+    def get_fx(self):
+
+
+        tether_force = self.tether_force
+
+        dir_D = self.va / ca.norm_2(self.va)
+        dir_L = (
+            -tether_force / ca.norm_2(tether_force)
+            - ca.dot(-tether_force / ca.norm_2(tether_force), dir_D)
+            * dir_D
+        )
+        dir_S = ca.cross(dir_L, dir_D)
+
+        L = self.CL * 0.5 * rho * self.area * ca.norm_2(self.va) ** 2 * dir_L
+        D = self.CD * 0.5 * rho * self.area * ca.norm_2(self.va) ** 2 * dir_D
+        S = self.CS * 0.5 * rho * self.area * ca.norm_2(self.va) ** 2 * dir_S
+
+        Fg = ca.vertcat(0, 0, -self.mass * g)
+        rp = self.v
+
+        vp = (tether_force + L + D + S + Fg) / self.mass
+
+        yaw_rate = self.k1_yaw_rate * self.us * ca.norm_2(self.va)
+        fx = ca.vertcat(rp, vp, yaw_rate)
+
+        return fx
+
+    def get_fx_fun(self):
+
+        return ca.Function("calc_Fx", [self.x, self.u], [self.get_fx()])
+    
+    def propagate(self, kite_input, ts):
+
+        x = np.hstack((kite_input.kite_position, kite_input.kite_velocity, np.array([kite_input.kite_yaw]))).reshape(-1)
+        u = np.hstack((kite_input.wind_velocity, np.array([kite_input.us]), np.array([kite_input.up]), kite_input.tether_force)).reshape(-1)
+        calc_fx = self.get_fx_fun()
+
+        # Define ODE system
+        dae = {"x": self.x, "p": self.u, "ode": calc_fx(self.x,self.u)}  # Define ODE system
+
+        integrator = ca.integrator("intg", "cvodes", dae, 0, ts)  # Define integrator
+
+        return np.array(integrator(x0=x, p=u)["xf"].T)
+
+@dataclass
+class KiteInput:
+    kite_position: np.array
+    kite_velocity: np.array
+    kite_yaw: float
+    wind_velocity: np.array
+    us: float
+    up: float
+    tether_force: np.array
