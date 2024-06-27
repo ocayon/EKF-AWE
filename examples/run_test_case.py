@@ -28,18 +28,20 @@ if __name__ == "__main__":
     
     flight_data = read_processed_flight_data(year, month, day, kite_model)
 
-    # flight_data = flight_data.iloc[:100]
+    # flight_data = flight_data.iloc[:10000]
     # flight_data.reset_index(drop=True, inplace=True)
 
     # %% Initialize EKF
     simConfig = SimulationConfig(**config_data["simulation_parameters"])
 
+    # Create system components
     kite = PointMassEKF(simConfig,**config_data["kite"])
     if config_data["kcu"]:
         kcu = KCU(**config_data["kcu"])
     else:
         kcu = None
     tether = Tether(kite,kcu,simConfig.obsData,**config_data["tether"])
+    kite.calc_fx = kite.get_fx_fun(tether)
 
     tuningParams = TuningParameters(config_data["tuning_parameters"], simConfig)
 
@@ -47,9 +49,11 @@ if __name__ == "__main__":
     ekf_input_list = create_input_from_csv(
         flight_data, kite, kcu, tether, simConfig, kite_sensor=0
     )
+
+    # Find initial state vector
     x0 = find_initial_state_vector(tether,ekf_input_list[0],simConfig)
     print(x0)
-    ekf, dyn_model = initialize_ekf(
+    ekf = initialize_ekf(
         ekf_input_list[0], simConfig, tuningParams, x0, kite, kcu, tether
     )
 
@@ -58,11 +62,9 @@ if __name__ == "__main__":
     start_time = time.time()
     mins = -1
     for k, ekf_input in enumerate(ekf_input_list):
-
-        # Propagate state EKF
         try :
             ekf, ekf_ouput = propagate_state_EKF(
-                ekf, dyn_model, ekf_input, simConfig, tether, kite, kcu
+                ekf, ekf_input, simConfig, tether, kite, kcu
             )
             # Store results
             ekf_output_list.append(ekf_ouput)
@@ -72,8 +74,8 @@ if __name__ == "__main__":
                 x0 = find_initial_state_vector(tether, ekf_input, simConfig)
             except:
                 print('Tether model error at iteration: ', k)
-                continue    
-            ekf, dyn_model = initialize_ekf(
+                # continue    
+            ekf = initialize_ekf(
                 ekf_input, simConfig, tuningParams, x0, kite, kcu, tether
             )
             flight_data.drop(k, inplace=True)  
@@ -94,6 +96,7 @@ if __name__ == "__main__":
     ekf_output_df.dropna(subset=["kite_pos_x"], inplace=True)
     ekf_output_df.reset_index(drop=True, inplace=True)
     rows_to_keep = ekf_output_df.index
+    print(rows_to_keep)
     flight_data = flight_data.iloc[rows_to_keep]
     flight_data.reset_index(drop=True, inplace=True)
     indices = ekf_output_df.index
@@ -103,7 +106,7 @@ if __name__ == "__main__":
         flight_data,
         kite,
         kcu,
-        imus=[0],
+        imus=[0,1],
         remove_IMU_offsets=remove_IMU_offsets,
         correct_IMU_deformation=correct_IMU_deformation,
         remove_vane_offsets=remove_vane_offsets,
