@@ -213,10 +213,6 @@ class PointMass(Kite):
         
         self.r = ca.SX.sym("r", 3)  # Kite position
         self.v = ca.SX.sym("v", 3)  # Kite velocity
-        self.CL = 0.9  # Lift coefficient
-        self.CD = 0.1  # Drag coefficient
-        self.CS = 0.1  # Side force coefficient
-        self.k1_yaw_rate = 0.1  # Yaw rate constant
         self.yaw = ca.SX.sym("yaw")  # Bias angle of attack
         self.us = ca.SX.sym("us")  # Steering input
         self.wind_velocity = ca.SX.sym("wind_velocity", 3)  # Wind velocity
@@ -257,16 +253,20 @@ class PointMass(Kite):
         )
         dir_S = ca.cross(dir_L, dir_D)
 
-        L = self.CL * 0.5 * rho * self.area * ca.norm_2(self.va) ** 2 * dir_L
-        D = self.CD * 0.5 * rho * self.area * ca.norm_2(self.va) ** 2 * dir_D
-        S = self.CS * 0.5 * rho * self.area * ca.norm_2(self.va) ** 2 * dir_S
+        CL = self.calculate_CL(self.up, self.us)
+        CD = self.calculate_CD(self.up, self.us)
+        CS = self.calculate_CS(self.up, self.us)
+
+        L = CL * 0.5 * rho * self.area * ca.norm_2(self.va) ** 2 * dir_L
+        D = CD * 0.5 * rho * self.area * ca.norm_2(self.va) ** 2 * dir_D
+        S = CS * 0.5 * rho * self.area * ca.norm_2(self.va) ** 2 * dir_S
 
         Fg = ca.vertcat(0, 0, -self.mass * g)
         rp = self.v
 
         vp = (tether_force + L + D + S + Fg) / self.mass
 
-        yaw_rate = self.k1_yaw_rate * self.us * ca.norm_2(self.va)
+        yaw_rate = self.calculate_yaw_rate(self.up, self.us)
         fx = ca.vertcat(rp, vp, yaw_rate)
 
         return fx
@@ -287,6 +287,27 @@ class PointMass(Kite):
         integrator = ca.integrator("intg", "cvodes", dae, 0, ts)  # Define integrator
 
         return np.array(integrator(x0=x, p=u)["xf"].T)
+    
+    def calculate_CL(self, up, us):
+        #TODO: Implement CL calculation
+        return 0.9
+    
+    def calculate_CD(self, up, us):
+        #TODO: Implement CD calculation
+        return 0.1
+    
+    def calculate_CS(self, up, us):
+        #TODO: Implement CS calculation  
+        return 0.1
+    
+    def calculate_yaw_rate(self, up, us):
+        #TODO: Implement yaw rate calculation
+        return 0.1
+    
+    def calculate_tether_force(self, KiteInput):
+        #TODO: Implement tether force calculation, linking to tether model
+        return np.array([0,0,0])
+
 
 @dataclass
 class KiteInput:
@@ -297,3 +318,4 @@ class KiteInput:
     us: float
     up: float
     tether_force: np.array
+    tether_length: float
