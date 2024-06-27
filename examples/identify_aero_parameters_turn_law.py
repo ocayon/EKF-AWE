@@ -1,4 +1,3 @@
-
 import numpy as np
 import matplotlib.pyplot as plt
 from awes_ekf.setup.settings import load_config
@@ -7,13 +6,18 @@ import awes_ekf.plotting.plot_utils as pu
 import pandas as pd
 
 # Example usage
-plt.close('all')
-config_file_name = "v3_config.yaml"
+plt.close("all")
+config_file_name = "v9_config.yaml"
 config = load_config("examples/" + config_file_name)
 
 # Load results and flight data and plot kite reference frame
-cut = 25000
-results, flight_data = read_results(str(config['year']), str(config['month']), str(config['day']), config['kite']['model_name'])
+cut = 10000
+results, flight_data = read_results(
+    str(config["year"]),
+    str(config["month"]),
+    str(config["day"]),
+    config["kite"]["model_name"],
+)
 # results1, flight_data1 = read_results('2023','10','26','v9')
 results = results.iloc[cut:-cut]
 # results1 = results1.iloc[cut:-cut]
@@ -25,84 +29,184 @@ flight_data = flight_data.iloc[cut:-cut]
 # flight_data1 = flight_data1.iloc[cut:-cut]
 # flight_data = pd.concat([flight_data,flight_data1])
 
-results = results[flight_data['kite_angle_of_attack']<14]
-flight_data = flight_data[flight_data['kite_angle_of_attack']<14]
+# results = results[flight_data['kite_angle_of_attack']<14]
+# flight_data = flight_data[flight_data['kite_angle_of_attack']<14]
 
 results = results.reset_index(drop=True)
 flight_data = flight_data.reset_index(drop=True)
 
 
-#%% AERO COEFFICIENTS IDENTIFICATION
+# %% AERO COEFFICIENTS IDENTIFICATION
 def calculate_weighted_least_squares(y, A, W):
-    x_hat = np.linalg.inv(A.T@W@A)@A.T@W@y
+    x_hat = np.linalg.inv(A.T @ W @ A) @ A.T @ W @ y
     return x_hat
+# def calculate_ls_estimation(alphas, us, up, coeffs):
 
-alpha = np.array(flight_data['kite_angle_of_attack'])
+
+### Create file with results
+alpha = np.array(flight_data["kite_angle_of_attack"])
+plt.figure()
+plt.plot(alpha)
 # alpha = np.array(results['kite_aoa'])
-us = np.array(flight_data['us'])
-# us = np.concatenate((np.zeros(12),us[:-12]))
-up = np.array(flight_data['up'])
+# alpha = results['aoa_IMU_0']
+mean_alpha = np.mean(alpha[flight_data['powered'] == 'powered'])
+std_alpha = np.std(alpha[flight_data['powered'] == 'powered'])
+print(f"Mean alpha powered: {mean_alpha}")
+print(f"Std alpha depowered: {std_alpha}")
 
+plt.plot(alpha)
+us = np.array(flight_data["us"])
+us = np.concatenate((np.zeros(12), us[:-12]))
+up = np.array(flight_data["up"])
+up = np.concatenate((np.zeros(12), up[:-12]))
+p = np.array(results["omega_p"])
+q = np.array(results["omega_q"])
+r = np.array(results["omega_r"])
 # Create least squares matrix
+mass = config['kite']['mass']
+yaw = flight_data['kite_yaw_s0']
+elevation = flight_data['kite_elevation']
 # x: [1, alpha, alpha^2, us, us^2, up, up^2]
-A = np.vstack([np.ones_like(alpha), alpha, alpha**2, us, us**2, up, up**2]).T
+def construct_A_matrix(us,up,mass,yaw,elevation):
+    A = np.vstack([np.ones_like(us), us, us**2, up, up**2, mass*9.81*np.sin(yaw)*np.cos(elevation)]).T
+    return A
+A = construct_A_matrix(us,up,mass,yaw,elevation)
+# A = np.vstack([np.ones_like(alpha), us, us**2, up, up**2, mass*9.81*np.sin(yaw)*np.cos(elevation)]).T
 W = np.eye(len(alpha))
+mask = (results["kite_aoa"] < 0) & (results["kite_aoa"] > 15)
+W[mask, mask] = 0.1
 # Solve for coefficients
-coeffs = calculate_weighted_least_squares(results['CL'], A, W)
-#%%
+coeffs_CL = calculate_weighted_least_squares(results["CL"], A, W)
+coeffs_CD = calculate_weighted_least_squares(results["CD"], A, W)
+# %%
 
-print(f"CL = {coeffs[0]:.3f} + {coeffs[1]:.3f}*alpha + {coeffs[2]:.3f}*alpha^2 + {coeffs[3]:.3f}*us + {coeffs[4]:.3f}*us^2 + {coeffs[5]:.3f}*up + {coeffs[6]:.3f}*up^2")
 
 # Calculate estimated CL
-CL_est = A@coeffs
+CL_est = A @ coeffs_CL
+CD_est = A @ coeffs_CD
 
 # calculate the mean squared error
-mse = np.mean((results['CL'] - CL_est)**2)
+mse = np.mean((results["CL"] - CL_est) ** 2)
 print(f"MSE: {mse}")
 print(f"MRSE: {np.sqrt(mse)}")
-#%%
+
+# calculate the mean squared error
+mse = np.mean((results["CD"] - CD_est) ** 2)
+print(f"MSE: {mse}")
+print(f"MRSE: {np.sqrt(mse)}")
+
+
+# print(
+#     f"CL = {coeffs_CL[0]:.3f} + {coeffs_CL[1]:.3f}*alpha + {coeffs_CL[2]:.3f}*alpha^2 + {coeffs_CL[3]:.3f}*us + {coeffs_CL[4]:.3f}*us^2 + {coeffs_CL[5]:.3f}*up + {coeffs_CL[6]:.3f}*up^2 + {coeffs_CL[7]:.3f}*p + {coeffs_CL[8]:.3f}*q"# + {coeffs_CL[9]:.3f}*r"
+# )
+# print(
+#     f"CD = {coeffs_CD[0]:.3f} + {coeffs_CD[1]:.3f}*alpha + {coeffs_CD[2]:.3f}*alpha^2 + {coeffs_CD[3]:.3f}*us + {coeffs_CD[4]:.3f}*us^2 + {coeffs_CD[5]:.3f}*up + {coeffs_CD[6]:.3f}*up^2 + {coeffs_CD[7]:.3f}*p + {coeffs_CD[8]:.3f}*q"# + {coeffs_CD[9]:.3f}*r"
+# )
+
+
+# %%
 # Plot the results
 plt.figure()
 mask = np.bool_(np.ones_like(alpha))
 
-plt.plot(flight_data['time'][mask], results['CL'][mask], label='Measured CL', color='b', alpha=0.5)
-plt.plot(flight_data['time'][mask], CL_est[mask], label='Estimated CL', color='r', alpha=0.5)
-plt.xlabel('Angle of attack [rad]')
-plt.ylabel('Lift coefficient')
+plt.plot(
+    flight_data["time"][mask],
+    results["CL"][mask],
+    label="Measured CL",
+    color="b",
+    alpha=0.5,
+)
+plt.plot(
+    flight_data["time"][mask], CL_est[mask], label="Estimated CL", color="r", alpha=0.5
+)
+plt.plot(
+    flight_data["time"][mask],
+    p[mask],
+    label="Omega p",
+    color="g",
+    alpha=0.5,
+)
+plt.plot(
+    flight_data["time"][mask],
+    q[mask],
+    label="Omega q",
+    color="y",
+    alpha=0.5,
+)
+plt.plot(
+    flight_data["time"][mask],
+    r[mask],
+    label="Omega r",
+    color="k",
+    alpha=0.5,
+)
+plt.xlabel("Time [s]")
+plt.ylabel("Lift coefficient")
 plt.legend()
 plt.grid(True)
 
 # Plot cl angle of attack
 plt.figure()
-plt.plot(alpha[mask], results['CL'][mask], label='Measured CL', color='b', alpha=0.5)
-plt.plot(alpha[mask], CL_est[mask], label='Estimated CL', color='r', alpha=0.5)
-plt.xlabel('Angle of attack [rad]')
-plt.ylabel('Lift coefficient')
+plt.scatter(alpha[mask], results["CL"][mask], label="Measured CL", color="b", alpha=0.5)
+plt.scatter(alpha[mask], CL_est[mask], label="Estimated CL", color="r", alpha=0.5)
+plt.xlabel("Angle of attack [rad]")
+plt.ylabel("Lift coefficient")
 
 
-# Plot Cl angle of attack
-aoas_plot = np.linspace(0, 20, 21)
-CLs_plot = coeffs[0] + coeffs[1]*aoas_plot + coeffs[2]*aoas_plot**2
-plt.figure()
-plt.plot(aoas_plot, CLs_plot, label='Estimated CL')
-plt.xlabel('Angle of attack [rad]')
-plt.ylabel('Lift coefficient')
+# Plot CL vs control inputs
+us = np.linspace(-1,1,41)
+up = np.zeros_like(us)
+yaw = np.zeros_like(up)
+elevation = np.zeros_like(up)
+A_us = construct_A_matrix(us,up,mass,yaw,elevation)
+CL_us = A_us @ coeffs_CL
+CD_us = A_us @ coeffs_CD
+up = np.linspace(0,1,41)
+us = np.zeros_like(up)
+yaw = np.zeros_like(up)
+elevation = np.zeros_like(up)
+A_up = construct_A_matrix(us,up,mass,yaw,elevation)
+CL_up = A_up @ coeffs_CL
+CD_up = A_up @ coeffs_CD
+
+us = np.linspace(-1,1,41)
+fig,axs = plt.subplots(2,2,figsize=(12,8))
+axs[0,0].plot(up,CL_up,label='CL vs up')
+axs[0,0].set_ylabel('CL')
+axs[1,0].plot(up,CD_up,label='CD vs up')
+axs[1,0].set_ylabel('CD')
+axs[1,0].set_xlabel('up')
+axs[0,1].plot(up,CL_us,label='CL vs us')
+axs[1,1].plot(up,CD_us,label='CD vs us')
+axs[1,1].set_xlabel('us')
+plt.show()
+
+
+
+
+
+
+
 
 # Plot the residuals
 plt.figure()
-plt.plot(flight_data['time'][mask], results['CL'][mask] - CL_est[mask], label='Residuals', color='b', alpha=0.5)
-plt.xlabel('Time [s]')
-plt.ylabel('Residuals')
+plt.plot(
+    flight_data["time"][mask],
+    results["CL"][mask] - CL_est[mask],
+    label="Residuals",
+    color="b",
+    alpha=0.5,
+)
+plt.xlabel("Time [s]")
+plt.ylabel("Residuals")
 plt.legend()
 plt.grid(True)
 
+plt.show()
 
 
-
-
-#%% TURN LAW IDENTIFICATION
-# from scipy.optimize import minimize
-# from awes_ekf.old_code.turn_law import calculate_yaw_rate_new, obj_yaw_rate, calculate_mse
+# # %% TURN LAW IDENTIFICATION
+# from awes_ekf.old_code.turn_law import calculate_mse
 # def find_time_delay(signal_1,signal_2):
 #     # Compute the cross-correlation
 #     cross_corr = np.correlate(signal_2, signal_1, mode='full')
@@ -139,7 +243,7 @@ plt.grid(True)
 
 
 # def calculate_yaw_rate( area,mass,span, us, va, beta, yaw,v,radius,yaw_rate=None,coeffs = None, offset=False):
-    
+
 #     c1 = us*(va)/span
 #     c2 = ( mass*v**2/(1.225*area*span**2*va*radius)-mass*9.81*np.sin(yaw)*np.cos(beta)/(1.225*area*span**2*va))
 #     A = np.vstack([c1, c2]).T
@@ -150,8 +254,8 @@ plt.grid(True)
 #     if coeffs is None:
 #         W = np.eye(len(us))
 #         coeffs = calculate_weighted_least_squares(yaw_rate, A, W)
-    
-    
+
+
 #     yaw_rate = A@coeffs
 
 #     return yaw_rate, coeffs
@@ -167,7 +271,7 @@ plt.grid(True)
 
 # #%%
 # signal_1 = np.degrees(yaw_rate_identified)
-# signal_2 = -flight_data['us']*results['va_kite']
+# # signal_2 = -flight_data['us']*results['va_kite']
 # signal_2 = np.degrees(yaw_rate)
 
 # time_delay, cross_corr = find_time_delay(signal_1, signal_2)
@@ -218,6 +322,7 @@ plt.grid(True)
 # plt.plot(flight_data['time'],yaw_rate*180/np.pi, label = 'Measured')
 # plt.legend()
 # plt.grid(True)
+# plt.show()
 # #%%
 # import copy
 # kite1 = copy.deepcopy(config['kite'])
@@ -242,7 +347,7 @@ plt.grid(True)
 # plt.grid(True)
 
 
-# #%% 
+# #%%
 
 
 # i = 460
@@ -275,7 +380,7 @@ plt.grid(True)
 # plt.grid(True)
 # plt.xlabel('Area [m^2]')
 # plt.ylabel('Yaw rate [deg/s]')
-
+# plt.show()
 # #%%
 # # i = 3851
 # # va = va[i]
@@ -301,8 +406,6 @@ plt.grid(True)
 # # plt.grid(True)
 # # plt.xlabel('Aspect ratio')
 # # plt.ylabel('Yaw rate [deg/s]')
-
-
 
 
 # # mse = calculate_mse(yaw_rate, yaw_rate_identified)
