@@ -8,7 +8,7 @@ import awes_ekf.plotting.plot_utils as pu
 
 # Example usage
 plt.close('all')
-config_file_name = "v3_config.yaml"
+config_file_name = "v9_config.yaml"
 config = load_config("examples/" + config_file_name)
 # Initialize EKF
 # Load results and flight data and plot kite reference frame
@@ -16,7 +16,7 @@ results, flight_data = read_results(str(config['year']), str(config['month']), s
 
 mask = (flight_data.cycle == 65)
 # mask = (flight_data.index > 1000)
-# mask = (flight_data.time > 550)
+mask = (flight_data.time > 10)
 flight_data = flight_data[mask]
 results = results[mask]
 # Calculate variables and vectors for plotting
@@ -31,7 +31,7 @@ for i in np.arange(0, len(flight_data)):
     )
     ex.append(dcm[:, 0])
 
-label_variables = [['kite_velocity'], ['CL'], ['Tether_force'], ["Mechanic power"],['Kite yaw']]
+label_variables = [['kite_velocity'], ['CL'], ['Tether_force'], ["Mechanic power"],['us'],['up']]
 t = flight_data['time'].values
 x = results['kite_pos_x'].values
 y = results['kite_pos_y'].values
@@ -42,7 +42,8 @@ variables = [
     results['CL'].values,
     [flight_data['ground_tether_force'].values],
     [flight_data['ground_tether_force'].values*flight_data['ground_tether_reelout_speed'].values],
-    np.degrees(flight_data['kite_yaw_s0'].values)%360,
+    flight_data['us'].values,
+    flight_data['up'].values,
 ]
 
 # Plot kite trajectory
