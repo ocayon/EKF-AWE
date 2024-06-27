@@ -28,6 +28,8 @@ def plot_kite_trajectory(time, x, y, z, variables=[], vecs=[], labels=None):
     for i, var_group in enumerate(variables):
         if var_group is not None:
             ax = fig.add_subplot(gs[i, 1:])
+            if i>0:
+                ax.sharex(ax_prev)
             lines = []
             if not isinstance(var_group, list):
                 var_group = [var_group]
@@ -47,6 +49,7 @@ def plot_kite_trajectory(time, x, y, z, variables=[], vecs=[], labels=None):
             ax.legend()
             ax.grid(True)
             ax_vars.append((lines, red_point))
+            ax_prev = ax
 
     # Vector plots
     arrows = []
