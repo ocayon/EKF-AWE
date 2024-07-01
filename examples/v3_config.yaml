@@ -25,7 +25,7 @@ simulation_parameters:
     kcu_vel: false                    # KCU velocity measurement
     kcu_acc: false                    # KCU acceleration measurement
     apparent_windspeed: false         # Apparent wind speed measurement
-    angle_of_attack: true            # Angle of attack measurement
+    angle_of_attack: false            # Angle of attack measurement
     angle_of_sideslip: false             # Sideslip angle measurement
     yaw_angle: false                  # Yaw angle measurement
 
