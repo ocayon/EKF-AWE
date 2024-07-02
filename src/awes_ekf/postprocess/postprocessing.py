@@ -237,7 +237,7 @@ def postprocess_results(
     
     if kcu is not None:
         slack = (
-            flight_data["ground_tether_length"]
+            results["tether_length"]
             + kcu.distance_kcu_kite
             - np.linalg.norm(r_kite, axis=1)
         )
@@ -247,6 +247,7 @@ def postprocess_results(
     omega_p = []
     omega_q = []
     omega_r = []
+    kite_elevation = []
     for i in range(len(results)):
         res = results.iloc[i]
         fd = flight_data.iloc[i]
@@ -264,7 +265,8 @@ def postprocess_results(
             airflow_angles = calculate_airflow_angles(dcm, va_kite[i])
             results.loc[i, "aoa_IMU_" + str(imu)] = airflow_angles[0]  # Angle of attack
             results.loc[i, "ss_IMU_" + str(imu)] = airflow_angles[1]  # Sideslip angle
-
+        ez_kite = dcm[:, 2]
+        kite_elevation.append(np.arcsin(-ez_kite[2]))
         at = (
             np.dot(a_kite[i], np.array(v_kite[i]) / np.linalg.norm(v_kite[i]))
             * np.array(v_kite[i])
@@ -298,12 +300,13 @@ def postprocess_results(
                 in_cycle = False
 
     print("Number of cycles:", cycle_count)
-    # results['slack'] = slack
+    results['slack'] = slack
     flight_data["radius_turn"] = radius_turn
     results["omega"] = omega
     results["omega_p"] = omega_p
     results["omega_q"] = omega_q
     results["omega_r"] = omega_r
+    results["kite_elevation"] = kite_elevation
 
     # Identify turn - straight and left - right
     flight_data["turn_straight"] = flight_data.apply(determine_turn_straight, axis=1)
