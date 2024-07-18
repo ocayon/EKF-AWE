@@ -19,29 +19,29 @@ class EKFOutput:
     kite_vel_x: float = None
     kite_vel_y: float = None
     kite_vel_z: float = None
-    wind_velocity: float = None
-    wind_direction: float = None
-    kite_roll: float = None
+    wind_velocity: float = None # m/s
+    wind_direction: float = None # Downwind direction ENU
+    kite_roll: float = None #[rad] NED
     kite_pitch: float = None
     kite_yaw: float = None
-    tether_length: float = None
+    tether_length: float = None # without offset and bridle?
     kite_aoa: float = None
     kite_sideslip: float = None
-    CL: float = None
-    CD: float = None
-    CS: float = None
-    elevation_first_element: float = None
-    azimuth_first_element: float = None
+    CL: float = None # Wing only
+    CD: float = None # Wing only
+    CS: float = None # WIng only
+    elevation_first_element: float = None # rad relative to horizon
+    azimuth_first_element: float = None # rad relative to ENU
     thrust_force: float = None
-    cd_tether: float = None
-    cd_kcu: float = None
-    z_wind: float = None
+    cd_tether: float = None # Non dimensionalized with area of the kite
+    cd_kcu: float = None # Non dimensionalized with area of the kite
+    z_wind: float = None # positive values are up (ENU)
     k_steering_law: float = None
-    kcu_roll: float = None
-    kcu_pitch: float = None
-    kcu_yaw: float = None
-    tether_offset: float = None
-    tether_force_kite: float = None
+    kcu_roll: float = None # Orientation of the first tether element below KCU
+    kcu_pitch: float = None # Orientation of the first tether element below KCU
+    kcu_yaw: float = None # Orientation of the first tether element below KCU
+    tether_offset: float = None # incl bridle?
+    tether_force_kite: float = None # [N]
 
 
 def create_ekf_output(x, u, ekf_input, tether, kcu, simConfig):
