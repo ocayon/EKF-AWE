@@ -13,3 +13,4 @@ src/awes_ekf.egg-info/
 examples/v9_config.yaml
 examples/kft_config.yaml
 venv/
+processed_data/

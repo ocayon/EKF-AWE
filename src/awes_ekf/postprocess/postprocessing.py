@@ -242,7 +242,7 @@ def postprocess_results(
             - np.linalg.norm(r_kite, axis=1)
         )
     else:
-        slack = flight_data["ground_tether_length"] - np.linalg.norm(r_kite, axis=1)
+        slack = results["tether_length"] - np.linalg.norm(r_kite, axis=1)
     
     omega_p = []
     omega_q = []
