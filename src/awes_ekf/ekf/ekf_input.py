@@ -21,7 +21,6 @@ class EKFInput:
     steering_input: float = None  # Steering input
     thrust_force: np.ndarray = None  # Thrust force
     up: float = None  # Depower input
-    wind_vel: np.ndarray = np.array([1e-3, 1e-3, 0])  # Wind velocity
 
     def __post_init__(self):
         if np.linalg.norm(self.kite_acc) < 1e-5:

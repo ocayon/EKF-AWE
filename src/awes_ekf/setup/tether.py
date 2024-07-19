@@ -473,7 +473,7 @@ class TetherInput:
     tether_length: float
     tether_elevation: float
     tether_azimuth: float
-    wind_vel: np.ndarray = np.array([0, 0, 0])
+    wind_vel: np.ndarray = np.array([1e-3, 1e-3, 0])
     kite_acc: np.ndarray = None
     kcu_acc: np.ndarray = None
     kcu_vel: np.ndarray = None

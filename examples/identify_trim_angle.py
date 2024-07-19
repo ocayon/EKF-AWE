@@ -7,7 +7,7 @@ import pandas as pd
 
 # Example usage
 plt.close("all")
-config_file_name = "v9_config.yaml"
+config_file_name = "v3_config.yaml"
 config = load_config("examples/" + config_file_name)
 
 # Load results and flight data and plot kite reference frame
