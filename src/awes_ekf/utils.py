@@ -1,8 +1,14 @@
 import numpy as np
 import casadi as ca
 from typing import Union
+from awes_ekf.setup.settings import kappa, z0
 
 # %% Function definitions
+
+def calculate_log_wind_velocity(uf, wdir, wvel_z, z):
+    wvel = uf / kappa * np.log(z / z0)
+    vw = np.array([wvel * np.cos(wdir), wvel * np.sin(wdir), wvel_z])
+
 
 
 def project_onto_plane(
