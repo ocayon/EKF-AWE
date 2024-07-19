@@ -23,11 +23,11 @@ class EKFOutput:
     wind_velocity: float = None # m/s
     wind_direction: float = None # Downwind direction ENU
     kite_roll: float = None #[rad] NED
-    kite_pitch: float = None
-    kite_yaw: float = None
-    tether_length: float = None # without offset and bridle?
-    kite_aoa: float = None
-    kite_sideslip: float = None
+    kite_pitch: float = None #[rad] NED
+    kite_yaw: float = None  # [rad] NED
+    tether_length: float = None # [m] without offset and up to the bridle point (KCU)
+    kite_aoa: float = None  # for now in degrees, angle of attack of the last tether element
+    kite_sideslip: float = None 
     cl_wing: float = None # Wing only
     cd_wing: float = None # Wing only
     cs_wing: float = None # WIng only
@@ -41,7 +41,7 @@ class EKFOutput:
     kcu_roll: float = None # Orientation of the first tether element below KCU
     kcu_pitch: float = None # Orientation of the first tether element below KCU
     kcu_yaw: float = None # Orientation of the first tether element below KCU
-    tether_offset: float = None # incl bridle?
+    tether_offset: float = None # [m] distance between the kite and the tether
     tether_force_kite: float = None # [N]
 
 
