@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import os
 
 
 def process_KP_data(df):
@@ -223,13 +224,16 @@ file_name.append("2019-10-08_11.csv")
 
 
 for file in file_name:
-    # %%
     df = pd.read_csv(file_path + file, delimiter=" ", low_memory=False)
     df = df[df["kite_height"] > 80]  # Select the indexes where the kite is flying
 
     flight_data = process_KP_data(df)
     date = str(df["date"].iloc[0])
-    # %%
+
+    # Create the directory if it doesn't exist
     csv_filepath = "./processed_data/flight_data/" + model + "/"
+    if not os.path.exists(csv_filepath):
+        os.makedirs(csv_filepath)
+
     csv_filename = model + "_" + date + ".csv"
     flight_data.to_csv(csv_filepath + csv_filename, index=False)
