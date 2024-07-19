@@ -145,10 +145,10 @@ class ExtendedKalmanFilter:
         # Append values to the NumPy array
         z = np.append(z, input_class.kite_pos)
         z = np.append(z, input_class.kite_vel)
+        z = np.append(z, np.zeros(3))  # Add zeros for the least-squares problem
         z = np.append(z, input_class.tether_length)
         z = np.append(z, input_class.elevation_first_element)
         z = np.append(z, input_class.azimuth_first_element)
-        z = np.append(z, np.zeros(3))  # Add zeros for the least-squares problem
         if simConfig.model_yaw:
             z = np.append(z, input_class.kite_yaw)
         if simConfig.enforce_z_wind:
