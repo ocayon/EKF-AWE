@@ -18,9 +18,9 @@ class EKFInput:
     kite_aoa: float = None  # Kite angle of attack (between last tether element and wind incident)
     kcu_vel: np.ndarray = field(default_factory=lambda: np.zeros(3))  # KCU velocity in ENU coordinates
     kcu_acc: np.ndarray = field(default_factory=lambda: np.zeros(3))  # KCU acceleration in ENU coordinates
-    elevation_first_element: float = None  # Elevation angle (angle of tether element at GS exit with respect to the horizon) (rad)
-    azimuth_first_element: float = None  # Azimuth angle (With respect to east in EN plane) (rad)
-    kite_yaw: float = None  # Yaw angle (don't use)
+    tether_elevation: float = None  # Elevation angle (angle of tether element at GS exit with respect to the horizon) (rad)
+    tether_azimuth: float = None  # Azimuth angle (With respect to east in EN plane) (rad)
+    kite_yaw: float = None  # Yaw angle (don't use) 
     steering_input: float = None  # Steering input (don't use, define units later)
     thrust_force: np.ndarray = field(default_factory=lambda: np.zeros(3))  # Thrust force (fly-gen kites value)
     depower_input: float = None  # Depower input (Units are irrelevant, as constant is automatically calculated)

@@ -143,8 +143,8 @@ def create_input_from_csv(
                 kite_aoa=kite_aoa[i],
                 kcu_vel=kcu_vel[i],
                 reelout_speed=relout_speed[i],
-                elevation_first_element=kite_elevation[i],
-                azimuth_first_element=kite_azimuth[i],
+                tether_elevation=kite_elevation[i],
+                tether_azimuth=kite_azimuth[i],
                 ts=timestep,
                 kite_yaw=kite_yaw[i],
                 steering_input=us[i],
@@ -164,8 +164,8 @@ def find_initial_state_vector(tether, ekf_input, simConfig, offset_aoa=0):
         kcu_acc=ekf_input.kcu_acc,
         kcu_vel=ekf_input.kcu_vel,
         tether_force=ekf_input.tether_force,
-        tether_elevation=ekf_input.elevation_first_element,
-        tether_azimuth=ekf_input.azimuth_first_element,
+        tether_elevation=ekf_input.tether_elevation,
+        tether_azimuth=ekf_input.tether_azimuth,
         tether_length=ekf_input.tether_length,
     )
 

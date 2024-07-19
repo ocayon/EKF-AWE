@@ -19,8 +19,8 @@ simulation_parameters:
     kite_acc: true                   # Kite acceleration measurement
     tether_force: true               # Tether force measurement
     tether_length: true              # Tether length measurement
-    tether_elevation: true           # Tether elevation angle measurement
-    tether_azimuth: true             # Tether azimuth angle measurement
+    tether_elevation: false           # Tether elevation angle measurement
+    tether_azimuth: false             # Tether azimuth angle measurement
     kcu_pos: false                    # KCU position measurement
     kcu_vel: false                    # KCU velocity measurement
     kcu_acc: false                    # KCU acceleration measurement
@@ -52,8 +52,8 @@ tuning_parameters:
     x: 2.5
     v: 1
     tether_length: 1
-    elevation: 0.2
-    azimuth: 0.2
+    tether_elevation: 0.2
+    tether_azimuth: 0.2
     least_squares: 1e-5
     yaw: 0.15  # 10 degrees in radians
     z_wind: 2
@@ -69,8 +69,8 @@ tuning_parameters:
     CL: 0.01
     CD: 0.003
     CS: 0.01
-    elevation: 0.3
-    azimuth: 0.3
+    tether_elevation: 0.3
+    tether_azimuth: 0.3
     tether_length: 0.1
     yaw: 0.0873
 

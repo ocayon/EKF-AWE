@@ -91,7 +91,7 @@ class PointMassEKF(Kite):
         if self.simConfig.log_profile is True:
             self.uf = ca.SX.sym("uf")  # Friction velocity
             self.wdir = ca.SX.sym("wdir")  # Ground wind direction
-            self.vwz = ca.SX.sym("vwz")  # Vertical wind velocity
+            self.vwz = ca.SX.sym("vw_2")  # Vertical wind velocity
             self.wvel = self.uf / kappa * ca.log(self.r[2] / z0)
             self.vw = ca.vertcat(
                 self.wvel * ca.cos(self.wdir), self.wvel * ca.sin(self.wdir), self.vwz
@@ -211,6 +211,23 @@ class PointMassEKF(Kite):
         x0_elements = [ca.SX.sym(f"{name}_0") for name in names]
         x0 = ca.vertcat(*x0_elements)
         return x0
+    @property
+    def state_index_map(self):
+        # Split the CasADi matrix into individual symbolic variables
+        state_variables = ca.vertsplit(self.x)
+
+        # Create a dictionary to map variable names to their indices
+        variable_index_map = {var.name(): i for i, var in enumerate(state_variables)}
+        return variable_index_map
+    
+    @property
+    def input_index_map(self):
+        # Split the CasADi matrix into individual symbolic variables
+        input_variables = ca.vertsplit(self.u)
+
+        # Create a dictionary to map variable names to their indices
+        variable_index_map = {var.name(): i for i, var in enumerate(input_variables)}
+        return variable_index_map
 
 class PointMass(Kite):
 

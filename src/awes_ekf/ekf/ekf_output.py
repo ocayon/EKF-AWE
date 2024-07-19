@@ -8,6 +8,7 @@ from awes_ekf.utils import (
     calculate_airflow_angles,
     calculate_reference_frame_euler,
     rotate_ENU2NED,
+    calculate_log_wind_velocity,
 )
 
 
@@ -27,9 +28,9 @@ class EKFOutput:
     tether_length: float = None # without offset and bridle?
     kite_aoa: float = None
     kite_sideslip: float = None
-    CL: float = None # Wing only
-    CD: float = None # Wing only
-    CS: float = None # WIng only
+    cl_wing: float = None # Wing only
+    cd_wing: float = None # Wing only
+    cs_wing: float = None # WIng only
     elevation_first_element: float = None # rad relative to horizon
     azimuth_first_element: float = None # rad relative to ENU
     thrust_force: float = None
@@ -44,27 +45,32 @@ class EKFOutput:
     tether_force_kite: float = None # [N]
 
 
-def create_ekf_output(x, u, ekf_input, tether, kcu, simConfig):
+def create_ekf_output(x, u, ekf_input, tether, kite, simConfig):
     """Store results in a list of instances of the class EKFOutput"""
+
+    state_index_map = kite.state_index_map
+    input_index_map = kite.input_index_map
     # Store tether force and tether model results
-    r_kite = x[0:3]
-    v_kite = x[3:6]
+    r_kite = np.array([x[state_index_map[f"r_{i}"]] for i in range(3)])
+    v_kite = np.array([x[state_index_map[f"v_{i}"]] for i in range(3)])
     if simConfig.log_profile:
-        wind_vel = x[6] / kappa * np.log(x[2] / z0)
-        wind_dir = x[7]
-        z_wind = x[8]
-        vw = np.array(
-            [wind_vel * np.cos(wind_dir), wind_vel * np.sin(wind_dir), z_wind]
+        vw = calculate_log_wind_velocity(
+            x[state_index_map["uf"]],
+            x[state_index_map["wdir"]],
+            x[state_index_map["vw_2"]],
+            x[state_index_map["r_2"]],
         )
     else:
-        vw = x[6:9]
-        wind_vel = np.linalg.norm(vw)
-        wind_dir = np.arctan2(vw[1], vw[0])
-        z_wind = vw[2]
-    tension_ground = u[1]
-    tether_length = x[12]
-    elevation_0 = x[13]
-    azimuth_0 = x[14]
+        vw = np.array([x[state_index_map[f"vw_{i}"]] for i in range(3)])
+
+    wind_vel = np.linalg.norm(vw)
+    wind_dir = np.arctan2(vw[1], vw[0])
+    z_wind = vw[2]
+
+    tension_ground = u[input_index_map["ground_tether_force"]]
+    tether_length = x[state_index_map["tether_length"]]
+    elevation_0 = x[state_index_map["elevation_first_tether_element"]]
+    azimuth_0 = x[state_index_map["azimuth_first_tether_element"]]
     args = (elevation_0, azimuth_0, tether_length, tension_ground, r_kite, v_kite, vw)
 
     if simConfig.obsData.kite_acc:
@@ -94,11 +100,11 @@ def create_ekf_output(x, u, ekf_input, tether, kcu, simConfig):
         airflow_angles = calculate_airflow_angles(dcm_b2vel, vw - v_kite)
 
     # Unpack position and velocity vectors
-    kite_pos_x, kite_pos_y, kite_pos_z = x[0:3]
-    kite_vel_x, kite_vel_y, kite_vel_z = x[3:6]
+    kite_pos_x, kite_pos_y, kite_pos_z = r_kite
+    kite_vel_x, kite_vel_y, kite_vel_z = v_kite
 
-    if simConfig.tether_offset:
-        tether_offset = x[15]
+    if simConfig.obsData.tether_length:
+        tether_offset = x[state_index_map["tether_offset"]]
     else:
         tether_offset = None
 
@@ -115,14 +121,14 @@ def create_ekf_output(x, u, ekf_input, tether, kcu, simConfig):
         kite_roll=euler_angles[0],
         kite_pitch=euler_angles[1],
         kite_yaw=euler_angles[2],
-        tether_length=x[12],
+        tether_length=x[state_index_map["tether_length"]],
         kite_aoa=airflow_angles[0],
         kite_sideslip=airflow_angles[1],
-        CL=x[9],
-        CD=x[10],
-        CS=x[11],
-        elevation_first_element=x[13],
-        azimuth_first_element=x[14],
+        cl_wing=x[state_index_map["CL"]],
+        cd_wing=x[state_index_map["CD"]],
+        cs_wing=x[state_index_map["CS"]],
+        elevation_first_element=elevation_0,
+        azimuth_first_element=azimuth_0,
         cd_kcu=cd_kcu,
         cd_tether=cd_tether,
         z_wind=z_wind,

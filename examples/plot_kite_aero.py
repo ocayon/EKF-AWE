@@ -29,29 +29,29 @@ mask_angles =mask#&((aoa_plot>0) & (aoa_plot<15))
 # mask_angles =(results['aoa']>0) & (results['aoa']<20)
 fig, axs = plt.subplots(2, 2, figsize=(10, 10), sharex=True)
 mask = (flight_data['turn_straight'] == 'straight') & mask_angles 
-pu.plot_cl_curve(np.sqrt((results['CL']**2+results['CS']**2)), results['CD'], aoa_plot, mask,axs, label = "Straight")
+pu.plot_cl_curve(np.sqrt((results['cl_wing']**2+results['cs_wing']**2)), results['cd_wing'], aoa_plot, mask,axs, label = "Straight")
 mask = (flight_data['turn_straight'] == 'turn')& mask_angles
-pu.plot_cl_curve(np.sqrt((results['CL']**2+results['CS']**2)), results['CD'], aoa_plot, mask,axs, label = "Turn")
+pu.plot_cl_curve(np.sqrt((results['cl_wing']**2+results['cs_wing']**2)), results['cd_wing'], aoa_plot, mask,axs, label = "Turn")
 
 axs[0,0].axvline(x = np.mean(aoa_plot[flight_data['powered'] == 'powered']), color = 'k',linestyle = '--', label = 'Mean reel-out angle of attack')
 axs[0,0].axvline(x = np.mean(aoa_plot[flight_data['powered'] == 'depowered']), color = 'b',linestyle = '--', label = 'Mean reel-in angle of attack')
 
 
 axs[0,0].legend()
-fig.suptitle('CL vs CD of the kite wing (without KCU and tether drag)')
+fig.suptitle('cl_wing vs cd_wing of the kite wing (without KCU and tether drag)')
 #plt.show()
 
 #%%
 fig, axs = plt.subplots(2, 2, figsize=(10, 10))
 aoa_plot=flight_data['kite_angle_of_attack']
 mask = (flight_data['turn_straight'] == 'straight') & mask_angles & (flight_data['up'] > 0.9) | (flight_data['up'] < 0.1)
-pu.plot_cl_curve(np.sqrt((results['CL']**2+results['CS']**2)), results['CD']+results['cd_tether']+results['cd_kcu'], aoa_plot, mask,axs, label = "Straight")
+pu.plot_cl_curve(np.sqrt((results['cl_wing']**2+results['cs_wing']**2)), results['cd_wing']+results['cd_tether']+results['cd_kcu'], aoa_plot, mask,axs, label = "Straight")
 mask = (flight_data['turn_straight'] == 'turn') & mask_angles
-pu.plot_cl_curve(np.sqrt((results['CL']**2+results['CS']**2)), results['CD']+results['cd_tether']+results['cd_kcu'], aoa_plot, mask,axs, label = "Turn")
+pu.plot_cl_curve(np.sqrt((results['cl_wing']**2+results['cs_wing']**2)), results['cd_wing']+results['cd_tether']+results['cd_kcu'], aoa_plot, mask,axs, label = "Turn")
 axs[0,0].axvline(x = np.mean(aoa_plot[flight_data['powered'] == 'powered']), color = 'k',linestyle = '--', label = 'Mean reel-out angle of attack')
 axs[0,0].axvline(x = np.mean(aoa_plot[flight_data['powered'] == 'depowered']), color = 'b',linestyle = '--', label = 'Mean reel-in angle of attack')
 axs[0,0].legend()
-fig.suptitle('CL vs CD of the system (incl. KCU and tether drag)')
+fig.suptitle('cl_wing vs cd_wing of the system (incl. KCU and tether drag)')
 
 #%%
 plt.figure()
@@ -69,7 +69,7 @@ plt.title('Tether force comparison')
 
 plt.show()
 
-#%% Find delay CS with us
+#%% Find delay cs_wing with us
 
 def find_time_delay(signal_1,signal_2):
     # Compute the cross-correlation
@@ -88,7 +88,7 @@ def find_time_delay(signal_1,signal_2):
 
         
 signal_1 = -flight_data['us']
-signal_2 = results['CS']
+signal_2 = results['cs_wing']
 
 time_delay,cross_corr = find_time_delay(signal_1, signal_2)
 # Plot the signals and their cross-correlation
@@ -99,7 +99,7 @@ axs[0].plot(signal_1, label='us')
 axs[0].legend()
 axs[0].set_title('Signal 1')
 
-axs[1].plot(signal_2, label='CS')
+axs[1].plot(signal_2, label='cs_wing')
 axs[1].legend()
 axs[1].set_title('Signal 2')
 axs[1].sharex(axs[0])
@@ -116,7 +116,7 @@ plt.tight_layout()
 #%% Plot kite velocity
 plt.figure()
 kite_speed = np.sqrt(results['kite_vel_x']**2+results['kite_vel_y']**2+results['kite_vel_z']**2)
-meas_kite_speed = np.sqrt(flight_data['kite_vel_x_s0']**2+flight_data['kite_vel_y_s0']**2+flight_data['kite_vel_z_s0']**2)
+meas_kite_speed = np.sqrt(flight_data['kite_velocity_east_s0']**2+flight_data['kite_velocity_north_s0']**2+flight_data['kite_velocity_up_s0']**2)
 plt.plot(results['time'],kite_speed,label = 'Estimated')
 plt.plot(flight_data['time'],meas_kite_speed,label = 'Measured')
 plt.xlabel('Time (s)')

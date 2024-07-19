@@ -70,8 +70,8 @@ class TuningParameters:
                 "CD",
                 "CS",
                 "tether_length",
-                "elevation",
-                "azimuth",
+                "tether_elevation",
+                "tether_azimuth",
             ]
         else:
             indices = [
@@ -88,17 +88,17 @@ class TuningParameters:
                 "CD",
                 "CS",
                 "tether_length",
-                "elevation",
-                "azimuth",
+                "tether_elevation",
+                "tether_azimuth",
             ]
 
         self.stdv_dynamic_model = np.array([float(model_stdv[key]) for key in indices])
         if simConfig.model_yaw:
             self.stdv_dynamic_model = np.append(
-                self.stdv_dynamic_model, [model_stdv["yaw"], 1e-6]
+                self.stdv_dynamic_model, [model_stdv["yaw"], 1e-6]  # Yaw  and yaw offset
             )
-        if simConfig.tether_offset:
-            self.stdv_dynamic_model = np.append(self.stdv_dynamic_model, 1e-6)
+        if simConfig.obsData.tether_length:
+            self.stdv_dynamic_model = np.append(self.stdv_dynamic_model, 1e-6) # Tether length offset
         indices = [
             "x",
             "x",
@@ -109,16 +109,18 @@ class TuningParameters:
             "least_squares",
             "least_squares",
             "least_squares",
-            "tether_length",
-            "elevation",
-            "azimuth",
         ]
         stdv_y = [float(meas_stdv[key]) for key in indices]
         if simConfig.model_yaw:
             stdv_y.append(meas_stdv["yaw"])
+        if simConfig.obsData.tether_length:
+            stdv_y.append(meas_stdv["tether_length"])
+        if simConfig.obsData.tether_elevation:
+            stdv_y.append(meas_stdv["tether_elevation"])
+        if simConfig.obsData.tether_azimuth:
+            stdv_y.append(meas_stdv["tether_azimuth"])
         if simConfig.enforce_z_wind:
             stdv_y.append(meas_stdv["z_wind"])
-
         if simConfig.obsData.apparent_windspeed:
             stdv_y.append(meas_stdv["va"])
         if simConfig.obsData.angle_of_attack:

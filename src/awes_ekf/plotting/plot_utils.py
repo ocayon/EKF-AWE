@@ -386,19 +386,19 @@ def plot_aero_coeff_vs_aoa_ss(
     time_max = flight_data[mask_cycle]["time"].max()
 
     # Plotting each aerodynamic coefficient
-    axs[0].plot(results[mask_cycle]["time"], results[mask_cycle]["CL"])
+    axs[0].plot(results[mask_cycle]["time"], results[mask_cycle]["cl_wing"])
     axs[1].plot(
-        results[mask_cycle]["time"], results[mask_cycle]["CD"], label="CD (Total)"
+        results[mask_cycle]["time"], results[mask_cycle]["cd_wing"], label="cd_wing (Total)"
     )
     axs[1].plot(
-        results[mask_cycle]["time"], results[mask_cycle]["cd_kcu"], label="CD (KCU)"
+        results[mask_cycle]["time"], results[mask_cycle]["cd_kcu"], label="cd_wing (KCU)"
     )
     axs[1].plot(
         results[mask_cycle]["time"],
         results[mask_cycle]["cd_tether"],
-        label="CD (Tether)",
+        label="cd_wing (Tether)",
     )
-    axs[2].plot(results[mask_cycle]["time"], results[mask_cycle]["CS"], label="CS")
+    axs[2].plot(results[mask_cycle]["time"], results[mask_cycle]["cs_wing"], label="cs_wing")
 
     # AOA and Side Slip plots with conditions
     if EKF:
@@ -533,9 +533,9 @@ def plot_aero_coeff_vs_aoa_ss(
     axs[1].legend()
     axs[3].legend()
     axs[4].legend()
-    axs[0].set_ylabel("CL")
-    axs[1].set_ylabel("CD")
-    axs[2].set_ylabel("CS")
+    axs[0].set_ylabel("cl_wing")
+    axs[1].set_ylabel("cd_wing")
+    axs[2].set_ylabel("cs_wing")
     axs[3].set_ylabel("Angle of attack (deg)")
     axs[4].set_ylabel("Side slip (deg)")
     axs[4].set_xlabel("Time (s)")
@@ -563,9 +563,9 @@ def plot_aero_coeff_vs_up_us(
         [flight_data["cycle"] == cycle for cycle in cycles_plotted], axis=0
     )
 
-    axs[0].plot(results[mask_cycle]["time"], results[mask_cycle]["CL"])
-    axs[1].plot(results[mask_cycle]["time"], results[mask_cycle]["CD"])
-    axs[2].plot(results[mask_cycle]["time"], results[mask_cycle]["CS"])
+    axs[0].plot(results[mask_cycle]["time"], results[mask_cycle]["cl_wing"])
+    axs[1].plot(results[mask_cycle]["time"], results[mask_cycle]["cd_wing"])
+    axs[2].plot(results[mask_cycle]["time"], results[mask_cycle]["cs_wing"])
 
     axs[3].plot(flight_data[mask_cycle]["time"], flight_data[mask_cycle]["up"])
     axs[4].plot(flight_data[mask_cycle]["time"], flight_data[mask_cycle]["us"])
@@ -666,9 +666,9 @@ def plot_aero_coeff_vs_up_us(
     axs[2].set_ylim([-0.12, 0.12])
     axs[3].set_ylim([0, 1])
     axs[4].set_ylim([-1, 1])
-    axs[0].set_ylabel("CL")
-    axs[1].set_ylabel("CD")
-    axs[2].set_ylabel("CS")
+    axs[0].set_ylabel("cl_wing")
+    axs[1].set_ylabel("cd_wing")
+    axs[2].set_ylabel("cs_wing")
     axs[3].set_ylabel("up")
     axs[4].set_ylabel("us")
     axs[0].grid()
@@ -735,7 +735,7 @@ def plot_hexbin_density(x, y, xlabel=None, ylabel=None):
     # plt.show()
 
 
-def plot_CL_CD_aoa(results, flight_data, mask, aoa_method, savefig=False):
+def plot_cl_wing_cd_wing_aoa(results, flight_data, mask, aoa_method, savefig=False):
 
     if aoa_method == "IMU_0":
         aoa = results["aoa_IMU_0"]
@@ -747,29 +747,29 @@ def plot_CL_CD_aoa(results, flight_data, mask, aoa_method, savefig=False):
         aoa = flight_data["kite_angle_of_attack"]
 
     fig, axs = plt.subplots(2, 1, figsize=(10, 10), sharex=True)
-    fig.suptitle("CL and CD vs aoa")
-    plot_probability_density(aoa[mask], results["CL"][mask], fig, axs[0], ylabel="CL")
-    plot_probability_density(aoa[mask], results["CD"][mask], fig, axs[1], "aoa", "CD")
+    fig.suptitle("cl_wing and cd_wing vs aoa")
+    plot_probability_density(aoa[mask], results["cl_wing"][mask], fig, axs[0], ylabel="cl_wing")
+    plot_probability_density(aoa[mask], results["cd_wing"][mask], fig, axs[1], "aoa", "cd_wing")
 
     if savefig == True:
         plt.tight_layout()
         plt.savefig("wind_profile.png", dpi=300)
 
 
-def plot_CL_CD_up(results, flight_data, mask, aoa_method, savefig=False):
+def plot_cl_wing_cd_wing_up(results, flight_data, mask, aoa_method, savefig=False):
 
     up = flight_data["up"]
 
     fig, axs = plt.subplots(2, 1, figsize=(10, 10), sharex=True)
-    fig.suptitle("CL and CD vs aoa")
-    plot_probability_density(up[mask], results["CL"][mask], fig, axs[0], ylabel="CL")
-    plot_probability_density(up[mask], results["CD"][mask], fig, axs[1], "up", "CD")
+    fig.suptitle("cl_wing and cd_wing vs aoa")
+    plot_probability_density(up[mask], results["cl_wing"][mask], fig, axs[0], ylabel="cl_wing")
+    plot_probability_density(up[mask], results["cd_wing"][mask], fig, axs[1], "up", "cd_wing")
     if savefig == True:
         plt.tight_layout()
         plt.savefig("wind_profile.png", dpi=300)
 
 
-def plot_CL_CD_ss(results, flight_data, mask, ss_method):
+def plot_cl_wing_cd_wing_ss(results, flight_data, mask, ss_method):
 
     if ss_method == "IMU_0":
         ss = results["ss_IMU_0"]
@@ -781,9 +781,9 @@ def plot_CL_CD_ss(results, flight_data, mask, ss_method):
         ss = flight_data["kite_sideslip_angle"]
 
     fig, axs = plt.subplots(2, 1, figsize=(10, 10), sharex=True)
-    fig.suptitle("CL and CD vs ss")
-    plot_probability_density(ss[mask], results["CL"][mask], fig, axs[0], ylabel="CL")
-    plot_probability_density(ss[mask], results["CD"][mask], fig, axs[1], "ss", "CD")
+    fig.suptitle("cl_wing and cd_wing vs ss")
+    plot_probability_density(ss[mask], results["cl_wing"][mask], fig, axs[0], ylabel="cl_wing")
+    plot_probability_density(ss[mask], results["cd_wing"][mask], fig, axs[1], "ss", "cd_wing")
 
 
 def plot_prob_coeff_vs_aoa_ss(results, coeff, mask, aoa_method):
@@ -1165,8 +1165,8 @@ def plot_kite_reference_frame(results, flight_data, imus, frame_axis="xyz"):
 
 
 def plot_cl_curve(cl, cd, aoa, mask, axs, label=None, savefig=False):
-    CL = cl[mask]
-    CD = cd[mask]
+    cl_wing = cl[mask]
+    cd_wing = cd[mask]
     alpha = aoa[mask]
 
     step = 1
@@ -1174,47 +1174,47 @@ def plot_cl_curve(cl, cd, aoa, mask, axs, label=None, savefig=False):
     bin_indices = np.digitize(alpha, bins)  # Find the bin index for each alpha value
     num_bins = len(bins)
 
-    CL_means = np.array([CL[bin_indices == i].mean() for i in range(1, num_bins)])
-    CD_means = np.array([CD[bin_indices == i].mean() for i in range(1, num_bins)])
+    cl_wing_means = np.array([cl_wing[bin_indices == i].mean() for i in range(1, num_bins)])
+    cd_wing_means = np.array([cd_wing[bin_indices == i].mean() for i in range(1, num_bins)])
 
-    CL_stds = np.array([CL[bin_indices == i].std() for i in range(1, num_bins)])
-    CD_stds = np.array([CD[bin_indices == i].std() for i in range(1, num_bins)])
+    cl_wing_stds = np.array([cl_wing[bin_indices == i].std() for i in range(1, num_bins)])
+    cd_wing_stds = np.array([cd_wing[bin_indices == i].std() for i in range(1, num_bins)])
     bin_centers = 0.5 * (bins[:-1] + bins[1:])
 
-    # Plot CL and shade the area for std deviation
-    axs[0, 0].plot(bin_centers, CL_means, "o-", markersize=8, linewidth=2, label=label)
+    # Plot cl_wing and shade the area for std deviation
+    axs[0, 0].plot(bin_centers, cl_wing_means, "o-", markersize=8, linewidth=2, label=label)
     axs[0, 0].fill_between(
-        bin_centers, CL_means - CL_stds, CL_means + CL_stds, alpha=0.2
+        bin_centers, cl_wing_means - cl_wing_stds, cl_wing_means + cl_wing_stds, alpha=0.2
     )
     axs[0, 0].set_xlabel("Angle of Attack (degrees)", fontsize=14)
-    axs[0, 0].set_ylabel("Lift Coefficient (CL)", fontsize=14)
+    axs[0, 0].set_ylabel("Lift Coefficient (cl_wing)", fontsize=14)
     axs[0, 0].grid(True)
 
-    # Plot CD and shade the area for std deviation
-    axs[0, 1].plot(bin_centers, CD_means, "o-", markersize=8, linewidth=2, label=label)
+    # Plot cd_wing and shade the area for std deviation
+    axs[0, 1].plot(bin_centers, cd_wing_means, "o-", markersize=8, linewidth=2, label=label)
     axs[0, 1].fill_between(
-        bin_centers, CD_means - CD_stds, CD_means + CD_stds, alpha=0.2
+        bin_centers, cd_wing_means - cd_wing_stds, cd_wing_means + cd_wing_stds, alpha=0.2
     )
     axs[0, 1].set_xlabel("Angle of Attack (degrees)", fontsize=14)
-    axs[0, 1].set_ylabel("Drag Coefficient (CD)", fontsize=14)
+    axs[0, 1].set_ylabel("Drag Coefficient (cd_wing)", fontsize=14)
     axs[0, 1].grid(True)
 
-    axs[1, 0].plot(bin_centers, CL_means**3 / CD_means**2, "o-", label=label)
+    axs[1, 0].plot(bin_centers, cl_wing_means**3 / cd_wing_means**2, "o-", label=label)
     axs[1, 0].fill_between(
         bin_centers,
-        (CL_means - CL_stds) ** 3 / (CD_means + CD_stds) ** 2,
-        (CL_means + CL_stds) ** 3 / (CD_means - CD_stds) ** 2,
+        (cl_wing_means - cl_wing_stds) ** 3 / (cd_wing_means + cd_wing_stds) ** 2,
+        (cl_wing_means + cl_wing_stds) ** 3 / (cd_wing_means - cd_wing_stds) ** 2,
         alpha=0.2,
     )
     axs[1, 0].set_xlabel("Angle of Attack (degrees)", fontsize=14)
-    axs[1, 0].set_ylabel("Power Coefficient (CL^3/CD^2)", fontsize=14)
+    axs[1, 0].set_ylabel("Power Coefficient (cl_wing^3/cd_wing^2)", fontsize=14)
     axs[1, 0].grid(True)
 
-    axs[1, 1].plot(bin_centers, CL_means / CD_means, "o-", label=label)
+    axs[1, 1].plot(bin_centers, cl_wing_means / cd_wing_means, "o-", label=label)
     axs[1, 1].fill_between(
         bin_centers,
-        (CL_means - CL_stds) / (CD_means + CD_stds),
-        (CL_means + CL_stds) / (CD_means - CD_stds),
+        (cl_wing_means - cl_wing_stds) / (cd_wing_means + cd_wing_stds),
+        (cl_wing_means + cl_wing_stds) / (cd_wing_means - cd_wing_stds),
         alpha=0.2,
     )
     axs[1, 1].set_xlabel("Angle of Attack (degrees)", fontsize=14)
