@@ -64,8 +64,8 @@ class PointMassEKF(Kite):
 
         self.u = self.get_input()
         self.x = self.get_state()
-        self.x0 = ca.SX.sym("x0", self.x.shape[0])  # Initial state vector
-
+        self.x0 = self.create_previous_state_vector()
+        
         super().__init__(**kwargs)
 
     def get_state(self):
@@ -203,6 +203,14 @@ class PointMassEKF(Kite):
         integrator = ca.integrator("intg", "cvodes", dae, 0, ts)  # Define integrator
 
         return np.array(integrator(x0=x, p=u)["xf"].T)
+    
+    def create_previous_state_vector(self):
+        # Extract the names of the symbolic variables
+        names = [str(self.x[i]) for i in range(self.x.size1())]
+        # Create new symbolic variables with names ending in _0
+        x0_elements = [ca.SX.sym(f"{name}_0") for name in names]
+        x0 = ca.vertcat(*x0_elements)
+        return x0
 
 class PointMass(Kite):
 

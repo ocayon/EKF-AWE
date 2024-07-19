@@ -1,7 +1,7 @@
 import numpy as np
 import casadi as ca
 from awes_ekf.setup.settings import kappa, z0
-from awes_ekf.utils import calculate_airflow_angles
+from awes_ekf.utils import calculate_airflow_angles, calculate_log_wind_velocity
 
 
 class ObservationModel:
@@ -9,32 +9,36 @@ class ObservationModel:
     def __init__(self, x, u, simConfig, kite, tether, kcu):
         self.x = x
         self.u = u
-        self.x0 = ca.SX.sym("x0", self.x.shape[0])  # Kite position
+        self.x0 = kite.x0
         self.simConfig = simConfig
 
     def get_hx(self, kite, tether, kcu):
 
         # Split the CasADi matrix into individual symbolic variables
         state_variables = ca.vertsplit(self.x)
+        previous_state_variables = ca.vertsplit(self.x0)
+        input_variables = ca.vertsplit(self.u)
         # Create a dictionary to map variable names to their symbolic variables
         state_map = {var.name(): var for var in state_variables}
-
-        input_variables = ca.vertsplit(self.u)
         input_map = {var.name(): var for var in input_variables}
+        previous_state_map = {var.name(): var for var in previous_state_variables}
 
         elevation_0 = state_map["elevation_first_tether_element"]
         azimuth_0 = state_map["azimuth_first_tether_element"]
         tether_length = state_map["tether_length"]
-        r_kite = self.x0[0:3]
-        v_kite = self.x0[3:6]
+        r_kite = np.array([previous_state_map[f"r_{i}_0"] for i in range(3)])
+        v_kite = np.array([previous_state_map[f"v_{i}_0"] for i in range(3)])
         tension_ground = input_map["ground_tether_force"]
 
         if self.simConfig.log_profile:
-            wvel = self.x0[6] / kappa * np.log(self.x0[2] / z0)
-            wdir = self.x0[7]
-            vw = np.array([wvel * np.cos(wdir), wvel * np.sin(wdir), self.x0[8]])
+            vw = calculate_log_wind_velocity(
+                previous_state_map["uf_0"],
+                previous_state_map["wdir_0"],
+                previous_state_map["vwz_0"],
+                previous_state_map["r_2_0"],
+            )
         else:
-            vw = self.x0[6:9]
+            vw = np.array([previous_state_map[f"vw_{i}_0"] for i in range(3)])
 
         args = (
             elevation_0,
@@ -46,49 +50,47 @@ class ObservationModel:
             vw,
         )
         if self.simConfig.obsData.kite_acc:
-            a_kite = self.u[2:5]
+            a_kite = np.array([input_map[f"a_kite_{i}"] for i in range(3)])
             args += (a_kite,)
         if self.simConfig.obsData.kcu_acc:
-            if self.simConfig.obsData.kite_acc:
-                a_kcu = self.u[5:8]
-                args += (a_kcu,)
-            else:
-                a_kcu = self.u[2:5]
-                args += (a_kcu,)
-
+            a_kcu = np.array([input_map[f"a_kcu_{i}"] for i in range(3)])
+            args += (a_kcu,)
         if self.simConfig.obsData.kcu_vel:
-            if self.simConfig.obsData.kite_acc:
-                v_kcu = self.u[8:11]
-                args += (v_kcu,)
-            else:
-                v_kcu = self.u[5:8]
-                args += (v_kcu,)
+            v_kcu = np.array([input_map[f"v_kcu_{i}"] for i in range(3)])
+            args += (v_kcu,)
 
         r_tether_model = tether.kite_position(*args)
 
-        if self.simConfig.log_profile:
-            wvel = self.x[6] / kappa * np.log(self.x[2] / z0)
-            wdir = self.x[7]
-            vw = np.array([wvel * np.cos(wdir), wvel * np.sin(wdir), self.x[8]])
-        else:
-            vw = self.x[6:9]
+        index_map = self.create_variable_index_map()
 
-        va = vw - self.x[3:6]
+        if self.simConfig.log_profile:
+            vw = calculate_log_wind_velocity(
+                self.x[index_map["uf"]],
+                self.x[index_map["wdir"]],
+                self.x[index_map["z"]],
+                self.x[index_map["r_2"]],
+            )
+        else:
+            vw = ca.vertcat(*[self.x[index_map[f"vw_{i}"]] for i in range(3)])
+
+        r_kite = ca.vertcat(*[self.x[index_map[f"r_{i}"]] for i in range(3)])
+        v_kite = ca.vertcat(*[self.x[index_map[f"v_{i}"]] for i in range(3)])
+        va = vw - v_kite
 
         dcm_b2vel = tether.bridle_frame_va(*args)
 
         airflow_angles = calculate_airflow_angles(dcm_b2vel, vw - v_kite)
 
         h = ca.SX()
-        h = ca.vertcat(self.x[0:3])
-        h = ca.vertcat(h, self.x[3:6])
+        h = ca.vertcat(r_kite)
+        h = ca.vertcat(h, v_kite)
+        h = ca.vertcat(h, (r_kite - r_tether_model))
         if self.simConfig.tether_offset:
             h = ca.vertcat(h, self.x[12] - self.x[-1])
         else:
             h = ca.vertcat(h, self.x[12])
         h = ca.vertcat(h, self.x[13])
         h = ca.vertcat(h, self.x[14])
-        h = ca.vertcat(h, (self.x[0:3] - r_tether_model))
         if self.simConfig.model_yaw:
             h = ca.vertcat(h, self.x[15])
         if self.simConfig.enforce_z_wind:
@@ -114,3 +116,10 @@ class ObservationModel:
         return ca.Function(
             "calc_hx", [self.x, self.u, self.x0], [self.get_hx(kite, tether, kcu)]
         )
+    def create_variable_index_map(self):
+        # Split the CasADi matrix into individual symbolic variables
+        state_variables = ca.vertsplit(self.x)
+
+        # Create a dictionary to map variable names to their indices
+        variable_index_map = {var.name(): i for i, var in enumerate(state_variables)}
+        return variable_index_map

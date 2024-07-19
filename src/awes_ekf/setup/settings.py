@@ -106,12 +106,12 @@ class TuningParameters:
             "v",
             "v",
             "v",
+            "least_squares",
+            "least_squares",
+            "least_squares",
             "tether_length",
             "elevation",
             "azimuth",
-            "least_squares",
-            "least_squares",
-            "least_squares",
         ]
         stdv_y = [float(meas_stdv[key]) for key in indices]
         if simConfig.model_yaw:
