@@ -61,7 +61,7 @@ class ObservationModel:
 
         r_tether_model = tether.kite_position(*args)
 
-        index_map = self.create_variable_index_map()
+        index_map = kite.state_index_map
 
         if self.simConfig.log_profile:
             vw = calculate_log_wind_velocity(
@@ -85,17 +85,16 @@ class ObservationModel:
         h = ca.vertcat(r_kite)
         h = ca.vertcat(h, v_kite)
         h = ca.vertcat(h, (r_kite - r_tether_model))
-        if self.simConfig.tether_offset:
-            h = ca.vertcat(h, self.x[12] - self.x[-1])
-        else:
-            h = ca.vertcat(h, self.x[12])
-        h = ca.vertcat(h, self.x[13])
-        h = ca.vertcat(h, self.x[14])
         if self.simConfig.model_yaw:
-            h = ca.vertcat(h, self.x[15])
+            h = ca.vertcat(h, self.x[index_map["yaw"]])
+        if self.simConfig.obsData.tether_length:
+            h = ca.vertcat(h, self.x[index_map["tether_length"]]-self.x[index_map["tether_offset"]])
+        if self.simConfig.obsData.tether_elevation:
+            h = ca.vertcat(h, self.x[index_map["elevation_first_tether_element"]])
+        if self.simConfig.obsData.tether_azimuth:
+            h = ca.vertcat(h, self.x[index_map["azimuth_first_tether_element"]])
         if self.simConfig.enforce_z_wind:
-            h = ca.vertcat(h, self.x[8])
-
+            h = ca.vertcat(h, self.x[index_map["vw_2"]])
         if self.simConfig.obsData.apparent_windspeed:
             h = ca.vertcat(h, ca.norm_2(va))
         if self.simConfig.obsData.angle_of_attack:
@@ -116,10 +115,3 @@ class ObservationModel:
         return ca.Function(
             "calc_hx", [self.x, self.u, self.x0], [self.get_hx(kite, tether, kcu)]
         )
-    def create_variable_index_map(self):
-        # Split the CasADi matrix into individual symbolic variables
-        state_variables = ca.vertsplit(self.x)
-
-        # Create a dictionary to map variable names to their indices
-        variable_index_map = {var.name(): i for i, var in enumerate(state_variables)}
-        return variable_index_map

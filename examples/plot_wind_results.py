@@ -12,7 +12,6 @@ config = load_config("examples/" + config_file_name)
 # Load results and flight data and plot kite reference frame
 results, flight_data = read_results(str(config['year']), str(config['month']), str(config['day']), config['kite']['model_name'])
 
-
 #%%Plot results wind speed
 
 pu.plot_wind_speed(results,flight_data,savefig=False) # PLot calculated wind speed against lidar

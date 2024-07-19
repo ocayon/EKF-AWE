@@ -75,7 +75,7 @@ def update_state_ekf_tether(ekf, tether, kite, kcu, ekf_input, simConfig):
     ekf.update()
 
     ekf_output = create_ekf_output(
-        ekf.x_k1_k1, ekf.u, ekf_input, tether, kcu, simConfig
+        ekf.x_k1_k1, ekf.u, ekf_input, tether, kite, simConfig
     )
 
     return ekf, ekf_output
