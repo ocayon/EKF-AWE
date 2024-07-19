@@ -3,7 +3,7 @@ import casadi as ca
 from awes_ekf.setup.settings import kappa, z0, rho, g
 import numpy as np
 from dataclasses import dataclass
-
+from awes_ekf.utils import calculate_log_wind_velocity
 
 class Kite(ABC):
     def __init__(self, **kwargs):
@@ -92,10 +92,7 @@ class PointMassEKF(Kite):
             self.uf = ca.SX.sym("uf")  # Friction velocity
             self.wdir = ca.SX.sym("wdir")  # Ground wind direction
             self.vwz = ca.SX.sym("vw_2")  # Vertical wind velocity
-            self.wvel = self.uf / kappa * ca.log(self.r[2] / z0)
-            self.vw = ca.vertcat(
-                self.wvel * ca.cos(self.wdir), self.wvel * ca.sin(self.wdir), self.vwz
-            )
+            self.vw = calculate_log_wind_velocity(self.uf, self.wdir, self.vwz, self.r[2])
             self.vw_state = ca.vertcat(self.uf, self.wdir, self.vwz)
         else:
             self.vw = ca.SX.sym("vw", 3)  # Wind velocity

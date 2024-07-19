@@ -160,12 +160,6 @@ def calculate_polar_coordinates(r):
     return el, az, r_mod
 
 
-def calculate_vw_loglaw(uf, z0, z, wdir, kappa=0.4, vz=0):
-    wvel = uf / kappa * np.log(z / z0)
-    vw = np.array([wvel * np.cos(wdir), wvel * np.sin(wdir), vz])
-    return vw
-
-
 def calculate_airflow_angles(dcm, apparent_wind_speed):
     ey_kite = dcm[:, 1]  # Kite y axis perpendicular to v and tether
     ez_kite = dcm[:, 2]  # Kite z axis pointing in the direction of the tension
