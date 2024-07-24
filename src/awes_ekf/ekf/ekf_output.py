@@ -43,7 +43,9 @@ class EKFOutput:
     kcu_yaw: float = None # Orientation of the first tether element below KCU
     tether_offset: float = None # [m] distance between the kite and the tether
     tether_force_kite: float = None # [N]
-
+    nis: float = None           # Normalized innovation squared
+    mahalanobis_distance: float = None  # Mahalanobis distance
+    norm_epsilon_norm: float = None  # Norm of the normalized residuals
 
 def create_ekf_output(x, u, ekf_input, tether, kite, simConfig):
     """Store results in a list of instances of the class EKFOutput"""
