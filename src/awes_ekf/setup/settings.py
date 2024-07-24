@@ -27,6 +27,7 @@ class SimulationConfig:
         self.enforce_z_wind = kwargs.get("enforce_z_wind", False)
         self.model_yaw = kwargs.get("model_yaw", False)
         self.thrust_force = kwargs.get("thrust_force", False)
+        self.debug = kwargs.get("debug", False)
         measurements = kwargs.get("measurements", {})
         self.obsData = ObservationData(**measurements)
 

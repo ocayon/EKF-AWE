@@ -77,6 +77,10 @@ def update_state_ekf_tether(ekf, tether, kite, kcu, ekf_input, simConfig):
     ekf_output = create_ekf_output(
         ekf.x_k1_k1, ekf.u, ekf_input, tether, kite, simConfig
     )
+    if simConfig.debug:
+        for key, value in ekf.debug_info.items():
+            ekf_output.__dict__[key] = value
+
 
     return ekf, ekf_output
 

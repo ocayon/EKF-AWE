@@ -3,13 +3,13 @@ month: '10'                         # Month of the flight
 day: '08'                           # Day of the flight
 
 simulation_parameters:
+  debug: true                      # Debug mode
   timestep: 0.1                       # Timestep in seconds
   n_tether_elements: 10                # Number of tether elements
   doIEKF: true                        # Use iterated extended Kalman filter
   epsilon: 1e-6                       # Tolerance for the IEKF
   max_iterations: 200                 # Maximum number of iterations for the IEKF
   log_profile: false                   # Model wind speed as logarithmic with height
-  tether_offset: true                 # Use tether offset in the measurements
   enforce_z_wind: true               # Enforce the z wind speed to be zero
   model_yaw: false                   # Model the yaw angle in the state vector
 

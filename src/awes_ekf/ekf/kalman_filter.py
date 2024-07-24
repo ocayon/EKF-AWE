@@ -117,6 +117,8 @@ class ExtendedKalmanFilter:
         self.std_x_cor = np.sqrt(
             np.diag(self.P_k1_k1)
         )  # standard deviation of state estimation error (for validation)
+        if self.simConfig.debug:
+            self.debug_info = self._output_debug_info()
 
     def get_state_noise_covariance(self, stdv_x, simConfig):
         Q = np.diag(np.array(stdv_x) ** 2)
@@ -163,6 +165,26 @@ class ExtendedKalmanFilter:
 
         self.z = z
 
+    def _output_debug_info(self):
+        epsilon = self.z - self.z_k1_k
+        epsilon_norm = epsilon / np.sqrt(np.diag(self.P_zz))
+        nis = epsilon.T @ np.linalg.inv(self.P_zz) @ epsilon
+        mahalanobis_distance = np.sqrt(nis)
+        norm_epsilon_norm = np.linalg.norm(epsilon_norm)
+        
+        debug_info = {
+            "nis": nis,
+            "mahalanobis_distance": mahalanobis_distance,
+            "norm_epsilon_norm": norm_epsilon_norm,
+        }
+        
+        # threshold = 0.3  # Example threshold, should be pre-calculated
+        # if norm_epsilon_norm < threshold:
+        #     debug_info["Threshold Check"] = "Within acceptable threshold"
+        # else:
+        #     debug_info["Threshold Check"] = "Exceeds acceptable threshold"
+        
+        return debug_info
 
 def observability_Lie_method(f, h, x, u, x0, u0):
 
