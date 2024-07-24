@@ -11,7 +11,7 @@ from awes_ekf.ekf.ekf_output import convert_ekf_output_to_df
 from awes_ekf.postprocess.postprocessing import postprocess_results
 
 
-config_file_name = "v3_config.yaml"
+config_file_name = "v9_config.yaml"
 
 if __name__ == "__main__":
     
