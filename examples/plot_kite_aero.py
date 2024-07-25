@@ -10,7 +10,7 @@ config_file_name = "v3_config.yaml"
 config = load_config("examples/" + config_file_name)
 
 # Load results and flight data and plot kite reference frame
-results, flight_data = read_results(str(config['year']), str(config['month']), str(config['day']), config['kite']['model_name'])
+results, flight_data = read_results(str(config['year']), str(config['month']), str(config['day']), config['kite']['model_name'], addition="_va")
 
 cycles_plotted = np.arange(6,50, step=1)
 # %% Plot results aerodynamic coefficients
@@ -123,5 +123,12 @@ plt.xlabel('Time (s)')
 plt.ylabel('Speed (m/s)')
 plt.legend()
 plt.title('Kite speed comparison')
+
+#%% Plot apparent wind speed
+fig, ax = plt.subplots(1, 1, figsize=(10, 5))
+pu.plot_time_series(flight_data,results['apparent_windspeed'],ax, ylabel='Apparent wind speed (m/s)', label='Estimated')
+pu.plot_time_series(flight_data,flight_data['kite_apparent_windspeed'],ax, ylabel='Apparent wind speed (m/s)', label='Measured')
+
+
 plt.show()
 

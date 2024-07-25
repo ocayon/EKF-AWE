@@ -85,6 +85,7 @@ class ObservationModel:
         h = ca.vertcat(r_kite)
         h = ca.vertcat(h, v_kite)
         h = ca.vertcat(h, (r_kite - r_tether_model))
+        # Convert into a for
         if self.simConfig.model_yaw:
             h = ca.vertcat(h, self.x[index_map["yaw"]])
         if self.simConfig.obsData.tether_length:

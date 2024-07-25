@@ -43,6 +43,7 @@ class EKFOutput:
     kcu_yaw: float = None # Orientation of the first tether element below KCU
     tether_offset: float = None # [m] distance between the kite and the tether
     tether_force_kite: float = None # [N]
+    apparent_windspeed: float = None # [m/s]
     nis: float = None           # Normalized innovation squared
     mahalanobis_distance: float = None  # Mahalanobis distance
     norm_epsilon_norm: float = None  # Norm of the normalized residuals
@@ -108,7 +109,8 @@ def create_ekf_output(x, u, ekf_input, tether, kite, simConfig):
         tether_offset = x[state_index_map["tether_offset"]]
     else:
         tether_offset = None
-
+    
+    apparent_windspeed = np.linalg.norm(vw - v_kite)
     # Create an instance of EKFOutput with unpacked vectors
     ekf_output = EKFOutput(
         kite_pos_x=kite_pos_x,
@@ -138,6 +140,7 @@ def create_ekf_output(x, u, ekf_input, tether, kite, simConfig):
         kcu_yaw=euler_angles1[2],
         tether_offset=tether_offset,
         tether_force_kite=tether_force_kite,
+        apparent_windspeed=apparent_windspeed,
     )
 
     if simConfig.model_yaw:

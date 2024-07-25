@@ -16,15 +16,18 @@ logging.basicConfig(
 # %%
 class ExtendedKalmanFilter:
     def __init__(
-        self, stdv_x, stdv_y, ts, dyn_model, obs_model, kite, tether, kcu, simConfig
-    ):
-        self.Q = self.get_state_noise_covariance(stdv_x, simConfig)
-        self.R = self.get_observation_noise_covariance(stdv_y)
+        self, stdv_dynamic_model, stdv_measurements, ts, dyn_model, obs_model, kite, tether, kcu, simConfig
+    ):  
+        self.simConfig = simConfig
+        self.stdv_dynamic_model = stdv_dynamic_model
+        self.stdv_measurements = stdv_measurements
+        self.Q = self.get_state_noise_covariance(stdv_dynamic_model, simConfig)
+        self.R = self.get_observation_noise_covariance(stdv_measurements)
         self.doIEKF = simConfig.doIEKF
         self.epsilon = simConfig.epsilon
         self.max_iterations = simConfig.max_iterations
         self.ts = ts
-        self.n = len(stdv_x)
+        self.n = len(stdv_dynamic_model)
         self.P_k1_k1 = np.eye(self.n) * 1**2
         self.simConfig = simConfig
 
@@ -36,6 +39,35 @@ class ExtendedKalmanFilter:
         self.calc_Fx = self.dyn_model.get_fx_jac_fun()
         self.calc_Hx = self.obs_model.get_hx_jac_fun(kite, tether, kcu)
         self.calc_hx = self.obs_model.get_hx_fun(kite, tether, kcu)
+    
+    @property
+    def obs_model(self):
+        return self._obs_model
+    
+    @obs_model.setter
+    def obs_model(self, obs_model):
+        self._obs_model = obs_model
+        self.calc_Hx = obs_model.get_hx_jac_fun(self.kite, self.tether, self.kcu)
+        self.calc_hx = obs_model.get_hx_fun(self.kite, self.tether, self.kcu)
+
+    @property
+    def stdv_dynamic_model(self):
+        return self._stdv_dynamic_model
+    
+    @stdv_dynamic_model.setter
+    def stdv_dynamic_model(self, value):
+        self.Q = self.get_state_noise_covariance(value, self.simConfig)
+        self.n = len(value)
+        self.P_k1_k1 = np.eye(self.n) * 1**2
+
+    @property
+    def stdv_measurements(self):
+        return self._stdv_measurements
+    
+    @stdv_measurements.setter
+    def stdv_measurements(self, value):
+        self.R = self.get_observation_noise_covariance(value)
+
 
     def predict(self):
 
@@ -128,12 +160,12 @@ class ExtendedKalmanFilter:
         if self.simConfig.debug:
             self.debug_info = self._output_debug_info()
 
-    def get_state_noise_covariance(self, stdv_x, simConfig):
-        Q = np.diag(np.array(stdv_x) ** 2)
+    def get_state_noise_covariance(self, stdv_dynamic_model, simConfig):
+        Q = np.diag(np.array(stdv_dynamic_model) ** 2)
         return Q
 
-    def get_observation_noise_covariance(self, stdv_y):
-        return np.diag(np.array(stdv_y) ** 2)
+    def get_observation_noise_covariance(self, stdv_measurements):
+        return np.diag(np.array(stdv_measurements) ** 2)
 
     def update_input_vector(self, input_class):
         input = np.array([input_class.reelout_speed, input_class.tether_force])

@@ -7,11 +7,11 @@ from awes_ekf.load_data.save_data import save_results
 from awes_ekf.setup.kite import PointMassEKF
 from awes_ekf.setup.tether import Tether
 from awes_ekf.setup.kcu import KCU
-from awes_ekf.ekf.ekf_output import convert_ekf_output_to_df
+from awes_ekf.ekf.ekf_output import convert_ekf_output_to_df, EKFOutput
 from awes_ekf.postprocess.postprocessing import postprocess_results
 
 
-config_file_name = "v9_config.yaml"
+config_file_name = "v3_config.yaml"
 
 if __name__ == "__main__":
     
@@ -28,8 +28,8 @@ if __name__ == "__main__":
     
     flight_data = read_processed_flight_data(year, month, day, kite_model)
 
-    # flight_data = flight_data.iloc[:10000]
-    # flight_data.reset_index(drop=True, inplace=True)
+    flight_data = flight_data.iloc[:10000]
+    flight_data.reset_index(drop=True, inplace=True)
 
     # %% Initialize EKF
     simConfig = SimulationConfig(**config_data["simulation_parameters"])
@@ -53,14 +53,15 @@ if __name__ == "__main__":
     # Find initial state vector
     x0 = find_initial_state_vector(tether,ekf_input_list[0],simConfig)
     print(x0)
-    ekf = initialize_ekf(
-        ekf_input_list[0], simConfig, tuningParams, x0, kite, kcu, tether
+    ekf, ekf_input_list = initialize_ekf(
+        ekf_input_list, simConfig, tuningParams, x0, kite, kcu, tether
     )
 
     # %% Main loop
     ekf_output_list = []  # List of instances of EKFOutput
     start_time = time.time()
     mins = -1
+    #TODO: Add a timeseries class
     for k, ekf_input in enumerate(ekf_input_list):
         try :
             ekf, ekf_ouput = propagate_state_EKF(
