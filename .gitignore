@@ -14,4 +14,4 @@ examples/v9_config.yaml
 examples/kft_config.yaml
 venv/
 processed_data/
-ekf_debug.log
+./ekf_debug.log
