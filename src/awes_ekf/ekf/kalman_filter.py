@@ -3,6 +3,14 @@ import casadi as ca
 from awes_ekf.setup.settings import kappa, z0, rho, g
 import control
 from awes_ekf.utils import project_onto_plane, calculate_angle_2vec
+import logging
+
+# Set up logging
+logging.basicConfig(
+    filename="ekf_debug.log",
+    level=logging.DEBUG,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
 
 
 # %%
@@ -148,6 +156,7 @@ class ExtendedKalmanFilter:
         z = np.append(z, input_class.kite_pos)
         z = np.append(z, input_class.kite_vel)
         z = np.append(z, np.zeros(3))  # Add zeros for the least-squares problem
+        # TODO: Convert this into dict to loop through and avoid hardcoding
         if simConfig.model_yaw:
             z = np.append(z, input_class.kite_yaw)
         if simConfig.obsData.tether_length:
@@ -173,18 +182,25 @@ class ExtendedKalmanFilter:
         norm_epsilon_norm = np.linalg.norm(epsilon_norm)
         
         debug_info = {
+            "norm_epsilon_norm": norm_epsilon_norm,
             "nis": nis,
             "mahalanobis_distance": mahalanobis_distance,
-            "norm_epsilon_norm": norm_epsilon_norm,
         }
-        
-        # threshold = 0.3  # Example threshold, should be pre-calculated
-        # if norm_epsilon_norm < threshold:
-        #     debug_info["Threshold Check"] = "Within acceptable threshold"
-        # else:
-        #     debug_info["Threshold Check"] = "Exceeds acceptable threshold"
-        
+        if self.simConfig.debug:
+            logging.debug(f"Residual (Innovation): {epsilon}")
+            logging.debug(f"Normalized Residual: {epsilon_norm}")
+            logging.debug(f"NIS: {nis}")
+            logging.debug(f"Mahalanobis Distance: {mahalanobis_distance}")
+            logging.debug(f"Norm of Normalized Residual: {norm_epsilon_norm}")
+
+        threshold = 1  # Example threshold, should be pre-calculated
+        if norm_epsilon_norm < threshold:
+            debug_info["exceeds_threshold"] = False
+        else:
+            debug_info["exceeds_threshold"] = True
+
         return debug_info
+
 
 def observability_Lie_method(f, h, x, u, x0, u0):
 
