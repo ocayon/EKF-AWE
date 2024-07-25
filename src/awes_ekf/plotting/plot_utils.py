@@ -57,6 +57,7 @@ def plot_wind_speed(
     EKF_tether=False,
     EKF=True,
     savefig=False,
+    plot_phase=False,
 ):
     """
     Plot wind speed based on kite and KCU IMU data
@@ -171,7 +172,47 @@ def plot_wind_speed(
             alpha=0.8,
         )
         axs[2].plot(flight_data["time"], results["z_wind"], label="EKF", alpha=0.8)
+    if plot_phase:
+        y = results["wind_velocity"]
+        y1 = min(y) - 0.1 * (max(y) - min(y))
+        y2 = max(y) + 0.1 * (max(y) - min(y))
+        mask = (flight_data["turn_straight"] == "straight") & (
+            flight_data["powered"] == "powered"
+        )
+        axs[0].fill_between(
+            flight_data["time"],
+            y1,
+            y2,
+            where=mask,
+            color="blue",
+            alpha=0.2,
+            label="Straight",
+        )
+        mask = (flight_data["turn_straight"] == "turn") & (
+            flight_data["powered"] == "powered"
+        )
+        axs[0].fill_between(
+            flight_data["time"],
+            y1,
+            y2,
+            where=mask,
+            color="red",
+            alpha=0.2,
+            label="Turn",
+        )
+        mask = flight_data["powered"] == "depowered"
+        axs[0].fill_between(
+            flight_data["time"],
+            y1,
+            y2,
+            where=mask,
+            color="green",
+            alpha=0.2,
+            label="Depowered",
+        )
+        axs[0].legend()
 
+        # def plot_wind_profile(flight_data,
     min_wdir = min(flight_data["ground_wind_direction"])
     max_wdir = max(flight_data["ground_wind_direction"])
 
