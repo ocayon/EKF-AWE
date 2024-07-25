@@ -8,6 +8,7 @@ from awes_ekf.setup.settings import kappa, z0
 def calculate_log_wind_velocity(uf, wdir, wvel_z, z):
     wvel = uf / kappa * np.log(z / z0)
     vw = np.array([wvel * np.cos(wdir), wvel * np.sin(wdir), wvel_z])
+    return vw
 
 
 

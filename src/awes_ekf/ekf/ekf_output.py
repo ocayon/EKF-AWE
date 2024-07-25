@@ -85,10 +85,9 @@ def create_ekf_output(x, u, ekf_input, tether, kite, simConfig):
     dcm_b2w = np.array(tether.bridle_frame_va(*args))
     dcm_b2vel = np.array(tether.bridle_frame_vk(*args))
     dcm_t2w = np.array(tether.tether_frame(*args))
-    dcm_b2w = rotate_ENU2NED(dcm_b2w)
-    dcm_t2w = rotate_ENU2NED(dcm_t2w)
-    euler_angles = calculate_euler_from_reference_frame(dcm_b2w)
-    euler_angles1 = calculate_euler_from_reference_frame(dcm_t2w)
+
+    euler_angles = calculate_euler_from_reference_frame(rotate_ENU2NED(dcm_b2w))
+    euler_angles1 = calculate_euler_from_reference_frame(rotate_ENU2NED(dcm_t2w))
     cd_kcu = float(tether.cd_kcu(*args))
     cd_tether = float(tether.cd_tether(*args))
     tether_force_kite = np.linalg.norm(tether.tether_force_kite(*args))

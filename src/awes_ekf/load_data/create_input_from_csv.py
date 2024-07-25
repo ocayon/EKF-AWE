@@ -63,9 +63,10 @@ def create_input_from_csv(
     except:
         apparent_windspeed = np.zeros(n_intervals)
 
-    up = np.array(flight_data["kcu_actual_depower"]) / max(
-        abs(flight_data["kcu_actual_depower"])
-    )
+    if kcu is not None:
+        up = np.array(flight_data["kcu_actual_depower"]) / max(
+            abs(flight_data["kcu_actual_depower"])
+        )
     try:
         kite_aoa = np.array(flight_data["kite_angle_of_attack"])
         kite_aoa_mean_v9 = 10
@@ -116,7 +117,7 @@ def create_input_from_csv(
         )
     except:
         us = np.zeros(n_intervals)
-    timestep = flight_data["time"].iloc[1] - flight_data["time"].iloc[0]
+    timestep = np.gradient(flight_data["time"].values)
 
     # Find initial wind velocity
     uf = init_wind_vel * kappa / np.log(10 / z0)
@@ -145,11 +146,10 @@ def create_input_from_csv(
                 reelout_speed=relout_speed[i],
                 tether_elevation=kite_elevation[i],
                 tether_azimuth=kite_azimuth[i],
-                ts=timestep,
+                ts=timestep[i],
                 kite_yaw=kite_yaw[i],
                 steering_input=us[i],
                 thrust_force=thrust_force[i],
-                depower_input=up[i],
             )
         )
 

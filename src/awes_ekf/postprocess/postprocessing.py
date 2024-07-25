@@ -381,19 +381,23 @@ def calculate_wind_speed_airborne_sensors(results, flight_data, imus=[0]):
 
 
 def determine_turn_straight(row):
-
-    if abs(row["us"]) > 0.5:
-        return "turn"
-    else:
-        return "straight"
+    try:
+        if abs(row["us"]) > 0.5:
+            return "turn"
+        else:
+            return "straight"
+    except:
+        return "none"
 
 
 def determine_powered_depowered(row):
-
-    if row["up"] > 0.6:
-        return "depowered"
-    else:
-        return "powered"
+    try:
+        if row["up"] > 0.6:
+            return "depowered"
+        else:
+            return "powered"
+    except:
+        return "none"
 
 
 def determine_left_right(row):
