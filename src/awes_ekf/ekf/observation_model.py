@@ -34,7 +34,7 @@ class ObservationModel:
             vw = calculate_log_wind_velocity(
                 previous_state_map["uf_0"],
                 previous_state_map["wdir_0"],
-                previous_state_map["vwz_0"],
+                previous_state_map["vw_2_0"],
                 previous_state_map["r_2_0"],
             )
         else:
@@ -67,7 +67,7 @@ class ObservationModel:
             vw = calculate_log_wind_velocity(
                 self.x[index_map["uf"]],
                 self.x[index_map["wdir"]],
-                self.x[index_map["z"]],
+                self.x[index_map["vw_2"]],
                 self.x[index_map["r_2"]],
             )
         else:
