@@ -84,7 +84,7 @@ def remove_offsets_IMU_data(results, flight_data, sensor=0):
     roll_offset = find_offset(
         results["kite_roll"], flight_data["kite_roll_s" + str(sensor)]
     )
-    flight_data["kite_roll_s" + str(sensor)] = (
+    results["kite_roll_s" + str(sensor)] = (
         flight_data["kite_roll_s" + str(sensor)] + roll_offset
     )
     print("Roll offset: ", roll_offset)
@@ -94,7 +94,7 @@ def remove_offsets_IMU_data(results, flight_data, sensor=0):
         results[mask_pitch]["kite_pitch"],
         flight_data[mask_pitch]["kite_pitch_s" + str(sensor)],
     )
-    flight_data["kite_pitch_s" + str(sensor)] = (
+    results["kite_pitch_s" + str(sensor)] = (
         flight_data["kite_pitch_s" + str(sensor)] + pitch_offset
     )
     print("Pitch offset: ", pitch_offset)
@@ -106,7 +106,7 @@ def remove_offsets_IMU_data(results, flight_data, sensor=0):
     yaw_offset = find_offset(
         results["kite_yaw"], flight_data["kite_yaw_s" + str(sensor)]
     )
-    flight_data["kite_yaw_s" + str(sensor)] = (
+    results["kite_yaw_s" + str(sensor)] = (
         flight_data["kite_yaw_s" + str(sensor)] + yaw_offset
     )
     print("Yaw offset: ", yaw_offset)
@@ -326,7 +326,7 @@ def postprocess_results(
 
     if correct_IMU_deformation:
         for imu in imus:
-            flight_data["kite_pitch_s" + str(imu)] = flight_data[
+            results["kite_pitch_s" + str(imu)] = flight_data[
                 "kite_pitch_s" + str(imu)
             ] + (flight_data["offset_pitch_s" + str(imu)])
 

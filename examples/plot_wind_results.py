@@ -10,7 +10,7 @@ config_file_name = "v3_config.yaml"
 config = load_config("examples/" + config_file_name)
 # Initialize EKF
 # Load results and flight data and plot kite reference frame
-results, flight_data = read_results(str(config['year']), str(config['month']), str(config['day']), config['kite']['model_name'])
+results, flight_data = read_results(str(config['year']), str(config['month']), str(config['day']), config['kite']['model_name'], addition="_va")
 
 #%%Plot results wind speed
 
