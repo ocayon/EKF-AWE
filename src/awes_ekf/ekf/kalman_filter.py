@@ -157,8 +157,8 @@ class ExtendedKalmanFilter:
         self.std_x_cor = np.sqrt(
             np.diag(self.P_k1_k1)
         )  # standard deviation of state estimation error (for validation)
-        if self.simConfig.debug:
-            self.debug_info = self._output_debug_info()
+        
+        self.debug_info = self._output_debug_info()
 
     def get_state_noise_covariance(self, stdv_dynamic_model, simConfig):
         Q = np.diag(np.array(stdv_dynamic_model) ** 2)

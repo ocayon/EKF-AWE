@@ -10,7 +10,7 @@ simulation_parameters:
   epsilon: 1e-6                       # Tolerance for the IEKF
   max_iterations: 200                 # Maximum number of iterations for the IEKF
   log_profile: false                   # Model wind speed as logarithmic with height
-  enforce_z_wind: false               # Enforce the z wind speed to be zero
+  enforce_z_wind: true               # Enforce the z wind speed to be zero
   model_yaw: false                   # Model the yaw angle in the state vector
 
   measurements:
@@ -24,7 +24,7 @@ simulation_parameters:
     kcu_pos: false                    # KCU position measurement
     kcu_vel: false                    # KCU velocity measurement
     kcu_acc: false                    # KCU acceleration measurement
-    apparent_windspeed: true         # Apparent wind speed measurement
+    apparent_windspeed: false         # Apparent wind speed measurement
     angle_of_attack: false            # Angle of attack measurement
     angle_of_sideslip: false             # Sideslip angle measurement
     yaw_angle: false                  # Yaw angle measurement

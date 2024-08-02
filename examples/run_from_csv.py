@@ -1,7 +1,10 @@
 import time as time
 from awes_ekf.ekf.initialize_and_update_ekf import initialize_ekf, propagate_state_EKF
 from awes_ekf.load_data.read_data import read_processed_flight_data
-from awes_ekf.load_data.create_input_from_csv import create_input_from_csv, find_initial_state_vector
+from awes_ekf.load_data.create_input_from_csv import (
+    create_input_from_csv,
+    find_initial_state_vector,
+)
 from awes_ekf.setup.settings import load_config, SimulationConfig, TuningParameters
 from awes_ekf.load_data.save_data import save_results
 from awes_ekf.setup.kite import PointMassEKF
@@ -12,35 +15,37 @@ from awes_ekf.postprocess.postprocessing import postprocess_results
 
 
 config_file_name = "v3_config.yaml"
+file_addition = ""
+imus = [0, 1]
 
 if __name__ == "__main__":
-    
-    config_data = load_config("examples/"+config_file_name)
-    #%% Load data
+
+    config_data = load_config("examples/" + config_file_name)
+    # %% Load data
     year = str(config_data["year"])
     month = str(config_data["month"])
     day = str(config_data["day"])
     kite_model = config_data["kite"]["model_name"]
-    remove_IMU_offsets = config_data['postprocess']["remove_IMU_offsets"]
-    correct_IMU_deformation = config_data['postprocess']["correct_IMU_deformation"]
-    remove_vane_offsets = config_data['postprocess']["remove_vane_offsets"]
-    estimate_kite_angle = config_data['postprocess']["estimate_kite_angle"]
-    
+    remove_IMU_offsets = config_data["postprocess"]["remove_IMU_offsets"]
+    correct_IMU_deformation = config_data["postprocess"]["correct_IMU_deformation"]
+    remove_vane_offsets = config_data["postprocess"]["remove_vane_offsets"]
+    estimate_kite_angle = config_data["postprocess"]["estimate_kite_angle"]
+
     flight_data = read_processed_flight_data(year, month, day, kite_model)
 
-    flight_data = flight_data.iloc[:10000]
+    # flight_data = flight_data.iloc[:10000]
     flight_data.reset_index(drop=True, inplace=True)
 
     # %% Initialize EKF
     simConfig = SimulationConfig(**config_data["simulation_parameters"])
 
     # Create system components
-    kite = PointMassEKF(simConfig,**config_data["kite"])
+    kite = PointMassEKF(simConfig, **config_data["kite"])
     if config_data["kcu"]:
         kcu = KCU(**config_data["kcu"])
     else:
         kcu = None
-    tether = Tether(kite,kcu,simConfig.obsData,**config_data["tether"])
+    tether = Tether(kite, kcu, simConfig.obsData, **config_data["tether"])
     kite.calc_fx = kite.get_fx_fun(tether)
 
     tuningParams = TuningParameters(config_data["tuning_parameters"], simConfig)
@@ -51,7 +56,7 @@ if __name__ == "__main__":
     )
 
     # Find initial state vector
-    x0 = find_initial_state_vector(tether,ekf_input_list[0],simConfig)
+    x0 = find_initial_state_vector(tether, ekf_input_list[0], simConfig)
     print(x0)
     ekf, ekf_input_list = initialize_ekf(
         ekf_input_list, simConfig, tuningParams, x0, kite, kcu, tether
@@ -61,27 +66,50 @@ if __name__ == "__main__":
     ekf_output_list = []  # List of instances of EKFOutput
     start_time = time.time()
     mins = -1
-    #TODO: Add a timeseries class
+    k_nis = 1000
+    # TODO: Add a timeseries class
     for k, ekf_input in enumerate(ekf_input_list):
-        try :
+        try:
             ekf, ekf_ouput = propagate_state_EKF(
                 ekf, ekf_input, simConfig, tether, kite, kcu
             )
             # Store results
             ekf_output_list.append(ekf_ouput)
-        except:  
+        except:
             try:
-                print('Integration error at iteration: ', k)
+                print("Integration error at iteration: ", k)
                 x0 = find_initial_state_vector(tether, ekf_input, simConfig)
             except:
-                print('Tether model error at iteration: ', k)
-                # continue    
-            ekf = initialize_ekf(
-                ekf_input, simConfig, tuningParams, x0, kite, kcu, tether
+                print("Tether model error at iteration: ", k)
+                x0 = ekf.x_k1_k1
+                # continue
+            ekf, ekf_input_list[k::] = initialize_ekf(
+                ekf_input_list[k::],
+                simConfig,
+                tuningParams,
+                x0,
+                kite,
+                kcu,
+                tether,
+                find_offsets=False,
             )
-            flight_data.drop(k, inplace=True)  
-            # continue                      
-
+            flight_data.drop(k, inplace=True)
+            continue
+                
+        if ekf_ouput.nis > 200:
+            simConfig.obsData.apparent_windspeed = False
+            tuningParams = TuningParameters(config_data["tuning_parameters"], simConfig)
+            ekf.stdv_measurements = tuningParams.stdv_measurements
+            ekf, ekf_input_list[k::] = initialize_ekf(
+                ekf_input_list[k::],
+                simConfig,
+                tuningParams,
+                ekf.x_k1_k1,
+                kite,
+                kcu,
+                tether,
+            )
+            k_nis = k
         # Print progress
         if k % 600 == 0:
             elapsed_time = time.time() - start_time
@@ -91,7 +119,6 @@ if __name__ == "__main__":
                 f"Real time: {mins} minutes.  Elapsed time: {elapsed_time:.2f} seconds"
             )
 
-    
     # Postprocess results
     ekf_output_df = convert_ekf_output_to_df(ekf_output_list)
     ekf_output_df.dropna(subset=["kite_pos_x"], inplace=True)
@@ -107,11 +134,11 @@ if __name__ == "__main__":
         flight_data,
         kite,
         kcu,
-        imus=[0,1],
+        imus=imus,
         remove_IMU_offsets=remove_IMU_offsets,
         correct_IMU_deformation=correct_IMU_deformation,
         remove_vane_offsets=remove_vane_offsets,
         estimate_kite_angle=estimate_kite_angle,
     )
     # %% Store results
-    save_results(ekf_output_df, flight_data, kite_model, year, month, day)
+    save_results(ekf_output_df, flight_data, kite_model, year, month, day, addition=file_addition)

@@ -53,7 +53,7 @@ def initialize_ekf(ekf_input_list, simConfig, tuningParams, x0, kite, kcu, tethe
             if variable in offset_variables and simConfig_copy.obsData.__dict__[variable]:
                 print(f"Finding offset for {variable}")
                 ekf_output_list = []
-                offset_sim_length = int(5*60/simConfig_copy.ts)
+                offset_sim_length = int(10*60/simConfig_copy.ts)
                 ekf_output_list = []
                 simConfig_copy.obsData.__dict__[variable] = False
                 simConfig_copy.enforce_z_wind = True
@@ -82,9 +82,10 @@ def initialize_ekf(ekf_input_list, simConfig, tuningParams, x0, kite, kcu, tethe
                 #TODO: Define universal namings and create timeseries class
                 if variable == "angle_of_attack":
                     variable = "kite_aoa"
+                converged_idx = int(5*60/simConfig_copy.ts)
                 estimated_variable = np.array([ekf_output.__dict__[variable] for ekf_output in ekf_output_list])
                 measured_variable = np.array([ekf_input.__dict__[variable] for ekf_input in ekf_input_list[:offset_sim_length]])
-                offset = find_offset(estimated_variable[1000::], measured_variable[1000::], offset_range=[-15,15])
+                offset = find_offset(estimated_variable[converged_idx::], measured_variable[converged_idx::], offset_range=[-15,15])
                 print(f"Offset for {variable}: {offset}")
 
                 # Update offset
@@ -132,9 +133,9 @@ def update_state_ekf_tether(ekf, tether, kite, kcu, ekf_input, simConfig):
     ekf_output = create_ekf_output(
         ekf.x_k1_k1, ekf.u, ekf_input, tether, kite, simConfig
     )
-    if simConfig.debug:
-        for key, value in ekf.debug_info.items():
-            ekf_output.__dict__[key] = value
+    
+    for key, value in ekf.debug_info.items():
+        ekf_output.__dict__[key] = value
 
 
     return ekf, ekf_output

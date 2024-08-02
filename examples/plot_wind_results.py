@@ -3,15 +3,17 @@ import matplotlib.pyplot as plt
 from awes_ekf.setup.settings import load_config
 from awes_ekf.load_data.read_data import read_results
 import awes_ekf.plotting.plot_utils as pu
+from awes_ekf.plotting.color_palette import get_color_list, visualize_palette, set_plot_style
 
 # Example usage
 plt.close('all')
-config_file_name = "v3_config.yaml"
+config_file_name = "v9_config.yaml"
 config = load_config("examples/" + config_file_name)
 # Initialize EKF
 # Load results and flight data and plot kite reference frame
-results, flight_data = read_results(str(config['year']), str(config['month']), str(config['day']), config['kite']['model_name'], addition="_va")
+results, flight_data = read_results(str(config['year']), str(config['month']), str(config['day']), config['kite']['model_name'], addition="")
 
+set_plot_style()
 #%%Plot results wind speed
 
 pu.plot_wind_speed(results,flight_data,savefig=False) # PLot calculated wind speed against lidar

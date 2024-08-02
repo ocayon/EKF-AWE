@@ -87,9 +87,9 @@ def remove_offsets_IMU_data(results, flight_data, sensor=0):
     results["kite_roll_s" + str(sensor)] = (
         flight_data["kite_roll_s" + str(sensor)] + roll_offset
     )
-    print("Roll offset: ", roll_offset)
+    print("Roll offset: ", np.rad2deg(roll_offset))
     # Pitch
-    mask_pitch = flight_data["powered"] == "powered"
+    mask_pitch = (flight_data["powered"] == "powered")& (abs(flight_data["us"])< 0.4)
     pitch_offset = find_offset(
         results[mask_pitch]["kite_pitch"],
         flight_data[mask_pitch]["kite_pitch_s" + str(sensor)],
@@ -97,7 +97,7 @@ def remove_offsets_IMU_data(results, flight_data, sensor=0):
     results["kite_pitch_s" + str(sensor)] = (
         flight_data["kite_pitch_s" + str(sensor)] + pitch_offset
     )
-    print("Pitch offset: ", pitch_offset)
+    print("Pitch offset: ", np.rad2deg(pitch_offset))
     # Yaw
     unwrapped_angles = np.unwrap(flight_data["kite_yaw_s" + str(sensor)])
     flight_data["kite_yaw_s" + str(sensor)] = unwrapped_angles
@@ -109,9 +109,9 @@ def remove_offsets_IMU_data(results, flight_data, sensor=0):
     results["kite_yaw_s" + str(sensor)] = (
         flight_data["kite_yaw_s" + str(sensor)] + yaw_offset
     )
-    print("Yaw offset: ", yaw_offset)
+    print("Yaw offset: ", np.rad2deg(yaw_offset))
 
-    return flight_data
+    return results,flight_data
 
 
 def normalize_kcu_steering_inputs(flight_data):
@@ -151,6 +151,9 @@ def postprocess_results(
     if kcu is not None:
         flight_data = normalize_kcu_steering_inputs(flight_data)
         flight_data["powered"] = flight_data.apply(determine_powered_depowered, axis=1)
+    # Identify turn - straight and left - right
+    flight_data["turn_straight"] = flight_data.apply(determine_turn_straight, axis=1)
+    flight_data["right_left"] = flight_data.apply(determine_turn_straight, axis=1)
 
     for imu in imus:
         flight_data["kite_pitch_s" + str(imu)] = flight_data["kite_pitch_s" + str(imu)]
@@ -161,7 +164,7 @@ def postprocess_results(
 
     if remove_IMU_offsets:
         for imu in imus:
-            flight_data = remove_offsets_IMU_data(results, flight_data, sensor=imu)
+            results, flight_data = remove_offsets_IMU_data(results, flight_data, sensor=imu)
 
     # Calculate apparent speed based on EKF results
     wvel = results["wind_velocity"]
@@ -308,9 +311,6 @@ def postprocess_results(
     results["omega_r"] = omega_r
     results["kite_elevation"] = kite_elevation
 
-    # Identify turn - straight and left - right
-    flight_data["turn_straight"] = flight_data.apply(determine_turn_straight, axis=1)
-    flight_data["right_left"] = flight_data.apply(determine_turn_straight, axis=1)
 
     if remove_vane_offsets:
         flight_data = correct_aoa_ss_measurements(results, flight_data)
@@ -382,7 +382,7 @@ def calculate_wind_speed_airborne_sensors(results, flight_data, imus=[0]):
 
 def determine_turn_straight(row):
     try:
-        if abs(row["us"]) > 0.5:
+        if abs(row["us"]) > 0.2:
             return "turn"
         else:
             return "straight"

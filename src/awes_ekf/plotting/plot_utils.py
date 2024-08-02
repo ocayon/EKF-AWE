@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from awes_ekf.utils import calculate_reference_frame_euler
 import seaborn as sns
-
+from awes_ekf.plotting.color_palette import get_color_list, get_color
 
 def find_turn_law(flight_data):
 
@@ -63,7 +63,7 @@ def plot_wind_speed(
     :param flight_data: flight data
     :return: wind speed plot
     """
-    palette = sns.color_palette("tab10")
+    palette = get_color_list()
     fig, axs = plt.subplots(3, 1, figsize=(6, 8), sharex=True)
 
     i = 1
@@ -230,7 +230,7 @@ def plot_wind_speed_height_bins(results, flight_data, lidar_heights=[], savefig=
     :param flight_data: flight data
     :return: wind speed plot
     """
-    palette = sns.color_palette("tab10")
+    palette = get_color_list()
     fig, axs = plt.subplots(3, 1, figsize=(8, 10), sharex=True)
 
     wvel = results["wind_velocity"]
@@ -373,7 +373,7 @@ def plot_aero_coeff_vs_aoa_ss(
     :param flight_data: flight data
     :return: wind speed plot
     """
-    palette = sns.color_palette("tab10")
+    palette = get_color_list()
     fig, axs = plt.subplots(5, 1, figsize=(12, 10), sharex=True)
     fig.suptitle("Aero coefficients vs aoa and ss")
 
@@ -556,7 +556,7 @@ def plot_aero_coeff_vs_up_us(
     :param flight_data: flight data
     :return: wind speed plot
     """
-    palette = sns.color_palette("tab10")
+    palette = get_color_list()
     fig, axs = plt.subplots(5, 1, figsize=(20, 12), sharex=True)
     fig.suptitle("Aero coefficients vs up and us")
     mask_cycle = np.any(
@@ -860,7 +860,7 @@ def plot_time_series(
 # def plot_kinematic_yaw(flight_data, results):
 def plot_wind_profile(flight_data, results, savefig=False):
 
-    palette = sns.color_palette("tab10")
+    palette = get_color_list()
     fig, axs = plt.subplots(1, 2, figsize=(10, 5), sharey=True)
 
     i = 1
@@ -982,8 +982,8 @@ def plot_wind_profile_bins(flight_data, results, step=20, savefig=False):
         bin_centers,
         xerr=wvel_stds,
         fmt="o-",
-        color="#00B8C8",
-        ecolor="lightgray",
+        color=get_color("Blue"),
+        ecolor=get_color("Blue", alpha=0.5),
         elinewidth=3,
         capsize=0,
         label="EKF ± SD",
@@ -993,8 +993,8 @@ def plot_wind_profile_bins(flight_data, results, step=20, savefig=False):
         lidar_heights,
         xerr=std_vel,
         fmt="o-",
-        color="#0076C2",
-        ecolor="gray",
+        color=get_color("Light Gray"),
+        ecolor=get_color("Light Gray", alpha=0.5),
         elinewidth=3,
         capsize=0,
         label="Lidar ± SD",
@@ -1010,8 +1010,8 @@ def plot_wind_profile_bins(flight_data, results, step=20, savefig=False):
         bin_centers,
         xerr=wdir_stds,
         fmt="o-",
-        color="#6CC24A",
-        ecolor="lightgray",
+        color=get_color("Blue"),
+        ecolor=get_color("Blue", alpha=0.5),
         elinewidth=3,
         capsize=0,
         label="EKF ± SD",
@@ -1021,8 +1021,8 @@ def plot_wind_profile_bins(flight_data, results, step=20, savefig=False):
         lidar_heights,
         xerr=std_dir,
         fmt="o-",
-        color="#009B77",
-        ecolor="gray",
+        color=get_color("Light Gray"),
+        ecolor=get_color("Light Gray", alpha=0.5),
         elinewidth=3,
         capsize=0,
         label="Lidar ± SD",

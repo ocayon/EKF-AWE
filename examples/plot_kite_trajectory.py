@@ -14,9 +14,9 @@ config = load_config("examples/" + config_file_name)
 # Load results and flight data and plot kite reference frame
 results, flight_data = read_results(str(config['year']), str(config['month']), str(config['day']), config['kite']['model_name'])
 
-mask = (flight_data.cycle == 65)
+mask = (flight_data.cycle == 20)
 # mask = (flight_data.index > 1000)
-mask = (flight_data.time > 10)
+# mask = (flight_data.time > 10)
 flight_data = flight_data[mask]
 results = results[mask]
 # Calculate variables and vectors for plotting
@@ -31,7 +31,7 @@ for i in np.arange(0, len(flight_data)):
     )
     ex.append(dcm[:, 0])
 
-label_variables = [['kite_velocity'], ['CL'], ['Tether_force'], ["Mechanic power"],['us'],['up']]
+label_variables = [['kite_velocity'], ['cl_wing'], ['Tether_force'], ["Mechanic power"],['us'],['up']]
 t = flight_data['time'].values
 x = results['kite_pos_x'].values
 y = results['kite_pos_y'].values
@@ -39,7 +39,7 @@ z = results['kite_pos_z'].values
 kite_velocity = np.sqrt(results['kite_vel_x']**2 + results['kite_vel_y']**2 + results['kite_vel_z']**2)
 variables = [
     kite_velocity.values,
-    results['CL'].values,
+    results['cl_wing'].values,
     [flight_data['ground_tether_force'].values],
     [flight_data['ground_tether_force'].values*flight_data['ground_tether_reelout_speed'].values],
     flight_data['us'].values,
