@@ -46,7 +46,8 @@ def visualize_palette():
 
 def set_plot_style():
     """Set the default style for plots using LaTeX."""
-    plt.style.use('seaborn-whitegrid')
+    # plt.style.use('seaborn-whitegrid')
+    plt.style.use('seaborn-v0_8-whitegrid')
     plt.rcParams.update({
         'text.usetex': True,
         'font.family': 'serif',

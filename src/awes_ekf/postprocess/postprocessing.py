@@ -14,7 +14,7 @@ def calculate_offset_pitch_depower_turn(flight_data, results, sensor_index=0):
     Returns:
     dict: Updated flight_data dictionary with 'offset_pitch' key added.
     """
-    mask_turn = abs(flight_data["us"]) > 0.9
+    mask_turn = abs(flight_data["us"]) > 0.8
     mask_dep = flight_data["up"] > 0.6
     pitch_EKF = np.array(results["kite_pitch"])
     pitch_IMU = np.array(flight_data[f"kite_pitch_s{sensor_index}"])
@@ -84,7 +84,7 @@ def remove_offsets_IMU_data(results, flight_data, sensor=0):
     roll_offset = find_offset(
         results["kite_roll"], flight_data["kite_roll_s" + str(sensor)]
     )
-    results["kite_roll_s" + str(sensor)] = (
+    flight_data["kite_roll_s" + str(sensor)] = (
         flight_data["kite_roll_s" + str(sensor)] + roll_offset
     )
     print("Roll offset: ", np.rad2deg(roll_offset))
@@ -94,7 +94,7 @@ def remove_offsets_IMU_data(results, flight_data, sensor=0):
         results[mask_pitch]["kite_pitch"],
         flight_data[mask_pitch]["kite_pitch_s" + str(sensor)],
     )
-    results["kite_pitch_s" + str(sensor)] = (
+    flight_data["kite_pitch_s" + str(sensor)] = (
         flight_data["kite_pitch_s" + str(sensor)] + pitch_offset
     )
     print("Pitch offset: ", np.rad2deg(pitch_offset))
@@ -106,12 +106,12 @@ def remove_offsets_IMU_data(results, flight_data, sensor=0):
     yaw_offset = find_offset(
         results["kite_yaw"], flight_data["kite_yaw_s" + str(sensor)]
     )
-    results["kite_yaw_s" + str(sensor)] = (
+    flight_data["kite_yaw_s" + str(sensor)] = (
         flight_data["kite_yaw_s" + str(sensor)] + yaw_offset
     )
     print("Yaw offset: ", np.rad2deg(yaw_offset))
 
-    return results,flight_data
+    return flight_data
 
 
 def normalize_kcu_steering_inputs(flight_data):
@@ -164,7 +164,7 @@ def postprocess_results(
 
     if remove_IMU_offsets:
         for imu in imus:
-            results, flight_data = remove_offsets_IMU_data(results, flight_data, sensor=imu)
+            flight_data = remove_offsets_IMU_data(results, flight_data, sensor=imu)
 
     # Calculate apparent speed based on EKF results
     wvel = results["wind_velocity"]
@@ -228,7 +228,7 @@ def postprocess_results(
                 flight_data, results, sensor_index=imu
             )
 
-            flight_data["offset_pitch_s" + str(imu)] = offset_dep * flight_data["up"]
+            flight_data["offset_pitch_s" + str(imu)] = offset_dep * flight_data["up"]# + offset_turn * flight_data["us"]
 
     flight_data["cycle"] = np.zeros(len(flight_data))
     cycle_count = 0

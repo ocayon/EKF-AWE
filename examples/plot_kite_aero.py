@@ -8,7 +8,7 @@ from awes_ekf.plotting.color_palette import get_color_list, set_plot_style
 set_plot_style()
 # Example usage
 plt.close("all")
-config_file_name = "v9_config.yaml"
+config_file_name = "v3_config.yaml"
 config = load_config("examples/" + config_file_name)
 
 # Load results and flight data and plot kite reference frame
@@ -17,11 +17,11 @@ results, flight_data = read_results(
     str(config["month"]),
     str(config["day"]),
     config["kite"]["model_name"],
-    addition="",
+    addition="_va",
 )
 
 
-cycles_plotted = np.arange(6, 10, step=1)
+cycles_plotted = np.arange(64, 66, step=1)
 # %% Plot results aerodynamic coefficients
 pu.plot_aero_coeff_vs_aoa_ss(
     results, flight_data, cycles_plotted, IMU_0=False, savefig=False

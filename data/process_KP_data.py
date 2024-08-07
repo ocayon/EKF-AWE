@@ -82,36 +82,29 @@ def process_KP_data(df):
         # Add angular velocity data
         if df["kite_" + str(sensor) + "_yaw_rate"].isnull().all():
             # Differentiate orientation to get angular velocity
-            roll_rate = np.diff(flight_data["kite_roll_s" + str(sensor)]) / dt
-            pitch_rate = np.diff(flight_data["kite_pitch_s" + str(sensor)]) / dt
-            yaw_rate = np.diff(flight_data["kite_yaw_s" + str(sensor)]) / dt
-            # Add the last value as 0 to keep the same length
-            flight_data["kite_roll_rate_s" + str(sensor)] = np.concatenate(
-                (roll_rate, [0])
-            )
-            flight_data["kite_pitch_rate_s" + str(sensor)] = np.concatenate(
-                (pitch_rate, [0])
-            )
-            flight_data["kite_yaw_rate_s" + str(sensor)] = np.concatenate(
-                (yaw_rate, [0])
-            )
+            roll_rate = np.gradient(flight_data["kite_roll_s" + str(sensor)], dt)
+            pitch_rate = np.gradient(flight_data["kite_pitch_s" + str(sensor)], dt)
+            yaw_rate = np.gradient(flight_data["kite_yaw_s" + str(sensor)], dt)
             # Smooth the yaw rate data
             flight_data["kite_roll_rate_s" + str(sensor)] = np.convolve(
-                flight_data["kite_roll_rate_s" + str(sensor)],
-                np.ones(window_size) / window_size,
-                mode="same",
+                roll_rate, np.ones(window_size) / window_size, mode="same"
             )
             flight_data["kite_pitch_rate_s" + str(sensor)] = np.convolve(
-                flight_data["kite_pitch_rate_s" + str(sensor)],
-                np.ones(window_size) / window_size,
-                mode="same",
+                pitch_rate, np.ones(window_size) / window_size, mode="same"
             )
             flight_data["kite_yaw_rate_s" + str(sensor)] = np.convolve(
-                flight_data["kite_yaw_rate_s" + str(sensor)],
-                np.ones(window_size) / window_size,
-                mode="same",
+                yaw_rate, np.ones(window_size) / window_size, mode="same"
             )
-
+        else:
+            flight_data["kite_roll_rate_s" + str(sensor)] = df[
+                "kite_" + str(sensor) + "_roll_rate"
+            ]
+            flight_data["kite_pitch_rate_s" + str(sensor)] = df[
+                "kite_" + str(sensor) + "_pitch_rate"
+            ]
+            flight_data["kite_yaw_rate_s" + str(sensor)] = df[
+                "kite_" + str(sensor) + "_yaw_rate"
+            ]
     # Add the ground station data
     flight_data["ground_tether_force"] = (
         df["ground_tether_force"] * 9.81
@@ -184,6 +177,7 @@ def process_KP_data(df):
         flight_data = pd.concat([flight_data, flight_data_add], axis=1)
 
     return flight_data
+
 
 file_name = []
 model = "v3"

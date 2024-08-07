@@ -671,11 +671,11 @@ def plot_aero_coeff_vs_up_us(
     axs[2].set_ylabel("cs_wing")
     axs[3].set_ylabel("up")
     axs[4].set_ylabel("us")
-    axs[0].grid()
-    axs[1].grid()
-    axs[2].grid()
-    axs[3].grid()
-    axs[4].grid()
+    # axs[0].grid()
+    # axs[1].grid()
+    # axs[2].grid()
+    # axs[3].grid()
+    # axs[4].grid()
     axs[0].legend()
 
     if savefig:
