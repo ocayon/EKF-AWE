@@ -37,18 +37,18 @@ class ObservationData:
     tether_length: bool = True
     tether_elevation: bool = True
     tether_azimuth: bool = True
-    kite_pos: bool = True
-    kite_vel: bool = True
+    kite_position: bool = True
+    kite_velocity: bool = True
     tether_force: bool = True
-    kite_acc: bool = False
-    kcu_pos: bool = False
-    kcu_acc: bool = False
-    kcu_vel: bool = False
-    apparent_windspeed: bool = False
-    angle_of_attack: bool = False
-    angle_of_sideslip: bool = False
-    yaw_angle: bool = False
-    thrust_force: bool = False
+    kite_acceleration: bool = False
+    kcu_position: bool = False
+    kcu_acceleration: bool = False
+    kcu_velocity: bool = False
+    kite_apparent_windspeed: bool = False
+    kite_angle_of_attack: bool = False
+    kite_angle_of_sideslip: bool = False
+    kite_yaw_angle: bool = False
+    kite_thrust_force: bool = False
 
 
 class TuningParameters:
@@ -127,9 +127,9 @@ class TuningParameters:
             stdv_y.append(self.dict_meas_stdv["tether_azimuth"])
         if simConfig.enforce_z_wind:
             stdv_y.append(self.dict_meas_stdv["z_wind"])
-        if simConfig.obsData.apparent_windspeed:
+        if simConfig.obsData.kite_apparent_windspeed:
             stdv_y.append(self.dict_meas_stdv["va"])
-        if simConfig.obsData.angle_of_attack:
+        if simConfig.obsData.kite_angle_of_attack:
             stdv_y.append(self.dict_meas_stdv["aoa"])
 
         self.stdv_measurements = np.array(stdv_y)

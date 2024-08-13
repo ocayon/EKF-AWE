@@ -143,7 +143,7 @@ def update_state_ekf_tether(ekf, tether, kite, kcu, ekf_input, simConfig):
 
 def propagate_state_EKF(ekf, ekf_input, simConfig, tether, kite, kcu):
     # Predict step
-    ekf.x_k1_k = kite.propagate(ekf.x_k1_k1, ekf.u, ekf_input.ts)
+    ekf.x_k1_k = kite.propagate(ekf.x_k1_k1, ekf.u, ekf_input.timestep)
 
     ## Update step
     ekf, ekf_ouput = update_state_ekf_tether(

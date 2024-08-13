@@ -49,13 +49,13 @@ class ObservationModel:
             v_kite,
             vw,
         )
-        if self.simConfig.obsData.kite_acc:
+        if self.simConfig.obsData.kite_acceleration:
             a_kite = np.array([input_map[f"a_kite_{i}"] for i in range(3)])
             args += (a_kite,)
-        if self.simConfig.obsData.kcu_acc:
+        if self.simConfig.obsData.kcu_acceleration:
             a_kcu = np.array([input_map[f"a_kcu_{i}"] for i in range(3)])
             args += (a_kcu,)
-        if self.simConfig.obsData.kcu_vel:
+        if self.simConfig.obsData.kcu_velocity:
             v_kcu = np.array([input_map[f"v_kcu_{i}"] for i in range(3)])
             args += (v_kcu,)
 
@@ -96,9 +96,9 @@ class ObservationModel:
             h = ca.vertcat(h, self.x[index_map["azimuth_first_tether_element"]])
         if self.simConfig.enforce_z_wind:
             h = ca.vertcat(h, self.x[index_map["vw_2"]])
-        if self.simConfig.obsData.apparent_windspeed:
+        if self.simConfig.obsData.kite_apparent_windspeed:
             h = ca.vertcat(h, ca.norm_2(va))
-        if self.simConfig.obsData.angle_of_attack:
+        if self.simConfig.obsData.kite_angle_of_attack:
             h = ca.vertcat(h, airflow_angles[0])
 
         return h

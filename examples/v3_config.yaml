@@ -14,20 +14,20 @@ simulation_parameters:
   model_yaw: false                   # Model the yaw angle in the state vector
 
   measurements:
-    kite_pos: true                   # Kite position measurement
-    kite_vel: true                   # Kite velocity measurement
-    kite_acc: true                   # Kite acceleration measurement
+    kite_position: true                   # Kite position measurement
+    kite_velocity: true                   # Kite velocity measurement
+    kite_acceleration: true                   # Kite acceleration measurement
     tether_force: true               # Tether force measurement
     tether_length: true              # Tether length measurement
     tether_elevation: false           # Tether elevation angle measurement
     tether_azimuth: false             # Tether azimuth angle measurement
-    kcu_pos: false                    # KCU position measurement
-    kcu_vel: false                    # KCU velocity measurement
-    kcu_acc: false                    # KCU acceleration measurement
-    apparent_windspeed: false         # Apparent wind speed measurement
-    angle_of_attack: false            # Angle of attack measurement
-    angle_of_sideslip: false             # Sideslip angle measurement
-    yaw_angle: false                  # Yaw angle measurement
+    kcu_position: false                    # KCU position measurement
+    kcu_velocity: false                    # KCU velocity measurement
+    kcu_acceleration: false                    # KCU acceleration measurement
+    kite_apparent_windspeed: false         # Apparent wind speed measurement
+    kite_angle_of_attack: false            # Angle of attack measurement
+    kite_angle_of_sideslip: false             # Sideslip angle measurement
+    kite_yaw_angle: false                  # Yaw angle measurement
 
 kite:
   model_name: 'v3'                # Kite model

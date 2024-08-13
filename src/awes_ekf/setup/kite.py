@@ -100,16 +100,16 @@ class PointMassEKF(Kite):
 
     def get_input(self):
         input = ca.vertcat(self.reelout_speed, self.Ftg)
-        if self.simConfig.obsData.kite_acc:
+        if self.simConfig.obsData.kite_acceleration:
             self.a_kite = ca.SX.sym("a_kite", 3)  # Kite acceleration
             input = ca.vertcat(input, self.a_kite)
-        if self.simConfig.obsData.kcu_acc:
+        if self.simConfig.obsData.kcu_acceleration:
             self.a_kcu = ca.SX.sym("a_kcu", 3)  # KCU acceleration
             input = ca.vertcat(input, self.a_kcu)
-        if self.simConfig.obsData.kcu_vel:
+        if self.simConfig.obsData.kcu_velocity:
             self.v_kcu = ca.SX.sym("v_kcu", 3)  # KCU velocity
             input = ca.vertcat(input, self.v_kcu)
-        if self.simConfig.obsData.thrust_force:
+        if self.simConfig.obsData.kite_thrust_force:
             self.thrust = ca.SX.sym("thrust", 3)  # Thrust force
             input = ca.vertcat(input, self.thrust)
         if self.simConfig.model_yaw:
@@ -142,11 +142,11 @@ class PointMassEKF(Kite):
             v_kite,
             vw,
         )
-        if self.simConfig.obsData.kite_acc:
+        if self.simConfig.obsData.kite_acceleration:
             args += (self.a_kite,)
-        if self.simConfig.obsData.kcu_acc:
+        if self.simConfig.obsData.kcu_acceleration:
             args += (self.a_kcu,)
-        if self.simConfig.obsData.kcu_vel:
+        if self.simConfig.obsData.kcu_velocity:
             args += (self.v_kcu,)
 
         tether_force = tether.tether_force_kite(*args)

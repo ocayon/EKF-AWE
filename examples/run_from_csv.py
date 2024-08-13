@@ -75,7 +75,8 @@ if __name__ == "__main__":
             )
             # Store results
             ekf_output_list.append(ekf_ouput)
-        except:
+        except Exception as e:
+            print(e)
             try:
                 print("Integration error at iteration: ", k)
                 x0 = find_initial_state_vector(tether, ekf_input, simConfig)
@@ -121,7 +122,7 @@ if __name__ == "__main__":
 
     # Postprocess results
     ekf_output_df = convert_ekf_output_to_df(ekf_output_list)
-    ekf_output_df.dropna(subset=["kite_pos_x"], inplace=True)
+    ekf_output_df.dropna(subset=["kite_position_x"], inplace=True)
     ekf_output_df.reset_index(drop=True, inplace=True)
     rows_to_keep = ekf_output_df.index
     print(rows_to_keep)

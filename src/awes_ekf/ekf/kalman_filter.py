@@ -168,14 +168,14 @@ class ExtendedKalmanFilter:
         return np.diag(np.array(stdv_measurements) ** 2)
 
     def update_input_vector(self, input_class):
-        input = np.array([input_class.reelout_speed, input_class.tether_force])
-        if self.simConfig.obsData.kite_acc:
-            input = np.concatenate((input, input_class.kite_acc))
-        if self.simConfig.obsData.kcu_acc:
-            input = np.concatenate((input, input_class.kcu_acc))
-        if self.simConfig.obsData.kcu_vel:
-            input = np.concatenate((input, input_class.kcu_vel))
-        if self.simConfig.obsData.thrust_force:
+        input = np.array([input_class.tether_reelout_speed, input_class.tether_force])
+        if self.simConfig.obsData.kite_acceleration:
+            input = np.concatenate((input, input_class.kite_acceleration))
+        if self.simConfig.obsData.kcu_acceleration:
+            input = np.concatenate((input, input_class.kcu_acceleration))
+        if self.simConfig.obsData.kcu_velocity:
+            input = np.concatenate((input, input_class.kcu_velocity))
+        if self.simConfig.obsData.kite_thrust_force:
             input = np.concatenate((input, input_class.thrust_force))
 
         self.u = input
@@ -185,8 +185,8 @@ class ExtendedKalmanFilter:
         z = np.array([])  # Initialize an empty NumPy array
 
         # Append values to the NumPy array
-        z = np.append(z, input_class.kite_pos)
-        z = np.append(z, input_class.kite_vel)
+        z = np.append(z, input_class.kite_position)
+        z = np.append(z, input_class.kite_velocity)
         z = np.append(z, np.zeros(3))  # Add zeros for the least-squares problem
         # TODO: Convert this into dict to loop through and avoid hardcoding
         if simConfig.model_yaw:
@@ -194,14 +194,14 @@ class ExtendedKalmanFilter:
         if simConfig.obsData.tether_length:
             z = np.append(z, input_class.tether_length)
         if simConfig.obsData.tether_elevation:
-            z = np.append(z, input_class.tether_elevation)
+            z = np.append(z, input_class.tether_elevation_ground)
         if simConfig.obsData.tether_azimuth:
-            z = np.append(z, input_class.tether_azimuth)
+            z = np.append(z, input_class.tether_azimuth_ground)
         if simConfig.enforce_z_wind:
             z = np.append(z, 0)
-        if simConfig.obsData.apparent_windspeed:
+        if simConfig.obsData.kite_apparent_windspeed:
             z = np.append(z, input_class.apparent_windspeed)
-        if simConfig.obsData.angle_of_attack:
+        if simConfig.obsData.kite_angle_of_attack:
             z = np.append(z, input_class.kite_aoa)
 
         self.z = z
