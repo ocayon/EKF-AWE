@@ -10,7 +10,7 @@ simulation_parameters:
   epsilon: 1e-6                       # Tolerance for the IEKF
   max_iterations: 200                 # Maximum number of iterations for the IEKF
   log_profile: false                   # Model wind speed as logarithmic with height
-  enforce_z_wind: false               # Enforce the vertical wind speed to be zero (change to )
+  enforce_vertical_wind_to_0: false    # Enforce the vertical wind speed to be zero (If apparent wind speed not measured, recommended to be true)
   model_yaw: false                   # Model the yaw angle in the state vector
 
   measurements:

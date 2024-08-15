@@ -24,7 +24,7 @@ class SimulationConfig:
         self.max_iterations = kwargs.get("max_iterations", 200)
         self.log_profile = kwargs.get("log_profile", False)
         self.tether_offset = kwargs.get("tether_offset", True)
-        self.enforce_z_wind = kwargs.get("enforce_z_wind", False)
+        self.enforce_vertical_wind_to_0 = kwargs.get("enforce_vertical_wind_to_0", False)
         self.model_yaw = kwargs.get("model_yaw", False)
         self.thrust_force = kwargs.get("thrust_force", False)
         self.debug = kwargs.get("debug", False)
@@ -125,7 +125,7 @@ class TuningParameters:
             stdv_y.append(self.dict_meas_stdv["tether_elevation"])
         if simConfig.obsData.tether_azimuth:
             stdv_y.append(self.dict_meas_stdv["tether_azimuth"])
-        if simConfig.enforce_z_wind:
+        if simConfig.enforce_vertical_wind_to_0:
             stdv_y.append(self.dict_meas_stdv["z_wind"])
         if simConfig.obsData.kite_apparent_windspeed:
             stdv_y.append(self.dict_meas_stdv["va"])

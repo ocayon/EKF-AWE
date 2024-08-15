@@ -56,7 +56,7 @@ def initialize_ekf(ekf_input_list, simConfig, tuningParams, x0, kite, kcu, tethe
                 offset_sim_length = int(10*60/simConfig_copy.ts)
                 ekf_output_list = []
                 simConfig_copy.obsData.__dict__[variable] = False
-                simConfig_copy.enforce_z_wind = True
+                simConfig_copy.enforce_vertical_wind_to_0 = True
                 obs_model = ObservationModel(dyn_model.x, dyn_model.u, simConfig_copy, kite, tether, kcu)
                 tuningParams.update_observation_vector(simConfig_copy)
                 ekf_copy.stdv_measurements = tuningParams.stdv_measurements

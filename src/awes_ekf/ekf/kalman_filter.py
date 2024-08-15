@@ -197,7 +197,7 @@ class ExtendedKalmanFilter:
             z = np.append(z, input_class.tether_elevation_ground)
         if simConfig.obsData.tether_azimuth:
             z = np.append(z, input_class.tether_azimuth_ground)
-        if simConfig.enforce_z_wind:
+        if simConfig.enforce_vertical_wind_to_0:
             z = np.append(z, 0)
         if simConfig.obsData.kite_apparent_windspeed:
             z = np.append(z, input_class.kite_apparent_windspeed)
