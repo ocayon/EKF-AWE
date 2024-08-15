@@ -2,6 +2,10 @@
 requires = ["setuptools>=61.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
+# Use flit to build your project if setuptools not working
+# requires = ["flit>=3.4", "wheel"]
+# build-backend = "flit_core.buildapi"
+
 [project]
 name = "awes_ekf"
 version = "1.0.0"
@@ -19,4 +23,5 @@ dependencies = [
     "control",
     "scipy",
     "seaborn",
+    "dataclasses",
 ]
