@@ -3,7 +3,7 @@ month: '10'                         # Month of the flight
 day: '08'                           # Day of the flight
 
 simulation_parameters:
-  debug: true                      # Debug mode
+  debug: false                      # Debug mode
   timestep: 0.1                       # Timestep in seconds
   n_tether_elements: 10                # Number of tether elements
   doIEKF: true                        # Use iterated extended Kalman filter

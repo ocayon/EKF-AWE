@@ -181,7 +181,7 @@ def create_ekf_output(x, u, ekf_input, tether, kite, simConfig):
         tether_roll=euler_angles1[0],
         tether_pitch=euler_angles1[1],
         tether_yaw=euler_angles1[2],
-        tether_offset=tether_offset,
+        tether_length_offset=tether_offset,
         tether_force_kite=tether_force_kite,
         kite_apparent_windspeed=kite_apparent_windspeed,
     )

@@ -17,9 +17,13 @@ def calculate_offset_pitch_depower_turn(flight_data, results, sensor_index=0, pr
     """
     mask_turn = abs(flight_data["us"]) > 0.8
     mask_dep = flight_data["up"] > 0.6
+    pitch_IMU = np.array(flight_data[f"{prefix}_pitch_{sensor_index}"])
+    
+    if prefix == "kcu":
+        prefix = "tether"
 
     pitch_EKF = np.array(results[f"{prefix}_pitch"])
-    pitch_IMU = np.array(flight_data[f"{prefix}_pitch_{sensor_index}"])
+    
 
     offset_dep = np.mean(pitch_EKF[mask_dep] - pitch_IMU[mask_dep])
     offset_turn = np.mean(pitch_EKF[mask_turn] - pitch_IMU[mask_turn])
@@ -80,12 +84,16 @@ def construct_transformation_matrix(e_x_b, e_y_b, e_z_b):
 def remove_offsets_IMU_data(results, flight_data, sensor=0, prefix="kite"):
     """Remove offsets of IMU euler angles based on EKF results"""
 
+    if prefix == "kcu":
+        prefix_results = "tether"
+    else:
+        prefix_results = prefix
     # Roll
     roll_column = f"{prefix}_roll_{sensor}"
     unwrapped_angles = np.unwrap(flight_data[roll_column])
     flight_data[roll_column] = unwrapped_angles
     roll_offset = find_offset(
-        results[f"{prefix}_roll"], flight_data[roll_column]
+        results[f"{prefix_results}_roll"], flight_data[roll_column]
     )
     flight_data[roll_column] = flight_data[roll_column] + roll_offset
     print("Roll offset: ", np.rad2deg(roll_offset))
@@ -94,7 +102,7 @@ def remove_offsets_IMU_data(results, flight_data, sensor=0, prefix="kite"):
     pitch_column = f"{prefix}_pitch_{sensor}"
     mask_pitch = (flight_data["powered"] == "powered") & (abs(flight_data["us"]) < 0.4)
     pitch_offset = find_offset(
-        results[mask_pitch][f"{prefix}_pitch"],
+        results[mask_pitch][f"{prefix_results}_pitch"],
         flight_data[mask_pitch][pitch_column],
     )
     flight_data[pitch_column] = flight_data[pitch_column] + pitch_offset
@@ -104,10 +112,10 @@ def remove_offsets_IMU_data(results, flight_data, sensor=0, prefix="kite"):
     yaw_column = f"{prefix}_yaw_{sensor}"
     unwrapped_angles = np.unwrap(flight_data[yaw_column])
     flight_data[yaw_column] = unwrapped_angles
-    unwrapped_angles = np.unwrap(results[f"{prefix}_yaw"])
-    results[f"{prefix}_yaw"] = unwrapped_angles
+    unwrapped_angles = np.unwrap(results[f"{prefix_results}_yaw"])
+    results[f"{prefix_results}_yaw"] = unwrapped_angles
     yaw_offset = find_offset(
-        results[f"{prefix}_yaw"], flight_data[yaw_column]
+        results[f"{prefix_results}_yaw"], flight_data[yaw_column]
     )
     flight_data[yaw_column] = flight_data[yaw_column] + yaw_offset
     print("Yaw offset: ", np.rad2deg(yaw_offset))

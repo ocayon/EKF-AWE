@@ -41,11 +41,11 @@ class ProcessKpData:
         valid_sensors = [sensor for sensor in sensors if sensor is not None]
 
         for sensor in valid_sensors:
-            if f"{prefix}_{sensor}_vy" in log.columns:
+            if f"kite_{sensor}_vy" in log.columns:
                 # Velocity data
-                fused_velocity_x += log[f"{prefix}_{sensor}_vy"]
-                fused_velocity_y += log[f"{prefix}_{sensor}_vx"]
-                fused_velocity_z += -log[f"{prefix}_{sensor}_vz"]
+                fused_velocity_x += log[f"kite_{sensor}_vy"]
+                fused_velocity_y += log[f"kite_{sensor}_vx"]
+                fused_velocity_z += -log[f"kite_{sensor}_vz"]
 
         if not valid_sensors:
             return fused_data
@@ -67,10 +67,10 @@ class ProcessKpData:
         accelerations_z = []
 
         for sensor in valid_sensors:
-            if f"{prefix}_{sensor}_ay" in log.columns and not log[f"{prefix}_{sensor}_ay"].isnull().all():
-                accelerations_x.append(log[f"{prefix}_{sensor}_ay"])
-                accelerations_y.append(log[f"{prefix}_{sensor}_ax"])
-                accelerations_z.append(-log[f"{prefix}_{sensor}_az"])
+            if f"kite_{sensor}_ay" in log.columns and not log[f"kite_{sensor}_ay"].isnull().all():
+                accelerations_x.append(log[f"kite_{sensor}_ay"])
+                accelerations_y.append(log[f"kite_{sensor}_ax"])
+                accelerations_z.append(-log[f"kite_{sensor}_az"])
 
         if accelerations_x:
             # If there are valid accelerations, average them
@@ -82,7 +82,7 @@ class ProcessKpData:
             ax = np.gradient(fused_velocity_x, dt)
             ay = np.gradient(fused_velocity_y, dt)
             az = np.gradient(fused_velocity_z, dt)
-
+            
             # Smooth the acceleration data
             fused_acceleration_x = np.convolve(ax, np.ones(window_size) / window_size, mode="same")
             fused_acceleration_y = np.convolve(ay, np.ones(window_size) / window_size, mode="same")
@@ -104,12 +104,12 @@ class ProcessKpData:
 
         for sensor in valid_sensors:
             # Euler angles data
-            flight_data[f"{prefix}_pitch_{sensor}"] = np.deg2rad(log[f"{prefix}_{sensor}_pitch"])
-            flight_data[f"{prefix}_roll_{sensor}"] = np.deg2rad(log[f"{prefix}_{sensor}_roll"])
-            flight_data[f"{prefix}_yaw_{sensor}"] = np.deg2rad(log[f"{prefix}_{sensor}_yaw"])
+            flight_data[f"{prefix}_pitch_{sensor}"] = np.deg2rad(log[f"kite_{sensor}_pitch"])
+            flight_data[f"{prefix}_roll_{sensor}"] = np.deg2rad(log[f"kite_{sensor}_roll"])
+            flight_data[f"{prefix}_yaw_{sensor}"] = np.deg2rad(log[f"kite_{sensor}_yaw"])
 
             # Angular velocity data
-            if log[f"{prefix}_{sensor}_yaw_rate"].isnull().all():
+            if log[f"kite_{sensor}_yaw_rate"].isnull().all():
                 dt = log["time"].iloc[1] - log["time"].iloc[0]
                 roll_rate = np.gradient(flight_data[f"{prefix}_roll_{sensor}"], dt)
                 pitch_rate = np.gradient(flight_data[f"{prefix}_pitch_{sensor}"], dt)
@@ -127,9 +127,9 @@ class ProcessKpData:
                     yaw_rate, np.ones(window_size) / window_size, mode="same"
                 )
             else:
-                flight_data[f"{prefix}_roll_rate_{sensor}"] = log[f"{prefix}_{sensor}_roll_rate"]
-                flight_data[f"{prefix}_pitch_rate_{sensor}"] = log[f"{prefix}_{sensor}_pitch_rate"]
-                flight_data[f"{prefix}_yaw_rate_{sensor}"] = log[f"{prefix}_{sensor}_yaw_rate"]
+                flight_data[f"{prefix}_roll_rate_{sensor}"] = log[f"kite_{sensor}_roll_rate"]
+                flight_data[f"{prefix}_pitch_rate_{sensor}"] = log[f"kite_{sensor}_pitch_rate"]
+                flight_data[f"{prefix}_yaw_rate_{sensor}"] = log[f"kite_{sensor}_yaw_rate"]
 
     def process_KP_data(self, log: pd.DataFrame) -> pd.DataFrame:
         # Smooth radius
