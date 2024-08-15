@@ -14,23 +14,23 @@ def create_input_from_csv(
     # Kite measurements
     kite_position = np.array(
         [
-            flight_data["kite_position_east"],
-            flight_data["kite_position_north"],
-            flight_data["kite_position_up"],
+            flight_data["kite_position_x"],
+            flight_data["kite_position_y"],
+            flight_data["kite_position_z"],
         ]
     ).T
     kite_velocity = np.array(
         [
-            flight_data["kite_velocity_east_s" + str(kite_sensor)],
-            flight_data["kite_velocity_north_s" + str(kite_sensor)],
-            flight_data["kite_velocity_up_s" + str(kite_sensor)],
+            flight_data["kite_velocity_x"],
+            flight_data["kite_velocity_y"],
+            flight_data["kite_velocity_z"],
         ]
     ).T
     kite_acceleration = np.array(
         [
-            flight_data["kite_acceleration_east_s" + str(kite_sensor)],
-            flight_data["kite_acceleration_north_s" + str(kite_sensor)],
-            flight_data["kite_acceleration_up_s" + str(kite_sensor)],
+            flight_data["kite_acceleration_x"],
+            flight_data["kite_acceleration_y"],
+            flight_data["kite_acceleration_z"],
         ]
     ).T
 
@@ -38,33 +38,35 @@ def create_input_from_csv(
     if kcu_sensor is not None:
         kcu_velocity = np.array(
             [
-                flight_data["kite_velocity_east_s" + str(kcu_sensor)],
-                flight_data["kite_velocity_north_s" + str(kcu_sensor)],
-                flight_data["kite_velocity_up_s" + str(kcu_sensor)],
+                flight_data["kcu_velocity_x"],
+                flight_data["kcu_velocity_y"],
+                flight_data["kcu_velocity_z"],
             ]
         ).T
         kcu_acceleration = np.array(
             [
-                flight_data["kite_acceleration_east_s" + str(kcu_sensor)],
-                flight_data["kite_acceleration_north_s" + str(kcu_sensor)],
-                flight_data["kite_acceleration_up_s" + str(kcu_sensor)],
+                flight_data["kcu_acceleration_x"],
+                flight_data["kcu_acceleration_y"],
+                flight_data["kcu_acceleration_z"],
             ]
         ).T
     else:
+        print("No KCU sensor found")
         kcu_velocity = np.zeros((n_intervals, 3))
         kcu_acceleration = np.zeros((n_intervals, 3))
 
     # Tether measurements
     tether_force = np.array(flight_data["ground_tether_force"])
-    tether_length = np.array(flight_data["ground_tether_length"])
+    tether_length = np.array(flight_data["tether_length"])
 
     # Airflow measurements
-    ground_windspeed = np.array(flight_data["ground_wind_velocity"])
+    ground_windspeed = np.array(flight_data["ground_wind_speed"])
     ground_winddir = np.array(flight_data["ground_wind_direction"])
 
     try:
         kite_apparent_windspeed = np.array(flight_data["kite_apparent_windspeed"])
     except KeyError:
+        print("No apparent wind speed data found")
         kite_apparent_windspeed = np.zeros(n_intervals)
 
     if kcu is not None:
@@ -75,7 +77,7 @@ def create_input_from_csv(
         depower_input = np.zeros(n_intervals)
 
     try:
-        kite_angle_of_attack = np.array(flight_data["kite_angle_of_attack"])
+        kite_angle_of_attack = np.array(flight_data["bridle_angle_of_attack"])
         kite_aoa_mean_v9 = 10
         offset_aoa = -0.590496147373921
         ########!!!!!!! ADD automation to calculate offset_aoa
@@ -84,28 +86,31 @@ def create_input_from_csv(
         kite_angle_of_attack = kite_angle_of_attack + offset_aoa + depower_input * offset_dep
 
     except KeyError:
+        print("No angle of attack data found")
         kite_angle_of_attack = np.zeros(n_intervals)
 
-    tether_reelout_speed = np.array(flight_data["ground_tether_reelout_speed"])
+    tether_reelout_speed = np.array(flight_data["tether_reelout_speed"])
     kite_elevation_ground = np.arcsin(kite_position[:, 2] / np.linalg.norm(kite_position, axis=1))
     kite_azimuth_ground = np.arctan2(kite_position[:, 1], kite_position[:, 0])
 
     try:
         kite_thrust_force = np.array(
             [
-                flight_data["thrust_force_east"],
-                flight_data["thrust_force_north"],
-                flight_data["thrust_force_up"],
+                flight_data["thrust_force_x"],
+                flight_data["thrust_force_y"],
+                flight_data["thrust_force_z"],
             ]
         ).T
     except KeyError:
+        print("No thrust force data found")
         kite_thrust_force = np.zeros((n_intervals, 3))
 
     try:
         kite_yaw = np.unwrap(
-            np.array(flight_data["kite_yaw_s" + str(kite_sensor)] - np.pi / 2)
+            np.array(flight_data["kite_yaw_" + str(kite_sensor)] - np.pi / 2)
         )
     except KeyError:
+        print("No kite yaw data found")
         kite_yaw = np.zeros(n_intervals)
 
     init_wind_dir = np.mean(ground_winddir[0:3000])
@@ -126,6 +131,7 @@ def create_input_from_csv(
             abs(flight_data["kcu_actual_steering"])
         )
     except KeyError:
+        print("No steering input data found")
         steering_input = np.zeros(n_intervals)
 
     timestep = np.gradient(flight_data["time"].values)
@@ -152,7 +158,7 @@ def create_input_from_csv(
                 tether_force=tether_force[i],
                 kite_apparent_windspeed=kite_apparent_windspeed[i],
                 tether_length=tether_length[i],
-                kite_angle_of_attack=kite_angle_of_attack[i],
+                bridle_angle_of_attack=kite_angle_of_attack[i],
                 kcu_velocity=kcu_velocity[i],
                 tether_reelout_speed=tether_reelout_speed[i],
                 tether_elevation_ground=kite_elevation_ground[i],
@@ -168,7 +174,7 @@ def create_input_from_csv(
     return ekf_input_list
 
 
-def find_initial_state_vector(tether, ekf_input, simConfig, offset_aoa=0):
+def find_initial_state_vector(tether, ekf_input, simConfig, wind_velocity=np.array([1e-3, 1e-3, 0]), CL=None, CD=None, CS=None):
     tether_input = TetherInput(
         kite_position=ekf_input.kite_position,
         kite_velocity=ekf_input.kite_velocity,
@@ -179,16 +185,20 @@ def find_initial_state_vector(tether, ekf_input, simConfig, offset_aoa=0):
         tether_elevation=ekf_input.tether_elevation_ground,
         tether_azimuth=ekf_input.tether_azimuth_ground,
         tether_length=ekf_input.tether_length,
+        wind_velocity=wind_velocity,
     )
 
     tether_input = tether.solve_tether_shape(tether_input)
 
     # %% Find the initial state vector for the EKF
     args = tether_input.create_input_tuple(simConfig.obsData)
+    if CL is None:
+        CL = float(tether.CL(*args))
+    if CD is None:
+        CD = float(tether.CD(*args))
+    if CS is None:
+        CS = float(tether.CS(*args))
 
-    CL = float(tether.CL(*args))
-    CD = float(tether.CD(*args))
-    CS = float(tether.CS(*args))
     x0 = np.vstack((tether_input.kite_position, tether_input.kite_velocity))
 
     if simConfig.log_profile:

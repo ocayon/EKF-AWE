@@ -22,7 +22,7 @@ def plot_wind_results(config_data: dict) -> None:
     #%% Plot wind energy spectrum
     fs = 10
     mask = range(len(results))#(results['kite_pos_z']>140)&(results['kite_pos_z']<180)
-    signal = np.array(results['wind_velocity'][mask])
+    signal = np.array(results["wind_speed_horizontal"][mask])
     from scipy.stats import linregress
 
     # Assuming your signal is stored in `signal`
@@ -74,11 +74,11 @@ def plot_wind_results(config_data: dict) -> None:
     # TI_160m = []
     # for i in range(len(results)):
     #     if i<600:
-    #         std = np.std(results['wind_velocity'].iloc[0:i][mask])
-    #         mean = np.mean(results['wind_velocity'].iloc[0:i][mask])
+    #         std = np.std(results["wind_speed_horizontal"].iloc[0:i][mask])
+    #         mean = np.mean(results["wind_speed_horizontal"].iloc[0:i][mask])
     #     else:
-    #         std = np.std(results['wind_velocity'].iloc[i-600:i][mask])
-    #         mean = np.mean(results['wind_velocity'].iloc[i-600:i][mask])
+    #         std = np.std(results["wind_speed_horizontal"].iloc[i-600:i][mask])
+    #         mean = np.mean(results["wind_speed_horizontal"].iloc[i-600:i][mask])
 
     #     TI_160m.append(std/mean)
     # #%%

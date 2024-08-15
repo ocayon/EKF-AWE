@@ -153,7 +153,7 @@ def plot_wind_speed(
             flight_data["time"], flight_data["vwz_EKF"], label="EKF_tether", alpha=0.5
         )
     if EKF:
-        wvel = results["wind_velocity"]
+        wvel = results["wind_speed_horizontal"]
         vw = np.vstack(
             (
                 wvel * np.cos(results["wind_direction"]),
@@ -170,7 +170,7 @@ def plot_wind_speed(
             label="EKF",
             alpha=0.8,
         )
-        axs[2].plot(flight_data["time"], results["z_wind"], label="EKF", alpha=0.8)
+        axs[2].plot(flight_data["time"], results["wind_speed_vertical"], label="EKF", alpha=0.8)
 
     min_wdir = min(flight_data["ground_wind_direction"])
     max_wdir = max(flight_data["ground_wind_direction"])
@@ -186,7 +186,7 @@ def plot_wind_speed(
 
     axs[0].plot(
         flight_data["time"],
-        flight_data["ground_wind_velocity"],
+        flight_data["ground_wind_speed"],
         label="Ground",
         color="grey",
         alpha=0.8,
@@ -233,7 +233,7 @@ def plot_wind_speed_height_bins(results, flight_data, lidar_heights=[], savefig=
     palette = get_color_list()
     fig, axs = plt.subplots(3, 1, figsize=(8, 10), sharex=True)
 
-    wvel = results["wind_velocity"]
+    wvel = results["wind_speed_horizontal"]
     wdir = np.degrees(results["wind_direction"])
     i0 = 0
     wvel100 = []
@@ -251,24 +251,24 @@ def plot_wind_speed_height_bins(results, flight_data, lidar_heights=[], savefig=
             break
     for i in range(len(flight_data) - 1):
         if flight_data[column].iloc[i] != flight_data[column].iloc[i + 1]:
-            wvel = results["wind_velocity"].iloc[i0:i]
+            wvel = results["wind_speed_horizontal"].iloc[i0:i]
             wdir = np.degrees(results["wind_direction"].iloc[i0:i])
-            wvel100.append(np.mean(wvel[results.kite_pos_z < 100]))
-            wdir100.append(np.mean(wdir[results.kite_pos_z < 100]))
+            wvel100.append(np.mean(wvel[results.kite_position_z < 100]))
+            wdir100.append(np.mean(wdir[results.kite_position_z < 100]))
             wvel150.append(
-                np.mean(wvel[(results.kite_pos_z < 150) & (results.kite_pos_z > 100)])
+                np.mean(wvel[(results.kite_position_z < 150) & (results.kite_position_z > 100)])
             )
             wdir150.append(
-                np.mean(wdir[(results.kite_pos_z < 150) & (results.kite_pos_z > 100)])
+                np.mean(wdir[(results.kite_position_z < 150) & (results.kite_position_z > 100)])
             )
             wvel200.append(
-                np.mean(wvel[(results.kite_pos_z > 150) & (results.kite_pos_z < 200)])
+                np.mean(wvel[(results.kite_position_z > 150) & (results.kite_position_z < 200)])
             )
             wdir200.append(
-                np.mean(wdir[(results.kite_pos_z > 150) & (results.kite_pos_z < 200)])
+                np.mean(wdir[(results.kite_position_z > 150) & (results.kite_position_z < 200)])
             )
-            wvel250.append(np.mean(wvel[results.kite_pos_z > 200]))
-            wdir250.append(np.mean(wdir[results.kite_pos_z > 200]))
+            wvel250.append(np.mean(wvel[results.kite_position_z > 200]))
+            wdir250.append(np.mean(wdir[results.kite_position_z > 200]))
             t_lidar.append(flight_data["time"].iloc[i0])
             i_change.append(i0)
             i0 = i + 1
@@ -364,7 +364,6 @@ def plot_aero_coeff_vs_aoa_ss(
     cycles_plotted,
     IMU_0=False,
     IMU_1=False,
-    EKF_tether=False,
     EKF=True,
     savefig=False,
 ):
@@ -386,64 +385,53 @@ def plot_aero_coeff_vs_aoa_ss(
     time_max = flight_data[mask_cycle]["time"].max()
 
     # Plotting each aerodynamic coefficient
-    axs[0].plot(results[mask_cycle]["time"], results[mask_cycle]["cl_wing"])
+    axs[0].plot(results[mask_cycle]["time"], results[mask_cycle]["wing_lift_coefficient"])
     axs[1].plot(
-        results[mask_cycle]["time"], results[mask_cycle]["cd_wing"], label="cd_wing (Total)"
+        results[mask_cycle]["time"], results[mask_cycle]["wing_drag_coefficient"], label="cd_wing (Total)"
     )
     axs[1].plot(
-        results[mask_cycle]["time"], results[mask_cycle]["cd_kcu"], label="cd_wing (KCU)"
+        results[mask_cycle]["time"], results[mask_cycle]["kcu_drag_coefficient"], label="cd_wing (KCU)"
     )
     axs[1].plot(
         results[mask_cycle]["time"],
-        results[mask_cycle]["cd_tether"],
+        results[mask_cycle]["tether_drag_coefficient"],
         label="cd_wing (Tether)",
     )
-    axs[2].plot(results[mask_cycle]["time"], results[mask_cycle]["cs_wing"], label="cs_wing")
+    axs[2].plot(results[mask_cycle]["time"], results[mask_cycle]["wing_sideforce_coefficient"], label="cs_wing")
 
     # AOA and Side Slip plots with conditions
     if EKF:
         axs[3].plot(
             results[mask_cycle]["time"],
-            results[mask_cycle]["kite_aoa"],
+            results[mask_cycle]["wing_angle_of_attack"],
             label="aoa EKF",
         )
         axs[4].plot(
             results[mask_cycle]["time"],
-            results[mask_cycle]["kite_sideslip"],
+            results[mask_cycle]["wing_sideslip_angle"],
             label="ss EKF",
         )
     if IMU_0:
         axs[3].plot(
             results[mask_cycle]["time"],
-            results[mask_cycle]["aoa_IMU_0"],
+            results[mask_cycle]["wing_angle_of_attack_imu_0"],
             label="aoa IMU 0",
         )
         axs[4].plot(
             results[mask_cycle]["time"],
-            results[mask_cycle]["ss_IMU_0"],
+            results[mask_cycle]["wing_sideslip_angle_imu_0"],
             label="ss IMU 0",
         )
     if IMU_1:
         axs[3].plot(
             results[mask_cycle]["time"],
-            results[mask_cycle]["aoa_IMU_1"],
+            results[mask_cycle]["wing_angle_of_attack_imu_1"],
             label="aoa IMU 1",
         )
         axs[4].plot(
             results[mask_cycle]["time"],
-            results[mask_cycle]["ss_IMU_1"],
+            results[mask_cycle]["wing_sideslip_angle_imu_1"],
             label="ss IMU 1",
-        )
-    if EKF_tether:
-        axs[3].plot(
-            results[mask_cycle]["time"],
-            results[mask_cycle]["aoa_EKF_tether"],
-            label="aoa EKF tether",
-        )
-        axs[4].plot(
-            results[mask_cycle]["time"],
-            results[mask_cycle]["ss_EKF_tether"],
-            label="ss EKF tether",
         )
 
     # Vane data
@@ -563,9 +551,9 @@ def plot_aero_coeff_vs_up_us(
         [flight_data["cycle"] == cycle for cycle in cycles_plotted], axis=0
     )
 
-    axs[0].plot(results[mask_cycle]["time"], results[mask_cycle]["cl_wing"])
-    axs[1].plot(results[mask_cycle]["time"], results[mask_cycle]["cd_wing"])
-    axs[2].plot(results[mask_cycle]["time"], results[mask_cycle]["cs_wing"])
+    axs[0].plot(results[mask_cycle]["time"], results[mask_cycle]["wing_lift_coefficient"])
+    axs[1].plot(results[mask_cycle]["time"], results[mask_cycle]["wing_drag_coefficient"])
+    axs[2].plot(results[mask_cycle]["time"], results[mask_cycle]["wing_sideforce_coefficient"])
 
     axs[3].plot(flight_data[mask_cycle]["time"], flight_data[mask_cycle]["up"])
     axs[4].plot(flight_data[mask_cycle]["time"], flight_data[mask_cycle]["us"])
@@ -748,8 +736,8 @@ def plot_cl_wing_cd_wing_aoa(results, flight_data, mask, aoa_method, savefig=Fal
 
     fig, axs = plt.subplots(2, 1, figsize=(10, 10), sharex=True)
     fig.suptitle("cl_wing and cd_wing vs aoa")
-    plot_probability_density(aoa[mask], results["cl_wing"][mask], fig, axs[0], ylabel="cl_wing")
-    plot_probability_density(aoa[mask], results["cd_wing"][mask], fig, axs[1], "aoa", "cd_wing")
+    plot_probability_density(aoa[mask], results["wing_lift_coefficient"][mask], fig, axs[0], ylabel="cl_wing")
+    plot_probability_density(aoa[mask], results["wing_drag_coefficient"][mask], fig, axs[1], "aoa", "cd_wing")
 
     if savefig == True:
         plt.tight_layout()
@@ -762,8 +750,8 @@ def plot_cl_wing_cd_wing_up(results, flight_data, mask, aoa_method, savefig=Fals
 
     fig, axs = plt.subplots(2, 1, figsize=(10, 10), sharex=True)
     fig.suptitle("cl_wing and cd_wing vs aoa")
-    plot_probability_density(up[mask], results["cl_wing"][mask], fig, axs[0], ylabel="cl_wing")
-    plot_probability_density(up[mask], results["cd_wing"][mask], fig, axs[1], "up", "cd_wing")
+    plot_probability_density(up[mask], results["wing_lift_coefficient"][mask], fig, axs[0], ylabel="cl_wing")
+    plot_probability_density(up[mask], results["wing_drag_coefficient"][mask], fig, axs[1], "up", "cd_wing")
     if savefig == True:
         plt.tight_layout()
         plt.savefig("wind_profile.png", dpi=300)
@@ -782,8 +770,8 @@ def plot_cl_wing_cd_wing_ss(results, flight_data, mask, ss_method):
 
     fig, axs = plt.subplots(2, 1, figsize=(10, 10), sharex=True)
     fig.suptitle("cl_wing and cd_wing vs ss")
-    plot_probability_density(ss[mask], results["cl_wing"][mask], fig, axs[0], ylabel="cl_wing")
-    plot_probability_density(ss[mask], results["cd_wing"][mask], fig, axs[1], "ss", "cd_wing")
+    plot_probability_density(ss[mask], results["wing_lift_coefficient"][mask], fig, axs[0], ylabel="cl_wing")
+    plot_probability_density(ss[mask], results["wing_drag_coefficient"][mask], fig, axs[1], "ss", "cd_wing")
 
 
 def plot_prob_coeff_vs_aoa_ss(results, coeff, mask, aoa_method):
@@ -895,12 +883,12 @@ def plot_wind_profile(flight_data, results, savefig=False):
         lidar_heights, min_dir, max_dir, color=palette[0], alpha=0.3, label="Lidar"
     )
 
-    wvelEKF = results["wind_velocity"]
-    plot_hexbin_density(wvelEKF, results["kite_pos_z"], fig, axs[0])
-    # axs[0].scatter( wvelEKF, results['kite_pos_z'], color=palette[1], label='EKF', alpha = 0.1)
+    wvelEKF = results["wind_speed_horizontal"]
+    plot_hexbin_density(wvelEKF, results["kite_position_z"], fig, axs[0])
+    # axs[0].scatter( wvelEKF, results['kite_position_z'], color=palette[1], label='EKF', alpha = 0.1)
     axs[1].scatter(
         np.degrees(results["wind_direction"]),
-        results["kite_pos_z"],
+        results["kite_position_z"],
         color=palette[1],
         label="EKF",
         alpha=0.1,
@@ -922,8 +910,8 @@ def plot_wind_profile(flight_data, results, savefig=False):
 
 def plot_wind_profile_bins(flight_data, results, step=20, savefig=False):
     # Extract data
-    height = results["kite_pos_z"]
-    wvel = results["wind_velocity"]
+    height = results["kite_position_z"]
+    wvel = results["wind_speed_horizontal"]
     wdir = np.degrees(results["wind_direction"])
 
     # Define bins and calculate statistics
@@ -1071,9 +1059,9 @@ def plot_kite_reference_frame(results, flight_data, imus, frame_axis="xyz"):
         ez = dcm[:, 2]
         if "x" in frame_axis:
             ax.quiver(
-                results["kite_pos_x"].iloc[i],
-                results["kite_pos_y"].iloc[i],
-                results["kite_pos_z"].iloc[i],
+                results["kite_position_x"].iloc[i],
+                results["kite_position_y"].iloc[i],
+                results["kite_position_z"].iloc[i],
                 ex[0],
                 ex[1],
                 ex[2],
@@ -1082,9 +1070,9 @@ def plot_kite_reference_frame(results, flight_data, imus, frame_axis="xyz"):
             )
         if "y" in frame_axis:
             ax.quiver(
-                results["kite_pos_x"].iloc[i],
-                results["kite_pos_y"].iloc[i],
-                results["kite_pos_z"].iloc[i],
+                results["kite_position_x"].iloc[i],
+                results["kite_position_y"].iloc[i],
+                results["kite_position_z"].iloc[i],
                 ey[0],
                 ey[1],
                 ey[2],
@@ -1093,9 +1081,9 @@ def plot_kite_reference_frame(results, flight_data, imus, frame_axis="xyz"):
             )
         if "z" in frame_axis:
             ax.quiver(
-                results["kite_pos_x"].iloc[i],
-                results["kite_pos_y"].iloc[i],
-                results["kite_pos_z"].iloc[i],
+                results["kite_position_x"].iloc[i],
+                results["kite_position_y"].iloc[i],
+                results["kite_position_z"].iloc[i],
                 ez[0],
                 ez[1],
                 ez[2],
@@ -1113,9 +1101,9 @@ def plot_kite_reference_frame(results, flight_data, imus, frame_axis="xyz"):
             )
 
             ax.quiver(
-                results["kite_pos_x"].iloc[i],
-                results["kite_pos_y"].iloc[i],
-                results["kite_pos_z"].iloc[i],
+                results["kite_position_x"].iloc[i],
+                results["kite_position_y"].iloc[i],
+                results["kite_position_z"].iloc[i],
                 ex[0],
                 ex[1],
                 ex[2],
@@ -1123,9 +1111,9 @@ def plot_kite_reference_frame(results, flight_data, imus, frame_axis="xyz"):
                 length=len_arrow,
             )
             ax.quiver(
-                results["kite_pos_x"].iloc[i],
-                results["kite_pos_y"].iloc[i],
-                results["kite_pos_z"].iloc[i],
+                results["kite_position_x"].iloc[i],
+                results["kite_position_y"].iloc[i],
+                results["kite_position_z"].iloc[i],
                 ey[0],
                 ey[1],
                 ey[2],
@@ -1133,9 +1121,9 @@ def plot_kite_reference_frame(results, flight_data, imus, frame_axis="xyz"):
                 length=len_arrow,
             )
             ax.quiver(
-                results["kite_pos_x"].iloc[i],
-                results["kite_pos_y"].iloc[i],
-                results["kite_pos_z"].iloc[i],
+                results["kite_position_x"].iloc[i],
+                results["kite_position_y"].iloc[i],
+                results["kite_position_z"].iloc[i],
                 ez[0],
                 ez[1],
                 ez[2],
@@ -1144,16 +1132,16 @@ def plot_kite_reference_frame(results, flight_data, imus, frame_axis="xyz"):
             )
 
     ax.plot(
-        results.kite_pos_x,
-        results.kite_pos_y,
-        results.kite_pos_z,
+        results.kite_position_x,
+        results.kite_position_y,
+        results.kite_position_z,
         color="grey",
         linestyle="--",
     )
     ax.scatter(
-        results["kite_pos_x"].iloc[0:spacing:-1],
-        results["kite_pos_y"].iloc[0:spacing:-1],
-        results["kite_pos_z"].iloc[0:spacing:-1],
+        results["kite_position_x"].iloc[0:spacing:-1],
+        results["kite_position_y"].iloc[0:spacing:-1],
+        results["kite_position_z"].iloc[0:spacing:-1],
         color="r",
     )
     ax.legend()

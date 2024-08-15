@@ -25,35 +25,53 @@ class EKFOutput:
     kite_velocity_z: float = None  # Kite velocity in ENU coordinates (m/s)
     kite_roll: float = None  # Bridle element roll angle in radians, NED frame (rad)
     kite_pitch: float = None  # Bridle element pitch angle in radians, NED frame (rad)
-    kite_yaw: float = None  # Bridle element yaw angle in radians, NED frame (rad)
+    kite_yaw: float = None  # Bridle element yaw angle in radians, NED frame (rad) (towards the kite velocity direction)
     kite_thrust_force: float = None  # Thrust force applied to the kite (N)
 
     # Wind dynamics
     wind_speed_horizontal: float = None  # Horizontal wind speed magnitude in ENU (m/s)
     wind_direction: float = None  # Downwind direction in ENU (rad)
-    wind_speed_vertical: float = None  # Vertical wind component (positive is up) in ENU (m/s)
+    wind_speed_vertical: float = (
+        None  # Vertical wind component (positive is up) in ENU (m/s)
+    )
 
     # Tether parameters
     tether_length: float = None  # Tether length (m)
-    tether_elevation_angle: float = None  # Elevation angle of the first tether element (rad)
-    tether_azimuth_angle: float = None  # Azimuth angle of the first tether element (rad)
-    tether_offset: float = None  # Tether measurement offset (m)
-    tether_force_at_kite: float = None  # Tether force at the bridle point (N)
-    tether_roll_angle: float = None  # Roll of the first tether element below KCU (rad)
-    tether_pitch_angle: float = None  # Pitch of the first tether element below KCU (rad)
-    tether_yaw_angle: float = None  # Yaw of the first tether element below KCU (rad)
+    tether_elevation_angle: float = (
+        None  # Elevation angle of the first tether element from the ground(rad)
+    )
+    tether_azimuth_angle: float = (
+        None  # Azimuth angle of the first tether element from the ground (rad)
+    )
+    tether_length_offset: float = None  # Tether length measurement offset (m)
+    tether_force_kite: float = None  # Tether force at the bridle point (N)
+    tether_roll: float = None  # Roll of the first tether element below KCU (rad)
+    tether_pitch: float = (
+        None  # Pitch of the first tether element below KCU (rad)
+    )
+    tether_yaw: float = None  # Yaw of the first tether element below KCU (rad) (Velocity direction)
 
     # Aerodynamic parameters
-    kite_apparent_wind_speed: float = None  # Apparent wind speed at the kite (m/s)
-    kite_angle_of_attack: float = None  # Angle of attack of the bridle tether element (rad)
-    kite_angle_of_sideslip: float = None  # Sideslip angle in degrees (rad)
-    kite_lift_coefficient: float = None  # Lift coefficient of the wing (-)
-    kite_drag_coefficient: float = None  # Drag coefficient of the wing (-)
-    kite_sideforce_coefficient: float = None  # Side force coefficient of the wing (-)
-    tether_angle_of_attack: float = None  # Angle of attack of the tether element below the KCU (rad)
-    tether_sideslip_angle: float = None  # Sideslip angle of the tether element below the KCU (rad)
-    tether_drag_coefficient: float = None  # Drag coefficient of the tether nondimensionalized with kite area
-    kcu_drag_coefficient: float = None  # Drag coefficient of the KCU nondimensionalized with kite area
+    kite_apparent_windspeed: float = None  # Apparent wind speed at the kite (m/s)
+    kite_angle_of_attack: float = (
+        None  # Angle of attack of the bridle tether element (rad)
+    )
+    kite_sideslip_angle: float = None  # Sideslip angle in degrees (rad) (Angle between velocity and apparent velocity)
+    wing_lift_coefficient: float = None  # Lift coefficient of the wing (-)
+    wing_drag_coefficient: float = None  # Drag coefficient of the wing (-)
+    wing_sideforce_coefficient: float = None  # Side force coefficient of the wing (-)
+    tether_angle_of_attack: float = (
+        None  # Angle of attack of the tether element below the KCU (rad)
+    )
+    tether_sideslip_angle: float = (
+        None  # Sideslip angle of the tether element below the KCU (rad)
+    )
+    tether_drag_coefficient: float = (
+        None  # Drag coefficient of the tether nondimensionalized with kite area
+    )
+    kcu_drag_coefficient: float = (
+        None  # Drag coefficient of the KCU nondimensionalized with kite area
+    )
 
     # Steering and control parameters
     steering_law_coefficient: float = None  # Steering law parameter (-)
@@ -61,7 +79,7 @@ class EKFOutput:
     # Performance metrics
     normalized_innovation_squared: float = None  # Normalized innovation squared
     mahalanobis_distance: float = None  # Mahalanobis distance
-    normalized_residual_norm: float = None  # Norm of the normalized residuals
+    normalized_residual_norm: float = None  # Norm of the normalized residuals by the stdv (0 is best fit) (more than 1 is bad)
 
 
 def create_ekf_output(x, u, ekf_input, tether, kite, simConfig):
@@ -113,7 +131,7 @@ def create_ekf_output(x, u, ekf_input, tether, kite, simConfig):
     euler_angles1 = calculate_euler_from_reference_frame(rotate_ENU2NED(dcm_t2w))
     drag_coefficient_kcu = float(tether.cd_kcu(*args))
     drag_coefficient_tether = float(tether.cd_tether(*args))
-    tether_force_at_kite = np.linalg.norm(tether.tether_force_kite(*args))
+    tether_force_kite = np.linalg.norm(tether.tether_force_kite(*args))
 
     # Airflow angles based on configuration
     if simConfig.model_yaw:
@@ -133,7 +151,7 @@ def create_ekf_output(x, u, ekf_input, tether, kite, simConfig):
     else:
         tether_offset = None
 
-    kite_apparent_wind_speed = np.linalg.norm(vw - v_kite)
+    kite_apparent_windspeed = np.linalg.norm(vw - v_kite)
 
     # Create an instance of EKFOutput with unpacked vectors and calculated parameters
     ekf_output = EKFOutput(
@@ -151,21 +169,21 @@ def create_ekf_output(x, u, ekf_input, tether, kite, simConfig):
         kite_yaw=euler_angles[2],
         tether_length=tether_length,
         kite_angle_of_attack=airflow_angles[0],
-        kite_angle_of_sideslip=airflow_angles[1],
-        kite_lift_coefficient=x[state_index_map["CL"]],
-        kite_drag_coefficient=x[state_index_map["CD"]],
-        kite_sideforce_coefficient=x[state_index_map["CS"]],
+        kite_sideslip_angle=airflow_angles[1],
+        wing_lift_coefficient=x[state_index_map["CL"]],
+        wing_drag_coefficient=x[state_index_map["CD"]],
+        wing_sideforce_coefficient=x[state_index_map["CS"]],
         tether_elevation_angle=elevation_0,
         tether_azimuth_angle=azimuth_0,
         kcu_drag_coefficient=drag_coefficient_kcu,
         tether_drag_coefficient=drag_coefficient_tether,
         kite_thrust_force=x[state_index_map.get("kite_thrust_force", 0)],
-        tether_roll_angle=euler_angles1[0],
-        tether_pitch_angle=euler_angles1[1],
-        tether_yaw_angle=euler_angles1[2],
+        tether_roll=euler_angles1[0],
+        tether_pitch=euler_angles1[1],
+        tether_yaw=euler_angles1[2],
         tether_offset=tether_offset,
-        tether_force_at_kite=tether_force_at_kite,
-        kite_apparent_wind_speed=kite_apparent_wind_speed,
+        tether_force_kite=tether_force_kite,
+        kite_apparent_windspeed=kite_apparent_windspeed,
     )
 
     # Optional yaw modeling

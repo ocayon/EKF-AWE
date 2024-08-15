@@ -15,7 +15,7 @@ class EKFInput:
 
     # Optional attributes
     kite_apparent_windspeed: float = None  # Apparent windspeed (m/s)
-    kite_angle_of_attack: float = None  # Kite angle of attack (between last tether element and wind incident) (rad)
+    bridle_angle_of_attack: float = None  # Kite angle of attack (between last tether element and wind incident) (rad)
     kcu_velocity: np.ndarray = field(default_factory=lambda: np.zeros(3))  # KCU velocity in ENU coordinates (m/s)
     kcu_acceleration: np.ndarray = field(default_factory=lambda: np.zeros(3))  # KCU acceleration in ENU coordinates (m/s^2)
     tether_elevation_ground: float = None  # Elevation angle (angle of tether element at GS exit with respect to the horizon) (rad)

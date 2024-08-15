@@ -30,15 +30,15 @@ def plot_kite_trajectories(config_data: dict) -> None:
 
     label_variables = [['kite_velocity'], ['CL'], ['Tether_force'], ["Mechanic power"],['us'],['up']]
     t = flight_data['time'].values
-    x = results['kite_pos_x'].values
-    y = results['kite_pos_y'].values
-    z = results['kite_pos_z'].values
-    kite_velocity = np.sqrt(results['kite_vel_x']**2 + results['kite_vel_y']**2 + results['kite_vel_z']**2)
+    x = results['kite_position_x'].values
+    y = results['kite_position_y'].values
+    z = results['kite_position_z'].values
+    kite_velocity = np.sqrt(results['kite_velocity_x']**2 + results['kite_velocity_y']**2 + results['kite_velocity_z']**2)
     variables = [
         kite_velocity.values,
-        results['CL'].values,
+        results['wing_lift_coefficient'].values,
         [flight_data['ground_tether_force'].values],
-        [flight_data['ground_tether_force'].values*flight_data['ground_tether_reelout_speed'].values],
+        [flight_data['ground_tether_force'].values*flight_data['tether_reelout_speed'].values],
         flight_data['us'].values,
         flight_data['up'].values,
     ]
@@ -48,15 +48,15 @@ def plot_kite_trajectories(config_data: dict) -> None:
 
     label_variables = [['kite_elevation'], ['kite_azimuth'], ['Reelout_speed'], ["Wind speed"]]
     t = flight_data['time'].values
-    x = results['kite_pos_x'].values
-    y = results['kite_pos_y'].values
-    z = results['kite_pos_z'].values
-    kite_velocity = np.sqrt(results['kite_vel_x']**2 + results['kite_vel_y']**2 + results['kite_vel_z']**2)
+    x = results['kite_position_x'].values
+    y = results['kite_position_y'].values
+    z = results['kite_position_z'].values
+    kite_velocity = np.sqrt(results['kite_velocity_x']**2 + results['kite_velocity_y']**2 + results['kite_velocity_z']**2)
     variables = [
         np.degrees(flight_data['kite_elevation'].values),
         np.degrees(flight_data['kite_azimuth'].values),
-        flight_data['ground_tether_reelout_speed'].values,
-        results['wind_velocity'].values,
+        flight_data['tether_reelout_speed'].values,
+        results['wind_speed_horizontal'].values,
     ]
 
     # Plot kite trajectory
@@ -64,18 +64,18 @@ def plot_kite_trajectories(config_data: dict) -> None:
 
     # Plot kite trajectory
     fig,ax = plt.subplots()
-    pu.plot_time_series(flight_data, flight_data['kite_position_up'], ax, color='blue',ylabel='Height', label='Measured',plot_phase=False)
-    pu.plot_time_series(flight_data,results['kite_pos_z'], ax, color='red', label='Estimated',plot_phase=True)
+    pu.plot_time_series(flight_data, flight_data['kite_position_z'], ax, color='blue',ylabel='Height', label='Measured',plot_phase=False)
+    pu.plot_time_series(flight_data,results['kite_position_z'], ax, color='red', label='Estimated',plot_phase=True)
     ax.grid()
 
     fig,ax = plt.subplots()
-    pu.plot_time_series(flight_data, flight_data['kite_position_east'], ax, color='blue', ylabel='x-east', label='Measured',plot_phase=False)
-    pu.plot_time_series(flight_data,results['kite_pos_x'], ax, color='red', label='Estimated',plot_phase=True)
+    pu.plot_time_series(flight_data, flight_data['kite_position_x'], ax, color='blue', ylabel='x-east', label='Measured',plot_phase=False)
+    pu.plot_time_series(flight_data,results['kite_position_x'], ax, color='red', label='Estimated',plot_phase=True)
     ax.grid()
 
     fig,ax = plt.subplots()
-    pu.plot_time_series(flight_data, flight_data['kite_position_north'], ax, color='blue', ylabel='y-north', label='Measured',plot_phase=False)
-    pu.plot_time_series(flight_data,results['kite_pos_y'], ax, color='red', label='Estimated',plot_phase=True)
+    pu.plot_time_series(flight_data, flight_data['kite_position_y'], ax, color='blue', ylabel='y-north', label='Measured',plot_phase=False)
+    pu.plot_time_series(flight_data,results['kite_position_y'], ax, color='red', label='Estimated',plot_phase=True)
     ax.grid()
 
 

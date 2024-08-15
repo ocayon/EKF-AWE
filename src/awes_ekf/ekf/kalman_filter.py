@@ -200,9 +200,9 @@ class ExtendedKalmanFilter:
         if simConfig.enforce_z_wind:
             z = np.append(z, 0)
         if simConfig.obsData.kite_apparent_windspeed:
-            z = np.append(z, input_class.apparent_windspeed)
-        if simConfig.obsData.kite_angle_of_attack:
-            z = np.append(z, input_class.kite_aoa)
+            z = np.append(z, input_class.kite_apparent_windspeed)
+        if simConfig.obsData.bridle_angle_of_attack:
+            z = np.append(z, input_class.bridle_angle_of_attack)
 
         self.z = z
 

@@ -47,7 +47,7 @@ def initialize_ekf(ekf_input_list, simConfig, tuningParams, x0, kite, kcu, tethe
     ekf_copy = copy.deepcopy(ekf)
     simConfig_copy = copy.deepcopy(simConfig)
     if find_offsets:
-        offset_variables = ["apparent_windspeed", "angle_of_attack"]
+        offset_variables = ["kite_apparent_windspeed", "bridle_angle_of_attack"]
         # Find offsets
         for variable in simConfig_copy.obsData.__dict__.keys():
             if variable in offset_variables and simConfig_copy.obsData.__dict__[variable]:
@@ -80,8 +80,8 @@ def initialize_ekf(ekf_input_list, simConfig, tuningParams, x0, kite, kcu, tethe
 
                 # Find offset
                 #TODO: Define universal namings and create timeseries class
-                if variable == "angle_of_attack":
-                    variable = "kite_aoa"
+                if variable == "bridle_angle_of_attack":
+                    variable = "kite_angle_of_attack"
                 converged_idx = int(5*60/simConfig_copy.ts)
                 estimated_variable = np.array([ekf_output.__dict__[variable] for ekf_output in ekf_output_list])
                 measured_variable = np.array([ekf_input.__dict__[variable] for ekf_input in ekf_input_list[:offset_sim_length]])

@@ -12,27 +12,21 @@ def plot_kite_aero(config_data: dict):
 
     cycles_plotted = np.arange(6,50, step=1)
     # %% Plot results aerodynamic coefficients
-    pu.plot_aero_coeff_vs_aoa_ss(results, flight_data, cycles_plotted,IMU_0=False,savefig=False) # Plot aero coeff vs aoa_ss
+    pu.plot_aero_coeff_vs_aoa_ss(results, flight_data, cycles_plotted,IMU_0=True,IMU_1=True,savefig=False) # Plot aero coeff vs aoa_ss
     pu.plot_aero_coeff_vs_up_us(results, flight_data, cycles_plotted,IMU_0=False,savefig=False) # Plot aero coeff vs up_used
 
 
     #%% Polars
-    aoa_plot = results['kite_aoa']
-    # aoa_plot = results['aoa_IMU_0']
-    # aoa_plot = flight_data['kite_angle_of_attack']
     mask = np.any(
         [flight_data['cycle'] == cycle for cycle in cycles_plotted], axis=0)
-    mask_angles =mask#&((aoa_plot>0) & (aoa_plot<15))
-
-    # mask_angles =(results['aoa']>0) & (results['aoa']<20)
     fig, axs = plt.subplots(2, 2, figsize=(10, 10), sharex=True)
-    mask = (flight_data['turn_straight'] == 'straight') & mask_angles
-    pu.plot_cl_curve(np.sqrt((results['cl_wing']**2+results['cs_wing']**2)), results['cd_wing'], aoa_plot, mask,axs, label = "Straight")
-    mask = (flight_data['turn_straight'] == 'turn')& mask_angles
-    pu.plot_cl_curve(np.sqrt((results['cl_wing']**2+results['cs_wing']**2)), results['cd_wing'], aoa_plot, mask,axs, label = "Turn")
+    pu.plot_cl_curve(np.sqrt((results["wing_lift_coefficient"]**2+results["wing_sideforce_coefficient"]**2)), results["wing_drag_coefficient"], results['wing_angle_of_attack'], mask,axs, label = "Wing from EKF")
+    pu.plot_cl_curve(np.sqrt((results["wing_lift_coefficient"]**2+results["wing_sideforce_coefficient"]**2)), results["wing_drag_coefficient"], flight_data['wing_angle_of_attack'], mask,axs, label = "Wing from bridle")
+    pu.plot_cl_curve(np.sqrt((results["wing_lift_coefficient"]**2+results["wing_sideforce_coefficient"]**2)), results["wing_drag_coefficient"], (results['wing_angle_of_attack_imu_0']+results['wing_angle_of_attack_imu_1'])/2, mask,axs, label = "IMU average")
 
-    axs[0,0].axvline(x = np.mean(aoa_plot[flight_data['powered'] == 'powered']), color = 'k',linestyle = '--', label = 'Mean reel-out angle of attack')
-    axs[0,0].axvline(x = np.mean(aoa_plot[flight_data['powered'] == 'depowered']), color = 'b',linestyle = '--', label = 'Mean reel-in angle of attack')
+
+    # axs[0,0].axvline(x = np.mean(aoa_plot[flight_data['powered'] == 'powered']), color = 'k',linestyle = '--', label = 'Mean reel-out angle of attack')
+    # axs[0,0].axvline(x = np.mean(aoa_plot[flight_data['powered'] == 'depowered']), color = 'b',linestyle = '--', label = 'Mean reel-in angle of attack')
 
 
     axs[0,0].legend()
@@ -41,11 +35,11 @@ def plot_kite_aero(config_data: dict):
 
     #%%
     fig, axs = plt.subplots(2, 2, figsize=(10, 10))
-    aoa_plot=flight_data['kite_angle_of_attack']
-    mask = (flight_data['turn_straight'] == 'straight') & mask_angles & (flight_data['up'] > 0.9) | (flight_data['up'] < 0.1)
-    pu.plot_cl_curve(np.sqrt((results['cl_wing']**2+results['cs_wing']**2)), results['cd_wing']+results['cd_tether']+results['cd_kcu'], aoa_plot, mask,axs, label = "Straight")
-    mask = (flight_data['turn_straight'] == 'turn') & mask_angles
-    pu.plot_cl_curve(np.sqrt((results['cl_wing']**2+results['cs_wing']**2)), results['cd_wing']+results['cd_tether']+results['cd_kcu'], aoa_plot, mask,axs, label = "Turn")
+    aoa_plot=flight_data['wing_angle_of_attack']
+    mask = (flight_data['turn_straight'] == 'straight') & mask & (flight_data['up'] > 0.9) | (flight_data['up'] < 0.1)
+    pu.plot_cl_curve(np.sqrt((results["wing_lift_coefficient"]**2+results["wing_sideforce_coefficient"]**2)), results["wing_drag_coefficient"]+results["tether_drag_coefficient"]+results["kcu_drag_coefficient"], aoa_plot, mask,axs, label = "Straight")
+    mask = (flight_data['turn_straight'] == 'turn') & mask
+    pu.plot_cl_curve(np.sqrt((results["wing_lift_coefficient"]**2+results["wing_sideforce_coefficient"]**2)), results["wing_drag_coefficient"]+results["tether_drag_coefficient"]+results["kcu_drag_coefficient"], aoa_plot, mask,axs, label = "Turn")
     axs[0,0].axvline(x = np.mean(aoa_plot[flight_data['powered'] == 'powered']), color = 'k',linestyle = '--', label = 'Mean reel-out angle of attack')
     axs[0,0].axvline(x = np.mean(aoa_plot[flight_data['powered'] == 'depowered']), color = 'b',linestyle = '--', label = 'Mean reel-in angle of attack')
     axs[0,0].legend()
@@ -58,7 +52,7 @@ def plot_kite_aero(config_data: dict):
     for column in flight_data.columns:
         if 'load_cell' in column:
             plt.plot(flight_data['time'],flight_data[column]*9.81,label = column)
-    plt.plot(flight_data['time'],flight_data['ground_tether_reelout_speed'],label = 'Reelout speed')
+    plt.plot(flight_data['time'],flight_data['tether_reelout_speed'],label = 'Reelout speed')
     plt.xlabel('Time (s)')
     plt.ylabel('Force (N)')
     plt.legend()
@@ -86,7 +80,7 @@ def plot_kite_aero(config_data: dict):
 
 
     signal_1 = -flight_data['us']
-    signal_2 = results['cs_wing']
+    signal_2 = results["wing_sideforce_coefficient"]
 
     time_delay,cross_corr = find_time_delay(signal_1, signal_2)
     # Plot the signals and their cross-correlation
@@ -113,8 +107,8 @@ def plot_kite_aero(config_data: dict):
 
     #%% Plot kite velocity
     plt.figure()
-    kite_speed = np.sqrt(results['kite_vel_x']**2+results['kite_vel_y']**2+results['kite_vel_z']**2)
-    meas_kite_speed = np.sqrt(flight_data['kite_velocity_east_s0']**2+flight_data['kite_velocity_north_s0']**2+flight_data['kite_velocity_up_s0']**2)
+    kite_speed = np.sqrt(results['kite_velocity_x']**2+results['kite_velocity_y']**2+results['kite_velocity_z']**2)
+    meas_kite_speed = np.sqrt(flight_data['kite_velocity_x']**2+flight_data['kite_velocity_y']**2+flight_data['kite_velocity_z']**2)
     plt.plot(results['time'],kite_speed,label = 'Estimated')
     plt.plot(flight_data['time'],meas_kite_speed,label = 'Measured')
     plt.xlabel('Time (s)')

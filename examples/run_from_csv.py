@@ -100,8 +100,8 @@ class AnalyzeAweFromCsvLog:
 
         flight_data = read_processed_flight_data(year, month, day, kite_model)
 
-        # flight_data = flight_data.iloc[:10000]
-        # flight_data.reset_index(drop=True, inplace=True)
+        flight_data = flight_data.iloc[:10000]
+        flight_data.reset_index(drop=True, inplace=True)
 
         # %% Initialize EKF
         simConfig = SimulationConfig(**self.config_data["simulation_parameters"])
@@ -117,7 +117,7 @@ class AnalyzeAweFromCsvLog:
 
         tuningParams = TuningParameters(self.config_data["tuning_parameters"], simConfig)
 
-        # Create input classes
+       # Create input classes
         ekf_input_list = create_input_from_csv(
             flight_data, kite, kcu, tether, simConfig, kite_sensor=0
         )
@@ -125,14 +125,16 @@ class AnalyzeAweFromCsvLog:
         # Find initial state vector
         x0 = find_initial_state_vector(tether, ekf_input_list[0], simConfig)
         print(x0)
-        ekf = initialize_ekf(
-            ekf_input_list[0], simConfig, tuningParams, x0, kite, kcu, tether
+        ekf, ekf_input_list = initialize_ekf(
+            ekf_input_list, simConfig, tuningParams, x0, kite, kcu, tether
         )
 
         # %% Main loop
         ekf_output_list = []  # List of instances of EKFOutput
         start_time = time.time()
         mins = -1
+        k_nis = 1000
+        # TODO: Add a timeseries class
         for k, ekf_input in enumerate(ekf_input_list):
             try:
                 ekf, ekf_ouput = propagate_state_EKF(
@@ -140,18 +142,27 @@ class AnalyzeAweFromCsvLog:
                 )
                 # Store results
                 ekf_output_list.append(ekf_ouput)
-            except:
+            except Exception as e:
+                print(e)
                 try:
-                    print('Integration error at iteration: ', k)
+                    print("Integration error at iteration: ", k)
                     x0 = find_initial_state_vector(tether, ekf_input, simConfig)
                 except:
-                    print('Tether model error at iteration: ', k)
+                    print("Tether model error at iteration: ", k)
+                    x0 = ekf.x_k1_k1
                     # continue
-                ekf = initialize_ekf(
-                    ekf_input, simConfig, tuningParams, x0, kite, kcu, tether
+                ekf, ekf_input_list[k::] = initialize_ekf(
+                    ekf_input_list[k::],
+                    simConfig,
+                    tuningParams,
+                    x0,
+                    kite,
+                    kcu,
+                    tether,
+                    find_offsets=False,
                 )
                 flight_data.drop(k, inplace=True)
-                # continue
+                continue
 
             # Print progress
             if k % 600 == 0:
@@ -164,7 +175,7 @@ class AnalyzeAweFromCsvLog:
 
         # Postprocess results
         ekf_output_df = convert_ekf_output_to_df(ekf_output_list)
-        ekf_output_df.dropna(subset=["kite_pos_x"], inplace=True)
+        ekf_output_df.dropna(subset=["kite_position_x"], inplace=True)
         ekf_output_df.reset_index(drop=True, inplace=True)
         rows_to_keep = ekf_output_df.index
         print(rows_to_keep)
@@ -172,16 +183,13 @@ class AnalyzeAweFromCsvLog:
         flight_data.reset_index(drop=True, inplace=True)
         indices = ekf_output_df.index
         flight_data = flight_data.iloc[indices]
-        results, flight_data = postprocess_results(
+        ekf_output_df, flight_data = postprocess_results(
             ekf_output_df,
             flight_data,
             kite,
             kcu,
-            imus=[0, 1],
-            remove_IMU_offsets=remove_IMU_offsets,
+            self.config_data,
             correct_IMU_deformation=correct_IMU_deformation,
-            remove_vane_offsets=remove_vane_offsets,
-            estimate_kite_angle=estimate_kite_angle,
         )
         # %% Store results
         save_results(ekf_output_df, flight_data, kite_model, year, month, day)
@@ -219,10 +227,10 @@ def get_awes_model_from_string(awes_model_str: str) -> AWESModel:
 
 
 def main() -> None:
-    default_model_str = 'kp-v9'
-    default_date = datetime.strptime('2024-06-06', '%Y-%m-%d').date()
+    default_model_str = 'kp-v3'
+    default_date = datetime.strptime('2019-10-08', '%Y-%m-%d').date()
     default_run_option = 'analyze'
-    default_log_dir = Path('./data/v9/')
+    default_log_dir = Path('./data/v3/')
 
     # Query for the system model
     valid_model_str = ['kp-v3', 'kp-v9', 'kft']

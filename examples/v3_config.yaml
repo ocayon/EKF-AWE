@@ -10,7 +10,7 @@ simulation_parameters:
   epsilon: 1e-6                       # Tolerance for the IEKF
   max_iterations: 200                 # Maximum number of iterations for the IEKF
   log_profile: false                   # Model wind speed as logarithmic with height
-  enforce_z_wind: true               # Enforce the z wind speed to be zero
+  enforce_z_wind: false               # Enforce the vertical wind speed to be zero (change to )
   model_yaw: false                   # Model the yaw angle in the state vector
 
   measurements:
@@ -24,9 +24,9 @@ simulation_parameters:
     kcu_position: false                    # KCU position measurement
     kcu_velocity: false                    # KCU velocity measurement
     kcu_acceleration: false                    # KCU acceleration measurement
-    kite_apparent_windspeed: false         # Apparent wind speed measurement
-    kite_angle_of_attack: false            # Angle of attack measurement
-    kite_angle_of_sideslip: false             # Sideslip angle measurement
+    kite_apparent_windspeed: true         # Apparent wind speed measurement
+    bridle_angle_of_attack: false            # Angle of attack measurement
+    bridle_angle_of_sideslip: false             # Sideslip angle measurement
     kite_yaw_angle: false                  # Yaw angle measurement
 
 kite:
@@ -34,6 +34,9 @@ kite:
   mass: 15                        # Mass of the kite in kg
   area: 19.75                    # Area of the kite in m^2
   span: 10                      # Span of the kite in m
+  sensor_ids:                     # Sensor IDs of the kite
+    - 0
+    - 1
 kcu:
   length: 1                     # Length of the KCU in m
   diameter: 0.48                      # Width of the KCU in m

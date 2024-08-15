@@ -98,7 +98,7 @@ class ObservationModel:
             h = ca.vertcat(h, self.x[index_map["vw_2"]])
         if self.simConfig.obsData.kite_apparent_windspeed:
             h = ca.vertcat(h, ca.norm_2(va))
-        if self.simConfig.obsData.kite_angle_of_attack:
+        if self.simConfig.obsData.bridle_angle_of_attack:
             h = ca.vertcat(h, airflow_angles[0])
 
         return h

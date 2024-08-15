@@ -45,8 +45,8 @@ class ObservationData:
     kcu_acceleration: bool = False
     kcu_velocity: bool = False
     kite_apparent_windspeed: bool = False
-    kite_angle_of_attack: bool = False
-    kite_angle_of_sideslip: bool = False
+    bridle_angle_of_attack: bool = False
+    bridle_angle_of_sideslip: bool = False
     kite_yaw_angle: bool = False
     kite_thrust_force: bool = False
 
@@ -129,7 +129,7 @@ class TuningParameters:
             stdv_y.append(self.dict_meas_stdv["z_wind"])
         if simConfig.obsData.kite_apparent_windspeed:
             stdv_y.append(self.dict_meas_stdv["va"])
-        if simConfig.obsData.kite_angle_of_attack:
+        if simConfig.obsData.bridle_angle_of_attack:
             stdv_y.append(self.dict_meas_stdv["aoa"])
 
         self.stdv_measurements = np.array(stdv_y)
