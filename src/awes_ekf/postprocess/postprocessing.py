@@ -210,6 +210,7 @@ def postprocess_results(
         flight_data["bridle_sideslip_angle"] = np.zeros(len(flight_data))
 
     results["time"] = flight_data["time"]
+    results["unix_time"] = flight_data["unix_time"]
     # Smooth a_kite
     window_size = 10
     a_kite[:, 0] = np.convolve(
