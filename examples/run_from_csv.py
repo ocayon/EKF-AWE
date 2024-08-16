@@ -100,8 +100,8 @@ class AnalyzeAweFromCsvLog:
 
         flight_data = read_processed_flight_data(year, month, day, kite_model)
 
-        flight_data = flight_data.iloc[:10000]
-        flight_data.reset_index(drop=True, inplace=True)
+        # flight_data = flight_data.iloc[:10000]
+        # flight_data.reset_index(drop=True, inplace=True)
 
         # %% Initialize EKF
         simConfig = SimulationConfig(**self.config_data["simulation_parameters"])
