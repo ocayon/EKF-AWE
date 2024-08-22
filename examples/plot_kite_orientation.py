@@ -15,7 +15,7 @@ from awes_ekf.postprocess.postprocessing import (
 
 def plot_kite_orientation(config_data: dict) -> None:
     # Load results and flight data and plot kite reference frame
-    results, flight_data = read_results(
+    results, flight_data,_ = read_results(
         str(config_data["year"]),
         str(config_data["month"]),
         str(config_data["day"]),

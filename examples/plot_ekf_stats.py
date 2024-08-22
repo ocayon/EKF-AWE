@@ -10,7 +10,7 @@ config_file_name = "v3_config.yaml"
 config = load_config("examples/" + config_file_name)
 
 # Load results and flight data
-results, flight_data = read_results(
+results, flight_data,_ = read_results(
     str(config["year"]),
     str(config["month"]),
     str(config["day"]),

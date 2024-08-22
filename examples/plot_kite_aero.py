@@ -8,7 +8,7 @@ from awes_ekf.plotting.color_palette import get_color_list, set_plot_style
 
 def plot_kite_aero(config_data: dict):
     # Load results and flight data and plot kite reference frame
-    results, flight_data = read_results(str(config_data['year']), str(config_data['month']), str(config_data['day']), config_data['kite']['model_name'])
+    results, flight_data,_ = read_results(str(config_data['year']), str(config_data['month']), str(config_data['day']), config_data['kite']['model_name'])
 
     kite_sensors = config_data['kite']['sensor_ids']
     cycles_plotted = np.arange(6,70, step=1)
@@ -22,7 +22,7 @@ def plot_kite_aero(config_data: dict):
         [flight_data['cycle'] == cycle for cycle in cycles_plotted], axis=0)
     fig, axs = plt.subplots(2, 2, figsize=(10, 10), sharex=True)
     pu.plot_cl_curve(np.sqrt((results["wing_lift_coefficient"]**2+results["wing_sideforce_coefficient"]**2)), results["wing_drag_coefficient"], results['wing_angle_of_attack'], mask,axs, label = "Wing from EKF")
-    pu.plot_cl_curve(np.sqrt((results["wing_lift_coefficient"]**2+results["wing_sideforce_coefficient"]**2)), results["wing_drag_coefficient"], flight_data['wing_angle_of_attack'], mask,axs, label = "Wing from bridle")
+    pu.plot_cl_curve(np.sqrt((results["wing_lift_coefficient"]**2+results["wing_sideforce_coefficient"]**2)), results["wing_drag_coefficient"], results['wing_angle_of_attack_bridle'], mask,axs, label = "Wing from bridle")
     pu.plot_cl_curve(np.sqrt((results["wing_lift_coefficient"]**2+results["wing_sideforce_coefficient"]**2)), results["wing_drag_coefficient"], (results['wing_angle_of_attack_imu_0']), mask,axs, label = "IMU 0")
 
 
@@ -36,7 +36,7 @@ def plot_kite_aero(config_data: dict):
 
     #%%
     fig, axs = plt.subplots(2, 2, figsize=(10, 10))
-    aoa_plot=flight_data['wing_angle_of_attack']
+    aoa_plot=results['wing_angle_of_attack_bridle']
     mask =  mask & (flight_data['up'] > 0.9) | (flight_data['up'] < 0.1)
     pu.plot_cl_curve(np.sqrt((results["wing_lift_coefficient"]**2+results["wing_sideforce_coefficient"]**2)), results["wing_drag_coefficient"], aoa_plot, mask,axs, label = "Straight")
     # mask = (flight_data['turn_straight'] == 'turn') & mask
@@ -79,7 +79,7 @@ def plot_kite_aero(config_data: dict):
 
         return time_delay, cross_corr
 
-
+    mask = flight_data['up'] > 0.8
     signal_1 = -flight_data['us'][mask]
     signal_2 = results["wing_sideforce_coefficient"][mask]
 

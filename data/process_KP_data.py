@@ -195,12 +195,7 @@ class ProcessKpData:
             ],
             axis=1,
         )
-        offset_tether_length = np.mean(
-            kite_radius - flight_data["tether_length"]
-        )
-        # flight_data["ground_tether_length"] = (
-        #     flight_data["ground_tether_length"] + offset_tether_length
-        # )
+
         print(
             "Date: ",
             log["date"].iloc[0],
@@ -208,7 +203,7 @@ class ProcessKpData:
             round(len(flight_data) / 10 / 60, 1),
             "min",
         )
-        print("Offset tether length: ", offset_tether_length)
+
         # Add the time data
         flight_data["time"] = log["time"] - log["time"].iloc[0]
         flight_data["time_of_day"] = log["time_of_day"]

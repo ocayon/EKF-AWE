@@ -93,14 +93,11 @@ class AnalyzeAweFromCsvLog:
         month = str(self.config_data["month"])
         day = str(self.config_data["day"])
         kite_model = self.config_data["kite"]["model_name"]
-        remove_IMU_offsets = self.config_data['postprocess']["remove_IMU_offsets"]
-        correct_IMU_deformation = self.config_data['postprocess']["correct_IMU_deformation"]
-        remove_vane_offsets = self.config_data['postprocess']["remove_vane_offsets"]
-        estimate_kite_angle = self.config_data['postprocess']["estimate_kite_angle"]
+
 
         flight_data = read_processed_flight_data(year, month, day, kite_model)
 
-        # flight_data = flight_data.iloc[:10000]
+        # flight_data = flight_data.iloc[:30000]
         # flight_data.reset_index(drop=True, inplace=True)
 
         # %% Initialize EKF
@@ -189,10 +186,9 @@ class AnalyzeAweFromCsvLog:
             kite,
             kcu,
             self.config_data,
-            correct_IMU_deformation=correct_IMU_deformation,
         )
         # %% Store results
-        save_results(ekf_output_df, flight_data, kite_model, year, month, day)
+        save_results(ekf_output_df, flight_data, kite_model, year, month, day, self.config_data)
 
     def run(self):
         if self.analysis_mode == AnalyzeAweFromCsvLog.AnalysisMode.Analyze:

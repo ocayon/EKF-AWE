@@ -9,7 +9,7 @@ import awes_ekf.plotting.plot_utils as pu
 
 def plot_kite_trajectories(config_data: dict) -> None:
     # Load results and flight data and plot kite reference frame
-    results, flight_data = read_results(str(config_data['year']), str(config_data['month']), str(config_data['day']), config_data['kite']['model_name'])
+    results, flight_data,_ = read_results(str(config_data['year']), str(config_data['month']), str(config_data['day']), config_data['kite']['model_name'])
 
     mask = (flight_data.cycle == 65)
     # mask = (flight_data.index > 1000)

@@ -144,7 +144,6 @@ def postprocess_results(
     kite,
     kcu,
     config_data,
-    correct_IMU_deformation=False,
 ):
     """
     Calculate angle of attack and sideslip based on kite and KCU IMU data
@@ -167,7 +166,7 @@ def postprocess_results(
     kite_sensors = config_data["kite"]["sensor_ids"]
     kcu_sensors = config_data["kcu"].get("sensor_ids", [])
 
-    
+    flight_data["tether_length"] = flight_data["tether_length"] + results["tether_length_offset"]
     for imu in kite_sensors:
         flight_data = remove_offsets_IMU_data(results, flight_data, sensor=imu, prefix="kite")
     for imu in kcu_sensors:
@@ -200,9 +199,9 @@ def postprocess_results(
     dt = flight_data["time"].iloc[1] - flight_data["time"].iloc[0]
     a_kite = np.vstack(
         (
-            np.concatenate((np.diff(v_kite[:, 0]) / dt, [0])),
-            np.concatenate((np.diff(v_kite[:, 1]) / dt, [0])),
-            np.concatenate((np.diff(v_kite[:, 2]) / dt, [0])),
+            np.gradient(v_kite[:, 0], dt),
+            np.gradient(v_kite[:, 1], dt),
+            np.gradient(v_kite[:, 2], dt),
         )
     ).T
 
@@ -236,15 +235,15 @@ def postprocess_results(
             flight_data, results, sensor_index=imu, prefix="kite"
         )
 
-        flight_data["offset_pitch_" + str(imu)] = (
+        results["offset_depower_imu_" + str(imu)] = (
             offset_dep * flight_data["up"]
-        )  # + offset_turn * flight_data["us"]
+        ) 
     for imu in kcu_sensors:
         offset_dep, offset_turn = calculate_offset_pitch_depower_turn(
             flight_data, results, sensor_index=imu, prefix="kcu"
         )
 
-        flight_data["offset_pitch_" + str(imu)] = (
+        results["offset_depower_imu_" + str(imu)] = (
             offset_dep * flight_data["up"]
         )  # + offset_turn * flight_data["us"]
             
@@ -268,12 +267,10 @@ def postprocess_results(
     omega_p = []
     omega_q = []
     omega_r = []
-    kite_elevation = []
     for i in range(len(results)):
         res = results.iloc[i]
         fd = flight_data.iloc[i]
-        # Calculate tether orientation based on euler angles
-        q = 0.5 * 1.225 * kite.area * res["kite_apparent_windspeed"] ** 2
+
         for imu in kite_sensors:
             dcm = calculate_reference_frame_euler(
                 flight_data["kite_roll_" + str(imu)].iloc[i],
@@ -286,8 +283,7 @@ def postprocess_results(
             airflow_angles = calculate_airflow_angles(dcm, va_kite[i])
             results.loc[i, "wing_angle_of_attack_imu_" + str(imu)] = airflow_angles[0]  # Angle of attack
             results.loc[i, "wing_sideslip_angle_imu_" + str(imu)] = airflow_angles[1]  # Sideslip angle
-        ez_kite = dcm[:, 2]
-        kite_elevation.append(np.arcsin(-ez_kite[2]))
+
         at = (
             np.dot(a_kite[i], np.array(v_kite[i]) / np.linalg.norm(v_kite[i]))
             * np.array(v_kite[i])
@@ -322,26 +318,14 @@ def postprocess_results(
 
     print("Number of cycles:", cycle_count)
     results["slack"] = slack
-    flight_data["radius_turn"] = radius_turn
+    results["radius_turn"] = radius_turn
     results["omega"] = omega
-    results["omega_p"] = omega_p
-    results["omega_q"] = omega_q
-    results["omega_r"] = omega_r
-    results["kite_elevation"] = kite_elevation
+    results["roll_rate"] = omega_p
+    results["pitch_rate"] = omega_q
+    results["yaw_rate"] = omega_r
 
-    
-    results, flight_data = correct_aoa_ss_measurements(results, flight_data)
-
-    if correct_IMU_deformation:
-        for imu in kite_sensors:
-            results["kite_pitch_" + str(imu)] = flight_data[
-                "kite_pitch_" + str(imu)
-            ] + (flight_data["offset_pitch_" + str(imu)])
-
-        for imu in kcu_sensors:
-            results["kcu_pitch_" + str(imu)] = flight_data[
-                "kcu_pitch_" + str(imu)
-            ] + (flight_data["offset_pitch_" + str(imu)])
+    if len(kite_sensors) > 0:
+        results, flight_data = correct_aoa_ss_measurements(results, flight_data)
 
     return results, flight_data
 
@@ -451,16 +435,16 @@ def correct_aoa_ss_measurements(results, flight_data, imu=0):
     print("Offset ss vane: ", offset_ss_vane)
     print("Offset ss ekf: ", offset_ss_ekf)
     # Correct angle of attack and sideslip angle based on kite deployment
-    flight_data["wing_angle_of_attack"] = aoa_vane + offset_aoa_vane
-    flight_data["wing_sideslip_angle"] = ss_vane + offset_ss_vane
+    results["wing_angle_of_attack_bridle"] = aoa_vane + offset_aoa_vane
+    results["wing_sideslip_angle_bridle"] = ss_vane + offset_ss_vane
     results["wing_angle_of_attack"] = aoa_ekf + offset_aoa_ekf
     results["wing_sideslip_angle"] = ss_ekf + offset_ss_ekf
 
     results["wing_angle_of_attack"] = results["wing_angle_of_attack"] - np.degrees(
-        flight_data["offset_pitch_0"]
+        results["offset_depower_imu_0"]
     )
-    flight_data["wing_angle_of_attack"] = flight_data[
-        "wing_angle_of_attack"
-    ] - np.degrees(flight_data["offset_pitch_0"])
+    results["wing_angle_of_attack_bridle"] = results[
+        "wing_angle_of_attack_bridle"
+    ] - np.degrees(results["offset_depower_imu_0"])
 
     return results, flight_data
