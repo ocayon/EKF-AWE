@@ -10,9 +10,10 @@ def plot_kite_aero(config_data: dict):
     # Load results and flight data and plot kite reference frame
     results, flight_data = read_results(str(config_data['year']), str(config_data['month']), str(config_data['day']), config_data['kite']['model_name'])
 
-    cycles_plotted = np.arange(6,50, step=1)
+    kite_sensors = config_data['kite']['sensor_ids']
+    cycles_plotted = np.arange(6,70, step=1)
     # %% Plot results aerodynamic coefficients
-    pu.plot_aero_coeff_vs_aoa_ss(results, flight_data, cycles_plotted,IMU_0=True,IMU_1=True,savefig=False) # Plot aero coeff vs aoa_ss
+    pu.plot_aero_coeff_vs_aoa_ss(results, flight_data, cycles_plotted,kite_sensors,savefig=False) # Plot aero coeff vs aoa_ss
     pu.plot_aero_coeff_vs_up_us(results, flight_data, cycles_plotted,IMU_0=False,savefig=False) # Plot aero coeff vs up_used
 
 
@@ -22,7 +23,7 @@ def plot_kite_aero(config_data: dict):
     fig, axs = plt.subplots(2, 2, figsize=(10, 10), sharex=True)
     pu.plot_cl_curve(np.sqrt((results["wing_lift_coefficient"]**2+results["wing_sideforce_coefficient"]**2)), results["wing_drag_coefficient"], results['wing_angle_of_attack'], mask,axs, label = "Wing from EKF")
     pu.plot_cl_curve(np.sqrt((results["wing_lift_coefficient"]**2+results["wing_sideforce_coefficient"]**2)), results["wing_drag_coefficient"], flight_data['wing_angle_of_attack'], mask,axs, label = "Wing from bridle")
-    pu.plot_cl_curve(np.sqrt((results["wing_lift_coefficient"]**2+results["wing_sideforce_coefficient"]**2)), results["wing_drag_coefficient"], (results['wing_angle_of_attack_imu_0']+results['wing_angle_of_attack_imu_1'])/2, mask,axs, label = "IMU average")
+    pu.plot_cl_curve(np.sqrt((results["wing_lift_coefficient"]**2+results["wing_sideforce_coefficient"]**2)), results["wing_drag_coefficient"], (results['wing_angle_of_attack_imu_0']), mask,axs, label = "IMU 0")
 
 
     # axs[0,0].axvline(x = np.mean(aoa_plot[flight_data['powered'] == 'powered']), color = 'k',linestyle = '--', label = 'Mean reel-out angle of attack')
@@ -36,10 +37,10 @@ def plot_kite_aero(config_data: dict):
     #%%
     fig, axs = plt.subplots(2, 2, figsize=(10, 10))
     aoa_plot=flight_data['wing_angle_of_attack']
-    mask = (flight_data['turn_straight'] == 'straight') & mask & (flight_data['up'] > 0.9) | (flight_data['up'] < 0.1)
-    pu.plot_cl_curve(np.sqrt((results["wing_lift_coefficient"]**2+results["wing_sideforce_coefficient"]**2)), results["wing_drag_coefficient"]+results["tether_drag_coefficient"]+results["kcu_drag_coefficient"], aoa_plot, mask,axs, label = "Straight")
-    mask = (flight_data['turn_straight'] == 'turn') & mask
-    pu.plot_cl_curve(np.sqrt((results["wing_lift_coefficient"]**2+results["wing_sideforce_coefficient"]**2)), results["wing_drag_coefficient"]+results["tether_drag_coefficient"]+results["kcu_drag_coefficient"], aoa_plot, mask,axs, label = "Turn")
+    mask =  mask & (flight_data['up'] > 0.9) | (flight_data['up'] < 0.1)
+    pu.plot_cl_curve(np.sqrt((results["wing_lift_coefficient"]**2+results["wing_sideforce_coefficient"]**2)), results["wing_drag_coefficient"], aoa_plot, mask,axs, label = "Straight")
+    # mask = (flight_data['turn_straight'] == 'turn') & mask
+    # pu.plot_cl_curve(np.sqrt((results["wing_lift_coefficient"]**2+results["wing_sideforce_coefficient"]**2)), results["wing_drag_coefficient"]+results["tether_drag_coefficient"]+results["kcu_drag_coefficient"], aoa_plot, mask,axs, label = "Turn")
     axs[0,0].axvline(x = np.mean(aoa_plot[flight_data['powered'] == 'powered']), color = 'k',linestyle = '--', label = 'Mean reel-out angle of attack')
     axs[0,0].axvline(x = np.mean(aoa_plot[flight_data['powered'] == 'depowered']), color = 'b',linestyle = '--', label = 'Mean reel-in angle of attack')
     axs[0,0].legend()
@@ -79,8 +80,8 @@ def plot_kite_aero(config_data: dict):
         return time_delay, cross_corr
 
 
-    signal_1 = -flight_data['us']
-    signal_2 = results["wing_sideforce_coefficient"]
+    signal_1 = -flight_data['us'][mask]
+    signal_2 = results["wing_sideforce_coefficient"][mask]
 
     time_delay,cross_corr = find_time_delay(signal_1, signal_2)
     # Plot the signals and their cross-correlation

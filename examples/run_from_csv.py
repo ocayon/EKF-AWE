@@ -227,10 +227,10 @@ def get_awes_model_from_string(awes_model_str: str) -> AWESModel:
 
 
 def main() -> None:
-    default_model_str = 'kp-v3'
-    default_date = datetime.strptime('2019-10-08', '%Y-%m-%d').date()
+    default_model_str = 'kp-v9'
+    default_date = datetime.strptime('2023-11-27', '%Y-%m-%d').date()
     default_run_option = 'analyze'
-    default_log_dir = Path('./data/v3/')
+    default_log_dir = Path('./data/v9/')
 
     # Query for the system model
     valid_model_str = ['kp-v3', 'kp-v9', 'kft']

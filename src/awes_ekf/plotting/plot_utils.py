@@ -362,9 +362,7 @@ def plot_aero_coeff_vs_aoa_ss(
     results,
     flight_data,
     cycles_plotted,
-    IMU_0=False,
-    IMU_1=False,
-    EKF=True,
+    kite_sensors,
     savefig=False,
 ):
     """
@@ -400,50 +398,39 @@ def plot_aero_coeff_vs_aoa_ss(
     axs[2].plot(results[mask_cycle]["time"], results[mask_cycle]["wing_sideforce_coefficient"], label="cs_wing")
 
     # AOA and Side Slip plots with conditions
-    if EKF:
-        axs[3].plot(
-            results[mask_cycle]["time"],
-            results[mask_cycle]["wing_angle_of_attack"],
-            label="aoa EKF",
-        )
-        axs[4].plot(
-            results[mask_cycle]["time"],
-            results[mask_cycle]["wing_sideslip_angle"],
-            label="ss EKF",
-        )
-    if IMU_0:
-        axs[3].plot(
-            results[mask_cycle]["time"],
-            results[mask_cycle]["wing_angle_of_attack_imu_0"],
-            label="aoa IMU 0",
-        )
-        axs[4].plot(
-            results[mask_cycle]["time"],
-            results[mask_cycle]["wing_sideslip_angle_imu_0"],
-            label="ss IMU 0",
-        )
-    if IMU_1:
-        axs[3].plot(
-            results[mask_cycle]["time"],
-            results[mask_cycle]["wing_angle_of_attack_imu_1"],
-            label="aoa IMU 1",
-        )
-        axs[4].plot(
-            results[mask_cycle]["time"],
-            results[mask_cycle]["wing_sideslip_angle_imu_1"],
-            label="ss IMU 1",
-        )
+    axs[3].plot(
+        results[mask_cycle]["time"],
+        results[mask_cycle]["wing_angle_of_attack"],
+        label="aoa EKF",
+    )
+    axs[4].plot(
+        results[mask_cycle]["time"],
+        results[mask_cycle]["wing_sideslip_angle"],
+        label="ss EKF",
+    )
+    aoa_imu = np.zeros(len(results[mask_cycle]))
+    ss_imu = np.zeros(len(results[mask_cycle]))
+    for sensor in kite_sensors:
+        aoa_imu += results[mask_cycle]["wing_angle_of_attack_imu_" + str(sensor)]
+        ss_imu += results[mask_cycle]["wing_sideslip_angle_imu_" + str(sensor)]
+    aoa_imu /= len(kite_sensors)
+    ss_imu /= len(kite_sensors)
+    axs[3].plot(
+        results[mask_cycle]["time"],
+        aoa_imu,
+        label="aoa IMU",
+    )
 
     # Vane data
-    if "kite_angle_of_attack" in flight_data.columns:
+    if "wing_angle_of_attack" in flight_data.columns:
         axs[3].plot(
             flight_data[mask_cycle]["time"],
-            flight_data[mask_cycle]["kite_angle_of_attack"],
+            flight_data[mask_cycle]["wing_angle_of_attack"],
             label="aoa vane",
         )
         axs[4].plot(
             flight_data[mask_cycle]["time"],
-            flight_data[mask_cycle]["kite_sideslip_angle"],
+            flight_data[mask_cycle]["wing_sideslip_angle"],
             label="ss vane",
         )
 

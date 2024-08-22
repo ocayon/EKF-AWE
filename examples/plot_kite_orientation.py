@@ -22,7 +22,7 @@ def plot_kite_orientation(config_data: dict) -> None:
         config_data["kite"]["model_name"],
     )
 
-    imus = [0, 1]
+    imus = config_data["kite"]["sensor_ids"]
 
     for column in results.columns:
         if "pitch" in column or "roll" in column or "yaw" in column:

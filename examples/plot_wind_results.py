@@ -10,6 +10,7 @@ def plot_wind_results(config_data: dict) -> None:
     # Load results and flight data and plot kite reference frame
     results, flight_data = read_results(str(config_data['year']), str(config_data['month']), str(config_data['day']), config_data['kite']['model_name'])
 
+    results['wind_direction'][results['wind_direction']>np.radians(330)] = results['wind_direction'][results['wind_direction']>np.radians(330)]-np.radians(360)
     #%%Plot results wind speed
 
     pu.plot_wind_speed(results,flight_data,savefig=False) # PLot calculated wind speed against lidar
