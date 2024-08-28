@@ -30,7 +30,25 @@ from plot_kite_trajectory import plot_kite_trajectories
 from plot_kite_aero import plot_kite_aero
 from plot_kite_orientation import plot_kite_orientation
 
-
+def list_available_flights(log_directory: Path, file_extension: str = ".csv") -> list:
+    """
+    Lists all available flight log files in the specified directory.
+    
+    :param log_directory: Path to the directory containing flight logs.
+    :param file_extension: Extension of the log files (default is ".csv").
+    :return: List of available flight log files.
+    """
+    flight_logs = list(log_directory.glob(f"*{file_extension}"))
+    
+    if not flight_logs:
+        print(f"No flight logs found in {log_directory}.")
+        return []
+    
+    print(f"Available flight logs in {log_directory}:")
+    for i, log_file in enumerate(flight_logs, start=1):
+        print(f"{i}: {log_file.name}")
+    
+    return flight_logs
 class LogProvider(enum.Enum):
     Kitepower = 1
     Kitekraft = 2
@@ -97,7 +115,7 @@ class AnalyzeAweFromCsvLog:
 
         flight_data = read_processed_flight_data(year, month, day, kite_model)
 
-        # flight_data = flight_data.iloc[:30000]
+        # flight_data = flight_data.iloc[:20000]
         # flight_data.reset_index(drop=True, inplace=True)
 
         # %% Initialize EKF
@@ -111,7 +129,7 @@ class AnalyzeAweFromCsvLog:
             kcu = None
         tether = Tether(kite, kcu, simConfig.obsData, **self.config_data["tether"])
         kite.calc_fx = kite.get_fx_fun(tether)
-
+        
         tuningParams = TuningParameters(self.config_data["tuning_parameters"], simConfig)
 
        # Create input classes
@@ -121,7 +139,7 @@ class AnalyzeAweFromCsvLog:
 
         # Find initial state vector
         x0 = find_initial_state_vector(tether, ekf_input_list[0], simConfig)
-        print(x0)
+        print(kcu.cdt, kcu.cdp)
         ekf, ekf_input_list = initialize_ekf(
             ekf_input_list, simConfig, tuningParams, x0, kite, kcu, tether
         )
@@ -172,7 +190,7 @@ class AnalyzeAweFromCsvLog:
 
         # Postprocess results
         ekf_output_df = convert_ekf_output_to_df(ekf_output_list)
-        ekf_output_df.dropna(subset=["kite_position_x"], inplace=True)
+        ekf_output_df.dropna(subset=["kite_pitch"], inplace=True)
         ekf_output_df.reset_index(drop=True, inplace=True)
         rows_to_keep = ekf_output_df.index
         print(rows_to_keep)
@@ -188,7 +206,7 @@ class AnalyzeAweFromCsvLog:
             self.config_data,
         )
         # %% Store results
-        save_results(ekf_output_df, flight_data, kite_model, year, month, day, self.config_data)
+        save_results(ekf_output_df, flight_data, kite_model, year, month, day, self.config_data, addition="")
 
     def run(self):
         if self.analysis_mode == AnalyzeAweFromCsvLog.AnalysisMode.Analyze:
@@ -228,6 +246,26 @@ def main() -> None:
     default_run_option = 'analyze'
     default_log_dir = Path('./data/v9/')
 
+    log_dir = Path(
+        input(f"Enter the directory with the flight logs [default: {default_log_dir}]: ").strip() or default_log_dir)
+    
+    # List available flights and select one
+    available_flights = list_available_flights(log_dir)
+    if not available_flights:
+        sys.exit("No flights available to analyze.")
+    
+    selected_flight_index = int(input(f"Select a flight to analyze (1-{len(available_flights)}): ")) - 1
+    selected_flight = available_flights[selected_flight_index]
+    print(f"Selected flight: {selected_flight.name}")
+
+    # Extract the date part from the filename
+    filename_parts = selected_flight.stem.split('_')
+    date_str = filename_parts[0]  # "2021-10-07"
+    time_str = filename_parts[1]  # "19-38-15"
+
+    # Convert the date string to a datetime object
+    date = datetime.strptime(date_str, '%Y-%m-%d')
+
     # Query for the system model
     valid_model_str = ['kp-v3', 'kp-v9', 'kft']
     awes_model_str = input(
@@ -239,16 +277,16 @@ def main() -> None:
         sys.exit(1)
     awes_model = get_awes_model_from_string(awes_model_str)
 
-    # Query for the date
-    date_input = input(f"Enter the date in the format YYYY-MM-DD [default: {default_date}]: ").strip()
-    if not date_input:
-        date = default_date
-    else:
-        try:
-            date = datetime.strptime(date_input, '%Y-%m-%d')
-        except ValueError:
-            print("Error: Invalid date format. Please use YYYY-MM-DD.")
-            sys.exit(1)
+    # # Query for the date
+    # date_input = input(f"Enter the date in the format YYYY-MM-DD [default: {default_date}]: ").strip()
+    # if not date_input:
+    #     date = default_date
+    # else:
+    #     try:
+    #         date = datetime.strptime(date_input, '%Y-%m-%d')
+    #     except ValueError:
+    #         print("Error: Invalid date format. Please use YYYY-MM-DD.")
+    #         sys.exit(1)
 
     # Query for the run option
     valid_options = ['analyze', 'plot-wind', 'plot-aero', 'plot-other']
@@ -260,7 +298,6 @@ def main() -> None:
         print(f"Error: Invalid run option. Valid options are: {', '.join(valid_options)}")
         sys.exit(1)
 
-    analysis_mode = None
     if run_option == 'analyze':
         analysis_mode = AnalyzeAweFromCsvLog.AnalysisMode.Analyze
     elif run_option == 'plot-wind':
@@ -270,8 +307,7 @@ def main() -> None:
     elif run_option == 'plot-other':
         analysis_mode = AnalyzeAweFromCsvLog.AnalysisMode.PlotOther
 
-    log_dir = default_log_dir if analysis_mode != AnalyzeAweFromCsvLog.AnalysisMode.Analyze else Path(
-        input(f"Enter the directory with the flight logs [default: {default_log_dir}]: ").strip() or default_log_dir)
+    
 
     print("Starting analysis with:")
     print(f"System Model: {awes_model_str}")

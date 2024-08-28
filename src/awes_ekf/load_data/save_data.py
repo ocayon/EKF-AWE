@@ -36,7 +36,16 @@ def save_results(ekf_output_df, flight_data, kite_model, year, month, day, confi
     # Convert string columns in both DataFrames
     ekf_output_df = encode_strings(ekf_output_df)
     flight_data = encode_strings(flight_data)
-    
+    def sanitize_column_names(df):
+        df.columns = df.columns.str.replace(' ', '_') \
+                                .str.replace('(', '') \
+                                .str.replace(')', '') \
+                                .str.replace('/', '_') \
+                                .str.replace('°', 'deg')
+        return df
+
+    # Sanitize column names
+    flight_data = sanitize_column_names(flight_data)
     # Save the DataFrames to an HDF5 file
     hdf5_filename = file_name + addition + ".h5"
     hdf5_path = os.path.join(path, hdf5_filename)
