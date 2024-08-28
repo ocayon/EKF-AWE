@@ -78,12 +78,8 @@ def create_input_from_csv(
 
     try:
         kite_angle_of_attack = np.array(flight_data["bridle_angle_of_attack"])
-        kite_aoa_mean_v9 = 10
-        offset_aoa = -0.590496147373921
-        ########!!!!!!! ADD automation to calculate offset_aoa
-        offset_dep = -0.89
-        offset_dep += -0.4
-        kite_angle_of_attack = kite_angle_of_attack + offset_aoa + depower_input * offset_dep
+
+        kite_angle_of_attack = kite_angle_of_attack
 
     except KeyError:
         print("No angle of attack data found")
@@ -202,8 +198,8 @@ def find_initial_state_vector(tether, ekf_input, simConfig, wind_velocity=np.arr
     x0 = np.vstack((tether_input.kite_position, tether_input.kite_velocity))
 
     if simConfig.log_profile:
-        uf = np.linalg.norm(tether_input.wind_vel) * kappa / np.log(10 / z0)
-        ground_winddir = np.arctan2(tether_input.wind_vel[1], tether_input.wind_vel[0])
+        uf = np.linalg.norm(tether_input.wind_velocity) * kappa / np.log(10 / z0)
+        ground_winddir = np.arctan2(tether_input.wind_velocity[1], tether_input.wind_velocity[0])
         x0 = np.append(
             x0, [uf, ground_winddir, 0]
         )  # Initial wind velocity and direction
@@ -224,7 +220,7 @@ def find_initial_state_vector(tether, ekf_input, simConfig, wind_velocity=np.arr
         x0 = np.append(
             x0, [ekf_input.kite_yaw, 0]
         )  # Initial wind velocity and direction
-    if simConfig.tether_offset:
+    if simConfig.obsData.tether_length:
         x0 = np.append(x0, 0)  # Initial tether offset
 
     return x0

@@ -225,20 +225,23 @@ class Tether:
                     )
                 elif kcu_element:
                     dj = -0.25 * tether_drag_basis
-                    theta = ca.pi / 2 - theta
-                    cd_kcu = kcu.cdt * ca.sin(theta) ** 3 + self.cf
-                    cl_kcu = kcu.cdt * ca.sin(theta) ** 2 * ca.cos(theta)
+                    
                     # D_turbine = 0.5*rho*ca.norm_2(vaj)**2*ca.pi*0.2**2*1
-                    # dp= -.5*rho*ca.norm_2(vajp)*vajp*kcu.cdp*kcu.Ap  # Adding kcu drag perpendicular to kcu
-                    # dt= -.5*rho*ca.norm_2(vajn)*vajn*kcu.cdt*kcu.At  # Adding kcu drag parallel to kcu
-                    # th = -0.5*rho*vaj_sq*ca.pi*0.2**2*0.4
-                    # dj += dp+dt
+                    dp= -.5*rho*ca.norm_2(vajp)*vajp*kcu.cdp*kcu.Ap  # Adding kcu drag perpendicular to kcu
+                    dt= -.5*rho*ca.norm_2(vajn)*vajn*kcu.cdt*kcu.At  # Adding kcu drag parallel to kcu
+                    th = -0.5*rho*vaj_sq*ca.pi*0.2**2*0.4
+                    D_kcu = ca.norm_2(dp+dt)
+                    dj += dp+dt
                     # Approach described in Hoerner, taken from Paul Thedens dissertation
-                    dir_D = -vaj / ca.norm_2(vaj)
-                    dir_L = ej - ca.dot(ej, dir_D) * dir_D
-                    L_kcu = 0.5 * rho * ca.norm_2(vaj) ** 2 * kcu.Ap * cl_kcu
-                    D_kcu = 0.5 * rho * ca.norm_2(vaj) ** 2 * cd_kcu * kcu.Ap
-                    dj += L_kcu * dir_L + D_kcu * dir_D  # + D_turbine*dir_D
+                    # theta = ca.pi / 2 - theta
+                    # cd_kcu = kcu.cdt * ca.sin(theta) ** 3 + self.cf
+                    # cl_kcu = kcu.cdt * ca.sin(theta) ** 2 * ca.cos(theta)
+                    # dir_D = -vaj / ca.norm_2(vaj)
+                    # dir_L = ej - ca.dot(ej, dir_D) * dir_D
+                    # print(cd_kcu)
+                    # L_kcu = 0.5 * rho * ca.norm_2(vaj) ** 2 * kcu.Ap * cl_kcu
+                    # D_kcu = 0.5 * rho * ca.norm_2(vaj) ** 2 * cd_kcu * kcu.Ap
+                    # dj += L_kcu * dir_L + D_kcu * dir_D  # + D_turbine*dir_D
 
                 else:
                     dir_D = -vaj / ca.norm_2(vaj)

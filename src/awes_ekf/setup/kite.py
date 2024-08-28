@@ -82,7 +82,7 @@ class PointMassEKF(Kite):
         )
         if self.simConfig.model_yaw:
             self.x = ca.vertcat(self.x, self.yaw, self.k_yaw_rate)
-        if self.simConfig.tether_offset:
+        if self.simConfig.obsData.tether_length:
             self.x = ca.vertcat(self.x, self.tether_offset)
 
         return self.x
@@ -174,7 +174,7 @@ class PointMassEKF(Kite):
         if self.simConfig.model_yaw:
             yaw_rate = self.k_yaw_rate * self.us * ca.norm_2(self.va)
             fx = ca.vertcat(fx, yaw_rate, 0)
-        if self.simConfig.tether_offset:
+        if self.simConfig.obsData.tether_length:
             fx = ca.vertcat(fx, 0)
 
         return fx
