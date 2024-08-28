@@ -132,3 +132,46 @@ def plot_kite_trajectory(time, x, y, z, variables=[], vecs=[], labels=None):
     azim_slider.on_changed(update_view)
 
     plt.show()
+
+
+def calculate_azimuth_elevation(x, y, z):
+    # Calculate the azimuth angle (in radians)
+    azimuth = np.arctan2(y, x)
+    
+    # Calculate the elevation angle (in radians)
+    distance = np.sqrt(x**2 + y**2 + z**2)
+    elevation = np.arcsin(z / distance)
+    
+    return azimuth, elevation
+
+def plot_position_azimuth_elevation(results, flight_data):
+    # Extract the EKF (estimated) data
+    x_ekf = results["kite_position_x"]
+    y_ekf = results["kite_position_y"]
+    z_ekf = results["kite_position_z"]
+
+    # Extract the measured data
+    x_meas = flight_data["kite_position_x"]
+    y_meas = flight_data["kite_position_y"]
+    z_meas = flight_data["kite_position_z"]
+
+
+    # Calculate azimuth and elevation for EKF (estimated) data
+    azimuth_ekf, elevation_ekf = calculate_azimuth_elevation(x_ekf, y_ekf, z_ekf)
+
+    # Calculate azimuth and elevation for measured data
+    azimuth_meas, elevation_meas = calculate_azimuth_elevation(x_meas, y_meas, z_meas)
+
+    mean_wind_dir = np.mean(results["wind_direction"])
+    plt.figure()
+    from awes_ekf.plotting.plot_utils import plot_time_series
+    plot_time_series(flight_data,azimuth_ekf, plt.gca(), label="Estimated", ylabel="Wind direction [rad]", plot_phase=True)
+    # Create the figure
+    fig = plt.figure(figsize=(8, 6))
+    plt.plot(np.rad2deg(azimuth_ekf-mean_wind_dir), np.rad2deg(elevation_ekf), label='Estimated')
+    plt.plot(np.rad2deg(azimuth_meas-mean_wind_dir), np.rad2deg(elevation_meas), label='Measured')
+
+    # Set labels and legend
+    plt.xlabel('Azimuth [deg]')
+    plt.ylabel('Elevation [deg]')
+    plt.legend()

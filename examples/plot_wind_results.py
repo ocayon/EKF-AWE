@@ -5,69 +5,55 @@ from awes_ekf.load_data.read_data import read_results
 import awes_ekf.plotting.plot_utils as pu
 from awes_ekf.plotting.color_palette import get_color_list, visualize_palette, set_plot_style
 
-
+set_plot_style()
 def plot_wind_results(config_data: dict) -> None:
     # Load results and flight data and plot kite reference frame
     results, flight_data,_ = read_results(str(config_data['year']), str(config_data['month']), str(config_data['day']), config_data['kite']['model_name'])
+    # res_va, fd_va, _ = read_results(str(config_data['year']), str(config_data['month']), str(config_data['day']), config_data['kite']['model_name'],addition='_va')
+    # res_log, fd_log, _ = read_results(str(config_data['year']), str(config_data['month']), str(config_data['day']), config_data['kite']['model_name'],addition='_log')
+    # res_min, fd_min, _ = read_results(str(config_data['year']), str(config_data['month']), str(config_data['day']), config_data['kite']['model_name'],addition='_min')
 
-    results['wind_direction'][results['wind_direction']>np.radians(330)] = results['wind_direction'][results['wind_direction']>np.radians(330)]-np.radians(360)
+    results.loc[results['wind_direction'] > np.radians(300), 'wind_direction'] -= np.radians(360)
+    cut = 1000
+    results = results.iloc[cut::]
+    flight_data = flight_data.iloc[cut::]
+ 
+    results = results.reset_index(drop=True)
+    flight_data = flight_data.reset_index(drop=True)
+
     #%%Plot results wind speed
+    fig, axs = plt.subplots(3, 1, figsize=(6, 8), sharex=True)
+    pu.plot_wind_speed(results,flight_data,axs,savefig=False) # PLot calculated wind speed against lidar
 
-    pu.plot_wind_speed(results,flight_data,savefig=False) # PLot calculated wind speed against lidar
+
+    # flight_data = pu.interpolate_lidar_data(flight_data, results)
+    # fig, axs = plt.subplots(3, 1, figsize=(6, 8), sharex=True)
+    # pu.plot_wind_speed_log_interpolation(results,flight_data,axs,savefig=False) # PLot calculated wind speed against lidar
+
+
     #%%
-    pu.plot_wind_speed_height_bins(results,flight_data, savefig=False) # Plot calculated wind speed against lidar
+    # pu.plot_wind_speed_height_bins(results,flight_data, savefig=False) # Plot calculated wind speed against lidar
+    
     #%%
-    axs = pu.plot_wind_profile_bins(flight_data, results, step = 10, savefig = False)
+    fig, axs = plt.subplots(1, 2, figsize=(8, 6))
+    pu.plot_wind_profile_bins(flight_data, results, axs, step=10, color="Blue", label="Min. + $l_t$", lidar_data=True)
+    # pu.plot_wind_profile_bins(flight_data, res_va, axs, step=10, color="Orange", label="Min. + $v_a$")
+    # pu.plot_wind_profile_bins(flight_data, res_log, axs, step=10, color="Green", label="Min. + Log Profile Law")
+
+    
+    # fig, axs = plt.subplots(1, 2, figsize=(8, 6))
+
+    # axs[0].plot(flight_data["interp_wind_speed"], results["wind_speed_horizontal"], '.', label="Min. + $l_t$", alpha=0.1)
+    # axs[0].plot(flight_data["interp_wind_speed"], flight_data["interp_wind_speed"], 'k--', label="1:1 line")
+    # flight_data["interp_wind_direction"] = 270-np.array(flight_data["interp_wind_direction"])
+    # axs[1].plot(flight_data["interp_wind_direction"], results["wind_direction"]*180/np.pi, '.', label="Min. + $l_t$", alpha=0.1)
+    # axs[1].plot(flight_data["interp_wind_direction"], flight_data["interp_wind_direction"], 'k--', label="1:1 line")
 
 
+    plt.show()
     #%% Plot wind energy spectrum
-    fs = 10
-    mask = range(len(results))#(results['kite_pos_z']>140)&(results['kite_pos_z']<180)
-    signal = np.array(results["wind_speed_horizontal"][mask])
-    from scipy.stats import linregress
-
-    # Assuming your signal is stored in `signal`
-    fs = 10  # Sampling frequency in Hz, adjusted to 10 Hz based on the timestep of 0.1s
-    T = len(signal) / fs  # Duration in seconds, calculated based on your signal length
-    t = np.linspace(0, T, int(T*fs), endpoint=False)  # Time vector, adjusted
-
-    # Subtract the mean to focus on fluctuations
-    signal_fluctuations = signal - np.mean(signal)
-
-    # Compute FFT and frequencies
-    fft_result = np.fft.fft(signal_fluctuations)
-    fft_freq = np.fft.fftfreq(signal_fluctuations.size, d=1/fs)
-
-    # Compute energy spectrum (magnitude squared)
-    energy_spectrum = np.abs(fft_result)**2/flight_data['time'].iloc[-1]
-
-    # Select positive frequencies for plotting and analysis
-    pos_freq = fft_freq > 0
-    pos_energy_spectrum = energy_spectrum[pos_freq]
-    pos_fft_freq = fft_freq[pos_freq]
-
-    # Log-log plot
-    plt.figure(figsize=(10, 6))
-    plt.loglog(pos_fft_freq, pos_energy_spectrum, label='Energy Spectrum')
-    plt.xlabel('Frequency (Hz)')
-    plt.ylabel('Power Spectral Density ($m^2/s^2$)')
-
-    # Determine an appropriate subrange and calculate the slope
-    # Adjust subrange_start and subrange_end based on your data
-    subrange_start = 1e-2  # Example start frequency
-    subrange_end = 2e-1   # Example end frequency
-    subrange_mask = (pos_fft_freq > subrange_start) & (pos_fft_freq < subrange_end)
-
-    if np.any(subrange_mask):
-        slope, intercept, r_value, p_value, std_err = linregress(np.log(pos_fft_freq[subrange_mask]), np.log(pos_energy_spectrum[subrange_mask]))
-        plt.plot(pos_fft_freq[subrange_mask], np.exp(intercept) * pos_fft_freq[subrange_mask] ** slope, 'r--', label=f'Fitted Slope: {slope:.2f}')
-        print(f"The calculated slope is: {slope:.2f}")
-    else:
-        print("No data in the specified subrange. Please adjust the subrange criteria.")
-
-    slope = -5/3
-    plt.plot(pos_fft_freq[subrange_mask], np.exp(intercept) * pos_fft_freq[subrange_mask] ** slope, 'g--', label=f'Kolmogorov: -5/3')
-    plt.legend()
+    fig, ax = plt.subplots(1, 1, figsize=(6, 4))
+    pu.plot_kinetic_energy_spectrum(results, flight_data,ax, savefig=False)    
 
 
     #%% Plot turbulence intensity

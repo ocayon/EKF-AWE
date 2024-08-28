@@ -11,7 +11,12 @@ from awes_ekf.postprocess.postprocessing import (
 )
 
 # set_plot_style()
-
+def cut_data(results, flight_data, range):
+    results = results.iloc[range[0]:range[1]]
+    flight_data = flight_data.iloc[range[0]:range[1]]
+    results = results.reset_index(drop=True)
+    flight_data = flight_data.reset_index(drop=True)
+    return results, flight_data
 
 def plot_kite_orientation(config_data: dict) -> None:
     # Load results and flight data and plot kite reference frame
@@ -21,6 +26,7 @@ def plot_kite_orientation(config_data: dict) -> None:
         str(config_data["day"]),
         config_data["kite"]["model_name"],
     )
+    results, flight_data = cut_data(results, flight_data, [5000,8000])
 
     imus = config_data["kite"]["sensor_ids"]
 

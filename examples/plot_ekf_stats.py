@@ -6,7 +6,7 @@ from awes_ekf.load_data.read_data import read_results
 import awes_ekf.plotting.plot_utils as pu
 
 # Load configuration
-config_file_name = "v3_config.yaml"
+config_file_name = "v9_config.yaml"
 config = load_config("examples/" + config_file_name)
 
 # Load results and flight data
