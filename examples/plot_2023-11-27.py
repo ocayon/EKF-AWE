@@ -28,7 +28,17 @@ res_min, fd_min, _ = read_results(year, month, day, kite_model,addition='_min')
 from awes_ekf.postprocess.postprocessing import remove_offsets_IMU_data
 from awes_ekf.plotting.plot_orientation import plot_kite_orientation
 
-mask = flight_data["cycle"].isin([40, 41])
+mask = flight_data["cycle"].isin([62,63,64,65,66])
+
+fig, ax = plt.subplots(1, 1, figsize=(10, 5))
+pu.plot_time_series(flight_data[mask], results[mask]["norm_epsilon_norm"], ax, plot_phase=True)
+ax.legend()
+ax.set_xlabel("Time [s]")
+ax.set_ylabel("Norm of Normalized Residuals")
+plt.tight_layout()
+plt.savefig("./results/plots_paper/norm_residuals_2023-11-27.pdf")
+plt.show()
+
 
 plot_kite_orientation(results[mask], flight_data[mask], kite_imus=config_data["kite"]["sensor_ids"])
 plt.savefig("./results/plots_paper/kite_orientation_2023-11-27.pdf")
@@ -40,9 +50,14 @@ res_va, fd_va = cut_data(res_va, fd_va, [cut, -cut])
 res_log, fd_log = cut_data(res_log, fd_log, [cut, -cut])
 res_min, fd_min = cut_data(res_min, fd_min, [cut, -cut])
 
+fig, ax = plt.subplots(1, 1, figsize=(10, 6))
+pu.plot_kinetic_energy_spectrum(res_va, fd_va, ax, savefig=False)
+plt.show()
+
 fig, ax = plt.subplots(1, 1, figsize=(8, 6))
-pu.plot_turbulence_intensity(results, flight_data, 140, ax)
+# pu.plot_turbulence_intensity(results, flight_data, 140, ax)
 pu.plot_turbulence_intensity(res_va, fd_va, 140, ax)
+plt.savefig("./results/plots_paper/turbulence_intensity_2023-11-27.pdf")
 plt.show()
 
 chunk_size = 12000  # Number of rows in each subset
@@ -108,7 +123,7 @@ res_min, fd_min = cut_data(res_min, fd_min, [t0, t0+dt])
 
 
 
-fig, axs = plt.subplots(3, 1, figsize=(8, 6), sharex=True)
+fig, axs = plt.subplots(3, 1, figsize=(10, 6), sharex=True)
 axs[0].plot(fd_min["time"], res_min["wind_speed_horizontal"], label="Min. measurements", color = get_color("Blue"))
 axs[0].plot(flight_data["time"], results["wind_speed_horizontal"], label="Min. + $l_t$", color = get_color("Orange"))
 axs[0].plot(fd_va["time"], res_va["wind_speed_horizontal"], label="Min. + $v_a$", color = get_color("Green"))
@@ -158,4 +173,6 @@ axs[2].set_xticklabels(time_of_day.iloc[tick_indices], rotation=45, ha="right")
 plt.tight_layout()
 plt.savefig("./results/plots_paper/wind_speed_2023-11-27.pdf")
 plt.show()
+
+
 

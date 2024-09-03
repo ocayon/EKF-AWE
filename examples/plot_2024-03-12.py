@@ -14,15 +14,20 @@ kite_model = "v9"
 
 results, flight_data,_ = read_results(year, month, day, kite_model,addition='_min')
 
+results["cycle"] = flight_data["cycle"]
+
 cut = 200
 results = results.iloc[cut:-cut]
 flight_data = flight_data.iloc[cut:-cut]
+
+
 
 results = results.reset_index(drop=True)
 flight_data = flight_data.reset_index(drop=True)
 
 fig, ax = plt.subplots(1, 1, figsize=(8, 6))
 pu.plot_turbulence_intensity(results, flight_data, 140, ax, savefig=False)
+plt.savefig("./results/plots_paper/turbulence_intensity_2024-03-12.pdf")
 plt.show()
 
 chunk_size = 12000  # Number of rows in each subset
@@ -75,7 +80,7 @@ flight_data = pu.interpolate_lidar_data(flight_data, results)
 
 
 
-fig, axs = plt.subplots(3, 1, figsize=(8, 6), sharex=True)
+fig, axs = plt.subplots(3, 1, figsize=(10, 6), sharex=True)
 axs[0].plot(flight_data["time"], results["wind_speed_horizontal"], label="Min. measurements", color = get_color("Blue"))
 axs[0].plot(flight_data["time"], flight_data["interp_wind_speed"], label="Lidar", color = get_color("Dark Gray"))
 axs[0].fill_between(

@@ -139,7 +139,7 @@ class AnalyzeAweFromCsvLog:
 
         # Find initial state vector
         x0 = find_initial_state_vector(tether, ekf_input_list[0], simConfig)
-        print(kcu.cdt, kcu.cdp)
+        
         ekf, ekf_input_list = initialize_ekf(
             ekf_input_list, simConfig, tuningParams, x0, kite, kcu, tether
         )
@@ -311,7 +311,7 @@ def main() -> None:
 
     print("Starting analysis with:")
     print(f"System Model: {awes_model_str}")
-    print(f"Date: {date}")
+    print(f"Date: {date_str}, Time: {time_str}")
     print(f"Run Option: {run_option}")
     print(f"Log directory: {log_dir}")
     

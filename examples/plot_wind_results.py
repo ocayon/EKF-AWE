@@ -13,7 +13,7 @@ def plot_wind_results(config_data: dict) -> None:
     # res_log, fd_log, _ = read_results(str(config_data['year']), str(config_data['month']), str(config_data['day']), config_data['kite']['model_name'],addition='_log')
     # res_min, fd_min, _ = read_results(str(config_data['year']), str(config_data['month']), str(config_data['day']), config_data['kite']['model_name'],addition='_min')
 
-    results.loc[results['wind_direction'] > np.radians(300), 'wind_direction'] -= np.radians(360)
+    results.loc[results['wind_direction'] > np.radians(250), 'wind_direction'] -= np.radians(360)
     cut = 1000
     results = results.iloc[cut::]
     flight_data = flight_data.iloc[cut::]

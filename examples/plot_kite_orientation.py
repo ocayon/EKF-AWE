@@ -6,8 +6,7 @@ import awes_ekf.plotting.plot_utils as pu
 import seaborn as sns
 from awes_ekf.plotting.color_palette import get_color_list, set_plot_style, get_color
 from awes_ekf.postprocess.postprocessing import (
-    remove_offsets_IMU_data,
-    calculate_offset_pitch_depower_turn,
+    remove_offsets_IMU_data_v3
 )
 
 # set_plot_style()
@@ -20,28 +19,41 @@ def cut_data(results, flight_data, range):
 
 def plot_kite_orientation(config_data: dict) -> None:
     # Load results and flight data and plot kite reference frame
-    results, flight_data,_ = read_results(
+    results, flight_data,config_data = read_results(
         str(config_data["year"]),
         str(config_data["month"]),
         str(config_data["day"]),
         config_data["kite"]["model_name"],
     )
+
+    for imu in config_data["kite"]["sensor_ids"]:
+        flight_data = remove_offsets_IMU_data_v3(results, flight_data, sensor=imu)
+
+
     results, flight_data = cut_data(results, flight_data, [5000,8000])
 
     imus = config_data["kite"]["sensor_ids"]
 
     for column in results.columns:
         if "pitch" in column or "roll" in column or "yaw" in column:
+            if "yaw" in column:
+                results[column] = np.unwrap(results[column])
             results[column] = np.degrees(results[column])
 
     for column in flight_data.columns:
         if "pitch" in column or "roll" in column or "yaw" in column:
+            if "yaw" in column:
+                flight_data[column] = np.unwrap(flight_data[column])
+            if "pitch" in column:
+                flight_data[column] = flight_data[column] + results["offset_depower_imu_0"]
             flight_data[column] = np.degrees(flight_data[column])
 
+    results["kite_pitch"] = np.convolve(results["kite_pitch"], np.ones(10)/10, mode="same")
+    results["kite_roll"] = np.convolve(results["kite_roll"], np.ones(10)/10, mode="same")
     # Calculate errors
     pitch_error = abs(flight_data["kite_pitch_0"] - results["kite_pitch"])
     roll_error = abs(flight_data["kite_roll_0"] - results["kite_roll"])
-    yaw_error = abs(flight_data["kite_yaw_0"] - results["kite_yaw"])
+    yaw_error = abs(flight_data[flight_data["us"]<0.3]["kite_yaw_0"] - results[flight_data["us"]<0.3]["kite_yaw"])
 
     mean_pitch_error = np.mean(pitch_error)
     mean_roll_error = np.mean(roll_error)

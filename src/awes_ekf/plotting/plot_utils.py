@@ -802,7 +802,7 @@ def plot_time_series(
         y1, y2 = ax.get_ylim()
 
         # Mask and fill for "straight and powered" phase
-        mask = (flight_data["turn_straight"] == "straight") & (
+        mask = (abs(flight_data["us"]) < 0.4) & (
             flight_data["powered"] == "powered"
         )
         ax.fill_between(
@@ -816,7 +816,7 @@ def plot_time_series(
         )
 
         # Mask and fill for "turn and powered" phase
-        mask = (flight_data["turn_straight"] == "turn") & (
+        mask = (abs(flight_data["us"]) > 0.4) & (
             flight_data["powered"] == "powered"
         )
         ax.fill_between(

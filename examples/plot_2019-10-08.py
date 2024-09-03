@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from awes_ekf.postprocess.postprocessing import remove_offsets_IMU_data_v3
 from awes_ekf.load_data.read_data import read_results
-from awes_ekf.plotting.plot_utils import plot_time_series
+from awes_ekf.plotting.plot_utils import plot_time_series, plot_kinetic_energy_spectrum
 from awes_ekf.plotting.plot_orientation import plot_kite_orientation
 from awes_ekf.plotting.color_palette import get_color_list, visualize_palette, set_plot_style, get_color
 
@@ -22,6 +22,10 @@ kite_model = "v3"
 
 results, flight_data,config_data = read_results(year, month, day, kite_model,addition='')
 
+
+plt.plot(results["offset_depower_imu_0"]*180/np.pi)
+plt.show()
+
 for imu in config_data["kite"]["sensor_ids"]:
     flight_data = remove_offsets_IMU_data_v3(results, flight_data, sensor=imu)
 
@@ -34,6 +38,37 @@ results["kite_roll"] = np.convolve(results["kite_roll"], np.ones(10)/10, mode="s
 plot_kite_orientation(results[mask], flight_data[mask], kite_imus=[0, 1])
 plt.savefig("./results/plots_paper/kite_orientation_2019-10-08.pdf")
 plt.show()
+
+plt.figure()
+plot_time_series(flight_data[mask], results[mask]["kite_apparent_windspeed"], plt.gca(), label="Yaw kite", plot_phase=True)
+plt.show()
+
+fig, ax = plt.subplots(1, 1, figsize=(10, 5))
+plot_time_series(
+    flight_data[mask],
+    np.rad2deg(results[mask]["kite_roll"] - results[mask]["tether_roll"]),
+    ax,
+    label="Roll kite-tether",
+    plot_phase=False,
+)
+
+plot_time_series(
+    flight_data[mask],
+    np.rad2deg(results[mask]["kite_pitch"] - results[mask]["tether_pitch"]),
+    ax,
+    label="Pitch kite-tether",
+    plot_phase=True,
+)
+ax.legend()
+ax.set_xlabel("Time [s]")
+ax.set_ylabel("Angle [deg]")
+plt.tight_layout()
+plt.savefig("./results/plots_paper/kite_tether_angles_2019-10-08.pdf")
+plt.show()
+#%% Plot wind energy spectrum
+fig, ax = plt.subplots(1, 1, figsize=(6, 4))
+plot_kinetic_energy_spectrum(results, flight_data,ax, savefig=False)    
+plt.savefig("./results/plots_paper/kinetic_energy_spectrum_2019-10-08.pdf")
 
 # Plot position and velocity
 from awes_ekf.plotting.plot_kite_trajectory import plot_position_azimuth_elevation
