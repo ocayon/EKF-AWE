@@ -70,7 +70,7 @@ def plot_wind_speed(
 
     i = 1
     for column in flight_data.columns:
-        if "Wind_Speed_m_s" in column:
+        if "m_Wind_Speed_m_s" in column:
             height = "".join(filter(str.isdigit, column))
             vw_max_col = height + "m_Wind_Speed_max_m_s"
             vw_min_col = height + "m_Wind_Speed_min_m_s"
@@ -79,13 +79,13 @@ def plot_wind_speed(
 
             if height in lidar_heights or lidar_heights == []:
 
-                axs[0].fill_between(
-                    flight_data["time"],
-                    flight_data[vw_min_col],
-                    flight_data[vw_max_col],
-                    color=palette[i % len(palette)],
-                    alpha=0.3,
-                )
+                # axs[0].fill_between(
+                #     flight_data["time"],
+                #     flight_data[vw_min_col],
+                #     flight_data[vw_max_col],
+                #     color=palette[i % len(palette)],
+                #     alpha=0.3,
+                # )
                 axs[0].plot(
                     flight_data["time"],
                     flight_data[column],
@@ -980,13 +980,13 @@ def plot_wind_profile_bins(flight_data, results, axs, step=20, savefig=False, co
         std_vel = []
         std_dir = []
         for column in flight_data.columns:
-            if "Wind_Speed_m_s" in column:
+            if "m_Wind_Speed_m_s" in column:
                 height = "".join(filter(str.isdigit, column))
-                stdvw_col = height + "m_Wind_Speed_Dispersion_m_s"
+                # stdvw_col = height + "m_Wind_Speed_Dispersion_m_s"
                 height = int(height)
                 lidar_heights.append(height)
-                min_vel.append(np.mean(flight_data[column] - flight_data[stdvw_col]))
-                max_vel.append(np.mean(flight_data[column] + flight_data[stdvw_col]))
+                # min_vel.append(np.mean(flight_data[column] - flight_data[stdvw_col]))
+                # max_vel.append(np.mean(flight_data[column] + flight_data[stdvw_col]))
                 wvel.append(np.mean(flight_data[column]))
                 std_vel.append(np.std(flight_data[column]))
                 i += 1
@@ -1228,13 +1228,16 @@ def plot_kite_reference_frame(results, flight_data, imus, frame_axis="xyz"):
             )
         # Calculate IMU tether orientation based on euler angles and plot it
         for imu in imus:
-            ex, ey, ez = calculate_reference_frame_euler(
-                flight_data["kite_roll_s" + str(imu)].iloc[i],
-                flight_data["kite_pitch_s" + str(imu)].iloc[i],
-                flight_data["kite_yaw_s" + str(imu)].iloc[i],
+            dcm = calculate_reference_frame_euler(
+                flight_data["kite_roll_" + str(imu)].iloc[i],
+                flight_data["kite_pitch_" + str(imu)].iloc[i],
+                flight_data["kite_yaw_" + str(imu)].iloc[i],
                 eulerFrame="NED",
                 outputFrame="ENU",
             )
+            ex = dcm[:, 0]
+            ey = dcm[:, 1]
+            ez = dcm[:, 2]
 
             ax.quiver(
                 results["kite_position_x"].iloc[i],
@@ -1405,6 +1408,31 @@ def plot_turbulence_intensity(results,flight_data, height, ax, savefig=False):
         TI_160m.append(std/mean)
     #%%
     TI_160m_lidar = flight_data[str(height)+'m_Wind_Speed_Dispersion_m_s'][mask]/flight_data[str(height)+'m_Wind_Speed_m_s'][mask]
+    ax.plot(TI_160m)
+    ax.plot(TI_160m_lidar)
+    ax.legend(['EKF','Lidar'])
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('Turbulence intensity')
+
+def plot_turbulence_intensity_high_res(results,flight_data, height, ax, savefig=False):
+    mask = (results['kite_position_z']>height-10)&(results['kite_position_z']<height+10)
+    TI_160m = []
+    TI_160m_lidar = []
+    for i in range(len(results)):
+        if i<600:
+            std = np.std(results["wind_speed_horizontal"].iloc[0:i][mask])
+            mean = np.mean(results["wind_speed_horizontal"].iloc[0:i][mask])
+            std_lidar = np.std(flight_data[str(height)+'m_Wind_Speed_m_s'].iloc[0:i][mask])
+            mean_lidar = np.mean(flight_data[str(height)+'m_Wind_Speed_m_s'].iloc[0:i][mask])
+        else:
+            std = np.std(results["wind_speed_horizontal"].iloc[i-600:i][mask])
+            mean = np.mean(results["wind_speed_horizontal"].iloc[i-600:i][mask])
+            std_lidar = np.std(flight_data[str(height)+'m_Wind_Speed_m_s'].iloc[i-600:i][mask])
+            mean_lidar = np.mean(flight_data[str(height)+'m_Wind_Speed_m_s'].iloc[i-600:i][mask])
+
+        TI_160m.append(std/mean)
+        TI_160m_lidar.append(std_lidar/mean_lidar)
+    #%%
     ax.plot(TI_160m)
     ax.plot(TI_160m_lidar)
     ax.legend(['EKF','Lidar'])

@@ -18,6 +18,36 @@ results, flight_data,_ = read_results(
     addition="",
 )
 
+plt.figure()
+plt.plot(np.degrees(flight_data["kite_heading"])%360)
+plt.plot((-np.degrees(results["kite_heading"]))%360)
+plt.show()
+
+plt.figure()
+plt.plot(flight_data["kite_position_z"])
+plt.plot(results["kite_position_z"])
+plt.show()
+
+plt.figure()
+plt.plot(flight_data["tether_elevation_ground"])
+plt.plot(results["tether_elevation"])
+plt.show()
+
+plt.figure()
+measured_velocity = np.sqrt(flight_data["kite_velocity_x"]**2 + flight_data["kite_velocity_y"]**2 + flight_data["kite_velocity_z"]**2)
+calculated_velocity = np.sqrt(results["kite_velocity_x"]**2 + results["kite_velocity_y"]**2 + results["kite_velocity_z"]**2)
+plt.plot(measured_velocity, label="Measured")
+plt.plot(calculated_velocity, label="Estimated")
+plt.fill_between(np.arange(4000,5000), 0, 30, color='red', alpha=0.5)
+plt.legend()
+plt.show()
+
+plt.figure()
+plt.plot(results["tether_length_offset"])  
+plt.plot(results["tether_elevation_offset"])
+plt.plot(results["tether_azimuth_offset"])
+plt.show()
+
 # results = results[(flight_data["cycle"]>10)&(flight_data["cycle"]<70)]
 # flight_data = flight_data[(flight_data["cycle"]>10)&(flight_data["cycle"]<70)]
 # Assuming that the degrees of freedom are set to the number of independent measurements

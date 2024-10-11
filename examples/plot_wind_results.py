@@ -24,7 +24,7 @@ def plot_wind_results(config_data: dict) -> None:
     #%%Plot results wind speed
     fig, axs = plt.subplots(3, 1, figsize=(6, 8), sharex=True)
     pu.plot_wind_speed(results,flight_data,axs,savefig=False) # PLot calculated wind speed against lidar
-
+    plt.show()
 
     # flight_data = pu.interpolate_lidar_data(flight_data, results)
     # fig, axs = plt.subplots(3, 1, figsize=(6, 8), sharex=True)
@@ -57,32 +57,15 @@ def plot_wind_results(config_data: dict) -> None:
 
 
     #%% Plot turbulence intensity
-    # mask = (results['kite_pos_z']>150)&(results['kite_pos_z']<170)
-    # TI_160m = []
-    # for i in range(len(results)):
-    #     if i<600:
-    #         std = np.std(results["wind_speed_horizontal"].iloc[0:i][mask])
-    #         mean = np.mean(results["wind_speed_horizontal"].iloc[0:i][mask])
-    #     else:
-    #         std = np.std(results["wind_speed_horizontal"].iloc[i-600:i][mask])
-    #         mean = np.mean(results["wind_speed_horizontal"].iloc[i-600:i][mask])
-
-    #     TI_160m.append(std/mean)
-    # #%%
-    # TI_160m_lidar = flight_data['160m Wind Speed Dispersion (m/s)']/flight_data['160m Wind Speed (m/s)']
-    # plt.figure()
-    # plt.plot(TI_160m)
-    # plt.plot(TI_160m_lidar)
-    # plt.legend(['EKF','Lidar'])
-    # plt.xlabel('Time (s)')
-    # plt.ylabel('Turbulence intensity')
-    # plt.title('Turbulence intensity at 160m altitude')
+    # fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+    # pu.plot_turbulence_intensity(results, flight_data, 140, ax)
+    # pu.plot_turbulence_intensity_high_res(results, flight_data, 140, ax)
 
 
 if __name__ == "__main__":
     # Example usage
     plt.close('all')
-    config_file_name = "v3_config.yaml"
+    config_file_name = "v9_config.yaml"
     config = load_config("examples/" + config_file_name)
     plot_wind_results(config)
     plt.show()

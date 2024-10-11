@@ -25,12 +25,13 @@ def plot_kite_orientation(config_data: dict) -> None:
         str(config_data["day"]),
         config_data["kite"]["model_name"],
     )
+    pu.plot_kite_reference_frame(results.iloc[0:2000], flight_data.iloc[0:2000], [])
 
     for imu in config_data["kite"]["sensor_ids"]:
         flight_data = remove_offsets_IMU_data_v3(results, flight_data, sensor=imu)
 
 
-    results, flight_data = cut_data(results, flight_data, [5000,8000])
+    results, flight_data = cut_data(results, flight_data, [5000,15000])
 
     imus = config_data["kite"]["sensor_ids"]
 
@@ -123,22 +124,42 @@ def plot_kite_orientation(config_data: dict) -> None:
         label="Roll kite-tether",
         plot_phase=False,
     )
-
     pu.plot_time_series(
         flight_data,
-        results["kite_pitch"] - results["tether_pitch"],
+        flight_data["kite_roll_0"] - flight_data["kcu_roll_1"],
         ax,
-        label="Pitch kite-tether",
+        label="Roll kite-tether",
         plot_phase=True,
     )
 
+    for col in flight_data.columns:
+        if "offset" in col:
+            print(col)
+
+    # pu.plot_time_series(
+    #     flight_data,
+    #     results["kite_pitch"] - results["tether_pitch"],
+    #     ax,
+    #     label="Pitch kite-tether",
+    #     plot_phase=False,
+    # )
+
+    # pu.plot_time_series(
+    #     flight_data,
+    #     flight_data["kite_pitch_0"]+np.degrees(results["offset_depower_imu_0"]) - flight_data["kcu_pitch_1"],
+    #     ax,
+    #     label="Pitch kite-tether",
+    #     plot_phase=True,
+    # )
     ax.legend()
+
+    
 
 
 if __name__ == "__main__":
     # Example usage
     plt.close("all")
-    config_file_name = "v3_config.yaml"
+    config_file_name = "v9_config.yaml"
     config = load_config("examples/" + config_file_name)
     plot_kite_orientation(config)
     plt.show()
