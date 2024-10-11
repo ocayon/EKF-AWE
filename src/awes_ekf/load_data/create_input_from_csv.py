@@ -86,8 +86,8 @@ def create_input_from_csv(
         kite_angle_of_attack = np.zeros(n_intervals)
 
     tether_reelout_speed = np.array(flight_data["tether_reelout_speed"])
-    kite_elevation_ground = np.arcsin(kite_position[:, 2] / np.linalg.norm(kite_position, axis=1))
-    kite_azimuth_ground = np.arctan2(kite_position[:, 1], kite_position[:, 0])
+    tether_elevation_ground = np.array(flight_data["tether_elevation_ground"])
+    tether_azimuth_ground = np.array(flight_data["tether_azimuth_ground"])
 
     try:
         kite_thrust_force = np.array(
@@ -157,8 +157,8 @@ def create_input_from_csv(
                 bridle_angle_of_attack=kite_angle_of_attack[i],
                 kcu_velocity=kcu_velocity[i],
                 tether_reelout_speed=tether_reelout_speed[i],
-                tether_elevation_ground=kite_elevation_ground[i],
-                tether_azimuth_ground=kite_azimuth_ground[i],
+                tether_elevation_ground = tether_elevation_ground[i],
+                tether_azimuth_ground = tether_azimuth_ground[i],
                 timestep=timestep[i],
                 kite_yaw=kite_yaw[i],
                 steering_input=steering_input[i],
@@ -222,5 +222,9 @@ def find_initial_state_vector(tether, ekf_input, simConfig, wind_velocity=np.arr
         )  # Initial wind velocity and direction
     if simConfig.obsData.tether_length:
         x0 = np.append(x0, 0)  # Initial tether offset
+    if simConfig.obsData.tether_elevation:
+        x0 = np.append(x0, 0)  # Initial tether elevation offset
+    if simConfig.obsData.tether_azimuth:
+        x0 = np.append(x0, 0)
 
     return x0

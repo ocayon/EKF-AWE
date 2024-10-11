@@ -100,6 +100,10 @@ class TuningParameters:
             )
         if simConfig.obsData.tether_length:
             self.stdv_dynamic_model = np.append(self.stdv_dynamic_model, 1e-6) # Tether length offset
+        if simConfig.obsData.tether_elevation:
+            self.stdv_dynamic_model = np.append(self.stdv_dynamic_model, 1e-6)
+        if simConfig.obsData.tether_azimuth:
+            self.stdv_dynamic_model = np.append(self.stdv_dynamic_model, 1e-6)
         self.indices_measurements = [
             "x",
             "x",

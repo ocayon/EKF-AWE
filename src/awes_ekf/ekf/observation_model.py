@@ -82,18 +82,20 @@ class ObservationModel:
         airflow_angles = calculate_airflow_angles(dcm_b2vel, vw - v_kite)
 
         h = ca.SX()
-        h = ca.vertcat(r_kite)
-        h = ca.vertcat(h, v_kite)
+        if self.simConfig.obsData.kite_position:
+            h = ca.vertcat(r_kite)
+        if self.simConfig.obsData.kite_velocity:
+            h = ca.vertcat(h, v_kite)
         h = ca.vertcat(h, (r_kite - r_tether_model))
         # Convert into a for
         if self.simConfig.model_yaw:
             h = ca.vertcat(h, self.x[index_map["yaw"]])
         if self.simConfig.obsData.tether_length:
-            h = ca.vertcat(h, self.x[index_map["tether_length"]]-self.x[index_map["tether_offset"]])
+            h = ca.vertcat(h, self.x[index_map["tether_length"]]-self.x[index_map["tether_length_offset"]])
         if self.simConfig.obsData.tether_elevation:
-            h = ca.vertcat(h, self.x[index_map["elevation_first_tether_element"]])
+            h = ca.vertcat(h, self.x[index_map["elevation_first_tether_element"]]-self.x[index_map["tether_elevation_offset"]])
         if self.simConfig.obsData.tether_azimuth:
-            h = ca.vertcat(h, self.x[index_map["azimuth_first_tether_element"]])
+            h = ca.vertcat(h, self.x[index_map["azimuth_first_tether_element"]] - self.x[index_map["tether_azimuth_offset"]])
         if self.simConfig.enforce_vertical_wind_to_0:
             h = ca.vertcat(h, self.x[index_map["vw_2"]])
         if self.simConfig.obsData.kite_apparent_windspeed:

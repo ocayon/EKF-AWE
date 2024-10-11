@@ -3,7 +3,7 @@ import casadi as ca
 from awes_ekf.setup.settings import kappa, z0, rho, g
 import numpy as np
 from dataclasses import dataclass
-from awes_ekf.utils import calculate_log_wind_velocity
+from awes_ekf.utils import calculate_log_wind_velocity, calculate_euler_from_reference_frame, project_onto_plane
 
 class Kite(ABC):
     def __init__(self, **kwargs):
@@ -54,7 +54,9 @@ class PointMassEKF(Kite):
         self.azimuth_0 = ca.SX.sym(
             "azimuth_first_tether_element"
         )  # Azimuth from ground to first tether element
-        self.tether_offset = ca.SX.sym("tether_offset")  # Tether offset
+        self.tether_length_offset = ca.SX.sym("tether_length_offset")  # Tether offset
+        self.tether_elevation_offset = ca.SX.sym("tether_elevation_offset") # Tether offset
+        self.tether_azimuth_offset = ca.SX.sym("tether_azimuth_offset") # Tether offset
         self.yaw = ca.SX.sym("yaw")  # Bias angle of attack
         self.us = ca.SX.sym("us")  # Steering input
         self.k_yaw_rate = ca.SX.sym("k_yaw_rate")  # Yaw rate constant
@@ -83,7 +85,11 @@ class PointMassEKF(Kite):
         if self.simConfig.model_yaw:
             self.x = ca.vertcat(self.x, self.yaw, self.k_yaw_rate)
         if self.simConfig.obsData.tether_length:
-            self.x = ca.vertcat(self.x, self.tether_offset)
+            self.x = ca.vertcat(self.x, self.tether_length_offset)
+        if self.simConfig.obsData.tether_elevation:
+            self.x = ca.vertcat(self.x, self.tether_elevation_offset)
+        if self.simConfig.obsData.tether_azimuth:
+            self.x = ca.vertcat(self.x, self.tether_azimuth_offset)
 
         return self.x
 
@@ -170,11 +176,26 @@ class PointMassEKF(Kite):
         else:
             vp = (-tether_force + L + D + S + Fg) / self.mass
 
-        fx = ca.vertcat(rp, vp, 0, 0, 0, 0, 0, 0, self.reelout_speed, 0, 0)
+        r_norm = ca.norm_2(r_kite)
+        r_normal = r_kite/r_norm
+        vert = ca.vertcat(0,0,1)
+        vert_norm = project_onto_plane(vert, r_normal)
+        horz_norm = ca.cross(vert_norm, r_normal)
+        v_kite_tan_horz = ca.dot(v_kite, horz_norm)
+        v_kite_tan_vert = ca.dot(v_kite, vert_norm)
+        elevation_rate = v_kite_tan_vert / r_norm
+        azimuth_rate = v_kite_tan_horz / (r_norm * ca.cos(elevation_0))
+        
+
+        fx = ca.vertcat(rp, vp, 0, 0, 0, 0, 0, 0, self.reelout_speed, elevation_rate, azimuth_rate)
         if self.simConfig.model_yaw:
             yaw_rate = self.k_yaw_rate * self.us * ca.norm_2(self.va)
             fx = ca.vertcat(fx, yaw_rate, 0)
         if self.simConfig.obsData.tether_length:
+            fx = ca.vertcat(fx, 0)
+        if self.simConfig.obsData.tether_elevation:
+            fx = ca.vertcat(fx, 0)
+        if self.simConfig.obsData.tether_azimuth:
             fx = ca.vertcat(fx, 0)
 
         return fx

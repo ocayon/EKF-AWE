@@ -37,13 +37,15 @@ class EKFOutput:
 
     # Tether parameters
     tether_length: float = None  # Tether length (m)
-    tether_elevation_angle: float = (
+    tether_elevation: float = (
         None  # Elevation angle of the first tether element from the ground(rad)
     )
-    tether_azimuth_angle: float = (
+    tether_azimuth: float = (
         None  # Azimuth angle of the first tether element from the ground (rad)
     )
     tether_length_offset: float = None  # Tether length measurement offset (m)
+    tether_elevation_offset: float = None  # Tether elevation measurement offset (rad)
+    tether_azimuth_offset: float = None  # Tether azimuth measurement offset (rad)
     tether_force_kite: float = None  # Tether force at the bridle point (N)
     tether_roll: float = None  # Roll of the first tether element below KCU (rad)
     tether_pitch: float = (
@@ -146,11 +148,6 @@ def create_ekf_output(x, u, ekf_input, tether, kite, simConfig):
     kite_position_x, kite_position_y, kite_position_z = r_kite
     kite_velocity_x, kite_velocity_y, kite_velocity_z = v_kite
 
-    if simConfig.obsData.tether_length:
-        tether_offset = x[state_index_map["tether_offset"]]
-    else:
-        tether_offset = None
-
     kite_apparent_windspeed = np.linalg.norm(vw - v_kite)
 
     # Create an instance of EKFOutput with unpacked vectors and calculated parameters
@@ -173,15 +170,17 @@ def create_ekf_output(x, u, ekf_input, tether, kite, simConfig):
         wing_lift_coefficient=x[state_index_map["CL"]],
         wing_drag_coefficient=x[state_index_map["CD"]],
         wing_sideforce_coefficient=x[state_index_map["CS"]],
-        tether_elevation_angle=elevation_0,
-        tether_azimuth_angle=azimuth_0,
+        tether_elevation=elevation_0,
+        tether_azimuth=azimuth_0,
         kcu_drag_coefficient=drag_coefficient_kcu,
         tether_drag_coefficient=drag_coefficient_tether,
         kite_thrust_force=x[state_index_map.get("kite_thrust_force", 0)],
         tether_roll=euler_angles1[0],
         tether_pitch=euler_angles1[1],
         tether_yaw=euler_angles1[2],
-        tether_length_offset=tether_offset,
+        tether_length_offset=x[state_index_map.get("tether_length_offset", 0)],
+        tether_elevation_offset = x[state_index_map.get("tether_elevation_offset", 0)],
+        tether_azimuth_offset = x[state_index_map.get("tether_azimuth_offset", 0)],
         tether_force_kite=tether_force_kite,
         kite_apparent_windspeed=kite_apparent_windspeed,
     )
