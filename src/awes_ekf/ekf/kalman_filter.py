@@ -88,6 +88,19 @@ class ExtendedKalmanFilter:
 
     def update(self):
 
+        # Find indices where z has None values
+        none_indices = np.where(np.isnan(self.z))[0]
+
+        # If there are None values, output a message
+        if len(none_indices) > 0:
+            print(f"Warning: None values found in the measurements at indices {none_indices}")
+
+        # Create a mask for valid indices (i.e., where z is not None)
+        valid_indices = [i for i in range(len(self.z)) if i not in none_indices]
+
+        # Create a reduced version of z without None values
+        self.z_valid = self.z[valid_indices]
+
         if self.doIEKF == True:
 
             eta2 = self.x_k1_k
@@ -105,26 +118,29 @@ class ExtendedKalmanFilter:
                 itts = itts + 1
                 eta1 = eta2
 
-                # Construct the Jacobian H = d/dx(h(x))) with h(x) the observation model transition matrix
-                self.Hx = np.array(self.calc_Hx(eta1, self.u, eta1))
+                # Construct the Jacobian Hx for valid observations only
+                self.Hx_full = np.array(self.calc_Hx(eta1, self.u, eta1))  # Full Hx
+                self.Hx = self.Hx_full[valid_indices, :]  # Reduced Hx (remove rows)
 
-                # Observation and observation error predictions
-                self.z_k1_k = np.array(self.calc_hx(eta1, self.u, eta1)).reshape(
-                    -1
-                )  # prediction of observation (for validation)
+                # Observation and observation error predictions (valid observations only)
+                self.z_k1_k_full = np.array(self.calc_hx(eta1, self.u, eta1)).reshape(-1)
+                self.z_k1_k = self.z_k1_k_full[valid_indices]  # Only valid predictions
+                self.R_full = self.R  # Save the full R matrix
+                self.R = self.R[np.ix_(valid_indices, valid_indices)]  # Remove rows/cols
+
                 self.P_zz = (
                     self.Hx @ self.P_k1_k @ self.Hx.T + self.R
-                )  # covariance matrix of observation error (for validation)
+                )  # Covariance matrix of observation error (for valid z)
                 self.std_z = np.sqrt(
                     np.diag(self.P_zz)
-                )  # standard deviation of observation error (for validation)
+                )  # Standard deviation of observation error (for valid z)
 
-                # K(k+1) (gain)
+                # Gain (K)
                 self.K = self.P_k1_k @ self.Hx.T @ np.linalg.inv(self.P_zz)
 
-                # new observation
+                # New observation for valid z values
                 eta2 = self.x_k1_k + self.K @ (
-                    self.z
+                    self.z_valid
                     - self.z_k1_k
                     - np.array((self.Hx @ (self.x_k1_k - eta1).T)).reshape(-1)
                 )
@@ -135,30 +151,39 @@ class ExtendedKalmanFilter:
             self.x_k1_k1 = eta2
 
         else:
-            self.Hx = np.array(self.calc_Hx(self.x_k1_k, self.u, self.x_k1_k))
+            # Non-iterative case
+            self.Hx_full = np.array(self.calc_Hx(self.x_k1_k, self.u, self.x_k1_k))  # Full Hx
+            self.Hx = self.Hx_full[valid_indices, :]  # Reduced Hx
 
-            # correction
-            self.z_k1_k = np.array(
-                self.calc_hx(self.x_k1_k, self.u, self.x_k1_k)
-            ).reshape(-1)
+            # Observation and observation error predictions (valid observations only)
+            self.z_k1_k_full = np.array(self.calc_hx(self.x_k1_k, self.u, self.x_k1_k)).reshape(-1)
+            self.z_k1_k = self.z_k1_k_full[valid_indices]  # Only valid predictions
+            self.R_full = self.R  # Save the full R matrix
+            self.R = self.R[np.ix_(valid_indices, valid_indices)]  # Remove rows/cols
+
             self.P_zz = (
                 self.Hx @ self.P_k1_k @ self.Hx.T + self.R
-            )  # covariance matrix of observation error (for validation)
+            )  # Covariance matrix of observation error (for valid z)
             self.std_z = np.sqrt(np.diag(self.P_zz))
-            # K(k+1) (gain)
+
+            # Gain (K)
             self.K = self.P_k1_k @ self.Hx.T @ np.linalg.inv(self.P_zz)
 
-            # Calculate optimal state x(k+1|k+1)
+            # Calculate optimal state x(k+1|k+1) for valid z
             self.x_k1_k1 = np.array(
-                self.x_k1_k + self.K @ (self.z - self.z_k1_k)
+                self.x_k1_k + self.K @ (self.z_valid - self.z_k1_k)
             ).reshape(-1)
 
         self.P_k1_k1 = (np.eye(self.n) - self.K @ self.Hx) @ self.P_k1_k
         self.std_x_cor = np.sqrt(
             np.diag(self.P_k1_k1)
-        )  # standard deviation of state estimation error (for validation)
+        )  # Standard deviation of state estimation error (for validation)
         
         self.debug_info = self._output_debug_info()
+
+        # Restore full R and Hx for the next update
+        self.R = self.R_full
+        self.Hx = self.Hx_full
 
     def get_state_noise_covariance(self, stdv_dynamic_model, simConfig):
         Q = np.diag(np.array(stdv_dynamic_model) ** 2)
@@ -185,7 +210,8 @@ class ExtendedKalmanFilter:
         z = np.array([])  # Initialize an empty NumPy array
 
         # Append values to the NumPy array
-        z = np.append(z, input_class.kite_position)
+        if simConfig.obsData.kite_position:
+            z = np.append(z, input_class.kite_position)
         z = np.append(z, input_class.kite_velocity)
         z = np.append(z, np.zeros(3))  # Add zeros for the least-squares problem
         # TODO: Convert this into dict to loop through and avoid hardcoding
@@ -207,7 +233,7 @@ class ExtendedKalmanFilter:
         self.z = z
 
     def _output_debug_info(self):
-        epsilon = self.z - self.z_k1_k
+        epsilon = self.z_valid - self.z_k1_k
         epsilon_norm = epsilon / np.sqrt(np.diag(self.P_zz))
         nis = epsilon.T @ np.linalg.inv(self.P_zz) @ epsilon
         mahalanobis_distance = np.sqrt(nis)

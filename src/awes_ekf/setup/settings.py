@@ -120,7 +120,15 @@ class TuningParameters:
         self.update_observation_vector(simConfig)
 
     def update_observation_vector(self, simConfig):
-        stdv_y = [float(self.dict_meas_stdv[key]) for key in self.indices_measurements]
+        stdv_y = []
+        if simConfig.obsData.kite_position:
+            for _ in range(3):
+                stdv_y.append(self.dict_meas_stdv["x"])
+        if simConfig.obsData.kite_velocity:
+            for _ in range(3):
+                stdv_y.append(self.dict_meas_stdv["v"])
+        for _ in range(3):
+            stdv_y.append(float(self.dict_meas_stdv["least_squares"]))
         if simConfig.model_yaw:
             stdv_y.append(self.dict_meas_stdv["yaw"])
         if simConfig.obsData.tether_length:
