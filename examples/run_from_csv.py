@@ -45,10 +45,10 @@ def list_available_flights(log_directory: Path, file_extension: str = ".csv") ->
         return []
     
     print(f"Available flight logs in {log_directory}:")
-    for i, log_file in enumerate(flight_logs, start=1):
-        print(f"{i}: {log_file.name}")
+    [print(f"{i + 1}: {log_file.name}") for i, log_file in enumerate(flight_logs)]
     
     return flight_logs
+
 class LogProvider(enum.Enum):
     Kitepower = 1
     Kitekraft = 2
@@ -102,7 +102,19 @@ class AnalyzeAweFromCsvLog:
             ProcessKpData(config_data=self.config_data, log_directory=self.log_directory)
         elif self.log_provider == LogProvider.Kitekraft:
             # Could add pre processing script here.
+            print("Pre-processing for Kitekraft not implemented yet.")  
             pass
+    def filter_by_time(self, start_minute: int, end_minute: int) -> None:
+        """Filter the flight data by the given start and end minute."""
+        #TODO: Frequency of the data is 10Hz, hardcoded
+        if start_minute > 0 or end_minute > 0:
+            if end_minute > 0 and end_minute <= len(self.flight_data/600):
+                self.flight_data = self.flight_data.iloc[start_minute * 600 : end_minute * 600].reset_index(drop=True)
+            else:
+                self.flight_data = self.flight_data.iloc[start_minute * 600 :].reset_index(drop=True)
+            print(f"Filtered data from minute {start_minute} to {end_minute}.")
+        else:
+            print("No time filtering applied.")
 
     def run_analysis(self) -> None:
         # Todo: This function could be split into multiple to mserve as a clearer documentation of how the ekf and
@@ -114,9 +126,19 @@ class AnalyzeAweFromCsvLog:
 
 
         flight_data = read_processed_flight_data(year, month, day, kite_model)
+        start_minute = int(input("Enter the start minute for analysis or skip: ").strip() or 0)
+        end_minute = int(input("Enter the end minute for analysis or skip: ").strip() or 0)
+        dt = flight_data["time"].diff().mean()
+        
+        if start_minute > 0 or end_minute > 0:
+            if end_minute > 0 and end_minute <= len(flight_data)/60*dt:
+                flight_data = flight_data.iloc[int(start_minute * 60/dt) : int(end_minute * 60/dt)].reset_index(drop=True)
+            else:
+                flight_data = flight_data.iloc[int(start_minute * 60/dt) :].reset_index(drop=True)
+            print(f"Filtered data from minute {start_minute} to {end_minute}.")
+        else:
+            print("No time filtering applied.")
 
-        # flight_data = flight_data.iloc[:20000]
-        # flight_data.reset_index(drop=True, inplace=True)
 
         # %% Initialize EKF
         simConfig = SimulationConfig(**self.config_data["simulation_parameters"])
@@ -149,8 +171,12 @@ class AnalyzeAweFromCsvLog:
         start_time = time.time()
         mins = -1
         k_nis = 1000
+        import numpy as np
         # TODO: Add a timeseries class
         for k, ekf_input in enumerate(ekf_input_list):
+            # if k > 4000 and k< 5000:
+            #     ekf_input.kite_position = np.array([np.nan, np.nan, np.nan])
+            #     ekf_input.kite_velocity = np.array([np.nan, np.nan, np.nan])
             try:
                 ekf, ekf_ouput = propagate_state_EKF(
                     ekf, ekf_input, simConfig, tether, kite, kcu
@@ -276,17 +302,6 @@ def main() -> None:
         print(f"Error: Invalid system model. Valid options are: {', '.join(valid_model_str)}")
         sys.exit(1)
     awes_model = get_awes_model_from_string(awes_model_str)
-
-    # # Query for the date
-    # date_input = input(f"Enter the date in the format YYYY-MM-DD [default: {default_date}]: ").strip()
-    # if not date_input:
-    #     date = default_date
-    # else:
-    #     try:
-    #         date = datetime.strptime(date_input, '%Y-%m-%d')
-    #     except ValueError:
-    #         print("Error: Invalid date format. Please use YYYY-MM-DD.")
-    #         sys.exit(1)
 
     # Query for the run option
     valid_options = ['analyze', 'plot-wind', 'plot-aero', 'plot-other']
