@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import os
 from pathlib import Path
+from awes_ekf.utils import llh_to_enu
 
 
 class ProcessKpData:
@@ -20,12 +21,22 @@ class ProcessKpData:
             if log.startswith(self.log_date):
                 log_path = f"{log_directory}/{log}"
                 break
-
-        log = pd.read_csv(log_path, delimiter=" ", low_memory=False)
+        delimiter = self.detect_delimiter(log_path)
+        log = pd.read_csv(log_path, delimiter=delimiter, low_memory=False)
         log = log[
             log["kite_height"] > 80
         ]  # Select the indexes where the kite is flying
         return log
+    
+    def detect_delimiter(self,file_path):
+        with open(file_path, 'r') as file:
+            first_line = file.readline()
+            if ',' in first_line:
+                return ','
+            elif ' ' in first_line:
+                return ' '
+            else:
+                return ','  # Default to comma if neither is detected
 
     def fuse_sensor_data(self, log: pd.DataFrame, sensors: list, prefix: str, dt: float, window_size: int) -> dict:
         fused_data = {}
@@ -140,15 +151,47 @@ class ProcessKpData:
 
         flight_data = pd.DataFrame()  # Create a new dataframe for the flight data
 
-        # Add position data
-        flight_data["kite_position_x"] = log["kite_pos_east"]
-        flight_data["kite_position_y"] = log["kite_pos_north"]
-        flight_data["kite_position_z"] = log["kite_height"]
+        try:
+            ref_lat = 54.126469
+            ref_lon = -9.781307
+            ref_alt = 12.7
+            lat =  log["gps_log_lat"]/1e7
+            lon =  log["gps_log_lon"]/1e7
+            alt =  log["gps_log_alt"]/1000
+
+            east, north, up = llh_to_enu(ref_lat, ref_lon, ref_alt, lat, lon, alt)
+            flight_data["kite_position_x"] = east
+            flight_data["kite_position_y"] = north
+            flight_data["kite_position_z"] = up
+            # raise Exception("No raw GPS data available")
+        except:
+            print("No raw GPS data available, using the fused data instead")
+
+            # Add position data
+            flight_data["kite_position_x"] = log["kite_pos_east"]
+            flight_data["kite_position_y"] = log["kite_pos_north"]
+            flight_data["kite_position_z"] = log["kite_height"]
+
 
         # Fuse and add kite sensor data
         kite_sensors = self.config_data["kite"]["sensor_ids"]
-        fused_kite_data = self.fuse_sensor_data(log, kite_sensors, "kite", dt, window_size)
-        flight_data = flight_data.assign(**fused_kite_data)
+        try:
+            flight_data["kite_velocity_x"] = log["gps_log_vel_e_m_s"]
+            flight_data["kite_velocity_y"] = log["gps_log_vel_n_m_s"]
+            flight_data["kite_velocity_z"] = -log["gps_log_vel_d_m_s"]
+            # raise Exception("No raw GPS data available")
+        except:
+            fused_kite_data = self.fuse_sensor_data(log, kite_sensors, "kite", dt, window_size)
+            flight_data = flight_data.assign(**fused_kite_data)
+            print("No raw GPS data available, using the fused data instead")
+
+        # # Add nan in position and velocity for a minute
+        # flight_data["kite_position_x"].iloc[2000:3000] = np.nan
+        # flight_data["kite_position_y"].iloc[2000:3000] = np.nan
+        # flight_data["kite_position_z"].iloc[2000:3000] = np.nan
+        # flight_data["kite_velocity_x"].iloc[2000:3000] = np.nan
+        # flight_data["kite_velocity_y"].iloc[2000:3000] = np.nan
+        # flight_data["kite_velocity_z"].iloc[2000:3000] = np.nan
 
         # Add kite orientation data (roll, pitch, yaw and their rates)
         self.add_orientation_data(log, kite_sensors, "kite", flight_data)
@@ -195,7 +238,8 @@ class ProcessKpData:
             ],
             axis=1,
         )
-
+        flight_data["kite_heading"] = log["kite_heading"]
+        flight_data["kite_azimuth"] = -log["kite_azimuth"]   
         print(
             "Date: ",
             log["date"].iloc[0],
@@ -211,8 +255,13 @@ class ProcessKpData:
         flight_data["date"] = log["date"]
 
         # Add azimuth and elevation
-        flight_data["kite_azimuth"] = log["kite_azimuth"]
-        flight_data["kite_elevation"] = log["kite_elevation"]
+        try:
+            flight_data["tether_azimuth_ground"] = -np.unwrap(log["ground_tether_fleet_angle_rad"])
+            flight_data["tether_elevation_ground"] = log["ground_tether_elevation_angle_rad"]
+        except:
+            print("No azimuth and elevation data available")
+            flight_data["tether_azimuth_ground"] = log["kite_azimuth"]
+            flight_data["tether_elevation_ground"] = log["kite_elevation"]
 
         # Add time of day
         flight_data["time_of_day"] = log["time_of_day"]  # Seems double with line 159
