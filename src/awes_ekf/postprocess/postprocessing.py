@@ -308,6 +308,7 @@ def postprocess_results(
     omega_p = []
     omega_q = []
     omega_r = []
+    heading = []
     for i in range(len(results)):
         res = results.iloc[i]
         fd = flight_data.iloc[i]
@@ -324,7 +325,10 @@ def postprocess_results(
             airflow_angles = calculate_airflow_angles(dcm, va_kite[i])
             results.loc[i, "wing_angle_of_attack_imu_" + str(imu)] = airflow_angles[0]  # Angle of attack
             results.loc[i, "wing_sideslip_angle_imu_" + str(imu)] = airflow_angles[1]  # Sideslip angle
-
+    # It is correct but I am calculating the small earth frame heading in the absolut azimuth and then translating it by the fd kite azimuth(respect to wind direction)
+    # It would make more sense to calculate it in the fd azimuth and then translating it by the wind direction (potato potato but still)
+        heading.append(calculate_heading(dcm, fd["kite_azimuth"], res["tether_elevation"], res["tether_azimuth"]))
+        
         at = (
             np.dot(a_kite[i], np.array(v_kite[i]) / np.linalg.norm(v_kite[i]))
             * np.array(v_kite[i])
@@ -364,6 +368,7 @@ def postprocess_results(
     results["roll_rate"] = omega_p
     results["pitch_rate"] = omega_q
     results["yaw_rate"] = omega_r
+    results["kite_heading"] = heading
 
     if len(kite_sensors) > 0:
         results, flight_data = correct_aoa_ss_measurements(results, flight_data)
@@ -490,3 +495,31 @@ def correct_aoa_ss_measurements(results, flight_data, imu=0):
     ] - np.degrees(results["offset_depower_imu_0"])
 
     return results, flight_data
+from awes_ekf.utils import rotation_matrix_azth_from_wind, project_onto_plane, Rz, calculate_angle_2vec
+
+def calculate_heading(dcm, az_wind, elevation, azimuth):
+    """
+    Calculate heading based on the wind azimuth and the DCM of the kite
+    :param dcm: DCM of the kite
+    :param az_wind: wind azimuth
+    :return: heading
+    """
+    # Rotate dcm around z-axis by wind azimuth
+    wind_from_azth = rotation_matrix_azth_from_wind(elevation,azimuth).T
+
+    z_se = wind_from_azth @ np.array([0,0,1])
+    x_se = wind_from_azth @ np.array([0,1,0])
+
+    # Rotate to the north-east-up frame
+    
+    z_se_enu = Rz(-az_wind) @ z_se
+    x_se_enu = Rz(-az_wind) @ x_se
+
+    # Project x-axis dcm onto plane defined by z-axis
+    dcm =  dcm
+    x_kite = dcm[:,0]
+    x_kite_proj = project_onto_plane(x_kite,z_se_enu)
+
+    # Calculate heading as angle between x-axis and x-axis projection
+    heading = calculate_angle_2vec(x_se_enu,x_kite, reference_vector=z_se_enu)
+    return heading
