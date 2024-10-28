@@ -25,6 +25,7 @@ from awes_ekf.setup.kcu import KCU
 from awes_ekf.ekf.ekf_output import convert_ekf_output_to_df, EKFOutput
 from awes_ekf.postprocess.postprocessing import postprocess_results
 from data.process_KP_data import ProcessKpData
+from data.process_KFT_data import ProcessKiteKraftData
 from plot_wind_results import plot_wind_results
 from plot_kite_trajectory import plot_kite_trajectories
 from plot_kite_aero import plot_kite_aero
@@ -86,7 +87,7 @@ class AnalyzeAweFromCsvLog:
         config_file_mapping = {
             (LogProvider.Kitepower, 'v3'): 'v3_config.yaml',
             (LogProvider.Kitepower, 'v9'): 'v9_config.yaml',
-            (LogProvider.Kitekraft, 'vX'): 'kft_config.yaml'
+            (LogProvider.Kitekraft, 'v1'): 'kft_config.yaml'
         }
         try:
             return config_file_mapping[(awes_model.log_provider, awes_model.model_name)]
@@ -101,9 +102,8 @@ class AnalyzeAweFromCsvLog:
         if self.log_provider == LogProvider.Kitepower:
             ProcessKpData(config_data=self.config_data, log_directory=self.log_directory)
         elif self.log_provider == LogProvider.Kitekraft:
-            # Could add pre processing script here.
-            print("Pre-processing for Kitekraft not implemented yet.")  
-            pass
+            ProcessKiteKraftData(config_data=self.config_data, log_directory=self.log_directory)
+            
     def filter_by_time(self, start_minute: int, end_minute: int) -> None:
         """Filter the flight data by the given start and end minute."""
         #TODO: Frequency of the data is 10Hz, hardcoded
@@ -290,11 +290,13 @@ def main() -> None:
     date_str = filename_parts[0]  # "2021-10-07"
     time_str = filename_parts[1]  # "19-38-15"
 
-    # Convert the date string to a datetime object
-    date = datetime.strptime(date_str, '%Y-%m-%d')
+    try:
+        date = datetime.strptime(date_str, '%Y-%m-%d').date()
+    except ValueError:
+        print(f"Error: Invalid or missing date format in the filename: {date_str}")
 
     # Query for the system model
-    valid_model_str = ['kp-v3', 'kp-v9', 'kft']
+    valid_model_str = ['kp-v3', 'kp-v9', 'kft-v1']
     awes_model_str = input(
         f"Enter the system model (options: {', '.join(valid_model_str)}) [default: {default_model_str}]: ").strip()
     if not awes_model_str:
