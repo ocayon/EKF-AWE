@@ -25,7 +25,9 @@ class EKFOutput:
     kite_velocity_z: float = None  # Kite velocity in ENU coordinates (m/s)
     kite_roll: float = None  # Bridle element roll angle in radians, NED frame (rad)
     kite_pitch: float = None  # Bridle element pitch angle in radians, NED frame (rad)
-    kite_yaw: float = None  # Bridle element yaw angle in radians, NED frame (rad) (towards the kite velocity direction)
+    kite_yaw: float = None  # Bridle element yaw angle in radians, NED frame (rad) (towards the kite apparent velocity direction)
+    kite_yaw_kin: float = None  # Bridle element yaw angle in radians, NED frame (rad) (towards the kite velocity direction)
+    kite_elevation: float = None  # Elevation angle of the kite (rad)
     kite_thrust_force: float = None  # Thrust force applied to the kite (N)
 
     # Wind dynamics
@@ -131,9 +133,13 @@ def create_ekf_output(x, u, ekf_input, tether, kite, simConfig):
 
     euler_angles = calculate_euler_from_reference_frame(rotate_ENU2NED(dcm_b2w))
     euler_angles1 = calculate_euler_from_reference_frame(rotate_ENU2NED(dcm_t2w))
+    euler_angles_kin = calculate_euler_from_reference_frame(rotate_ENU2NED(dcm_b2vel))
     drag_coefficient_kcu = float(tether.cd_kcu(*args))
     drag_coefficient_tether = float(tether.cd_tether(*args))
     tether_force_kite = np.linalg.norm(tether.tether_force_kite(*args))
+
+    z_axis_kite = dcm_b2w[:, 2]
+    kite_elevation = np.arctan2(z_axis_kite[2], np.linalg.norm(z_axis_kite))
 
     # Airflow angles based on configuration
     if simConfig.model_yaw:
@@ -164,6 +170,8 @@ def create_ekf_output(x, u, ekf_input, tether, kite, simConfig):
         kite_roll=euler_angles[0],
         kite_pitch=euler_angles[1],
         kite_yaw=euler_angles[2],
+        kite_yaw_kin=euler_angles_kin[2],
+        kite_elevation=kite_elevation,
         tether_length=tether_length,
         kite_angle_of_attack=airflow_angles[0],
         kite_sideslip_angle=airflow_angles[1],
