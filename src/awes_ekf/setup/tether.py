@@ -101,7 +101,7 @@ class Tether:
             at = (
                 ca.dot(a_kite, v_kite / ca.norm_2(v_kite)) * v_kite / ca.norm_2(v_kite)
             )  # Tangential acceleration
-            omega_kite = ca.cross(a_kite, v_kite) / (
+            omega_kite = ca.cross(a_kite-at, v_kite) / (
                 ca.norm_2(v_kite) ** 2
             )  # Angular velocity of the kite
             ICR = ca.cross(v_kite, omega_kite) / (
@@ -229,7 +229,7 @@ class Tether:
                     # D_turbine = 0.5*rho*ca.norm_2(vaj)**2*ca.pi*0.2**2*1
                     dp= -.5*rho*ca.norm_2(vajp)*vajp*kcu.cdp*kcu.Ap  # Adding kcu drag perpendicular to kcu
                     dt= -.5*rho*ca.norm_2(vajn)*vajn*kcu.cdt*kcu.At  # Adding kcu drag parallel to kcu
-                    th = -0.5*rho*vaj_sq*ca.pi*0.2**2*0.4
+                    th = -0.5*rho*vaj_sq*ca.pi*0.2**2*0.4       # Add thrust of a wind turbine if present
                     D_kcu = ca.norm_2(dp+dt)
                     dj += dp+dt
                     # Approach described in Hoerner, taken from Paul Thedens dissertation
