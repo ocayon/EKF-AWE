@@ -329,3 +329,66 @@ def rotation_matrix_azth_from_wind(beta,phi):
                 [np.cos(beta) * np.cos(phi), np.cos(beta) * np.sin(phi), np.sin(beta)]
             ])
 
+
+
+def calculate_weighted_least_squares(y, A, W=None):
+    if W is None:
+        x_hat = np.linalg.inv(A) @ y
+    else:
+        x_hat = np.linalg.inv(A.T @ W @ A) @ A.T @ W @ y
+    return x_hat
+
+def calculate_turn_rate_law(results, flight_data, model = 'simple', steering_offset = False, mass=15, area=19.75, span=10, coeffs = None):
+    from scipy.sparse import eye
+
+    us = -flight_data["kcu_actual_steering"]/100
+    va = results["kite_apparent_windspeed"]
+    v = np.sqrt(results["kite_velocity_x"]**2 + results["kite_velocity_y"]**2 + results["kite_velocity_z"]**2)
+    yaw = flight_data["kite_yaw_0"]
+    beta = results["kite_elevation"]
+    yaw_rate = flight_data["kite_yaw_rate"]
+    radius = results["radius_turn"]
+
+    if model == 'simple':
+        c1 = us*va
+        A = np.vstack([c1]).T
+        W = eye(len(us))
+    elif model == 'simple_weight':
+        c1 = us*va
+        c2 = np.sin(yaw)*np.cos(beta)/va
+        A = np.vstack([c1,c2]).T
+        W = eye(len(us))
+    elif model == 'full':
+        c1 = us*(va)/span
+        c2 = ( mass*v**2/(1.225*area*span**2*va*radius)-mass*9.81*np.sin(yaw)*np.cos(beta)/(1.225*area*span**2*va))
+        A = np.vstack([c1,c2]).T
+        W = eye(len(us))
+
+
+    if steering_offset:
+        c3 = va.to_numpy()
+        A = np.hstack([A, c3.reshape(-1, 1)])
+    
+
+    if coeffs is None:
+        coeffs = calculate_weighted_least_squares(yaw_rate, A, W)
+        yaw_rate = A@coeffs
+        return yaw_rate, coeffs
+    
+    yaw_rate = A@coeffs
+
+    return yaw_rate
+
+
+
+def find_time_delay(signal_1,signal_2):
+    # Compute the cross-correlation
+    cross_corr = np.correlate(signal_1, signal_2, mode='full')
+
+    # Find the index of the maximum value in the cross-correlation
+    max_corr_index = np.argmax(cross_corr)
+
+    # Compute the time delay
+    time_delay = (max_corr_index - (len(signal_1) - 1))
+
+    return time_delay, cross_corr
