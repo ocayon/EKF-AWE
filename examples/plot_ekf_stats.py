@@ -19,6 +19,10 @@ results, flight_data,_ = read_results(
 )
 
 plt.figure()
+plt.plot(results['radius_turn'])
+plt.show()
+
+plt.figure()
 plt.plot(np.degrees(flight_data["kite_heading"])%360)
 plt.plot((-np.degrees(results["kite_heading"]))%360)
 plt.show()

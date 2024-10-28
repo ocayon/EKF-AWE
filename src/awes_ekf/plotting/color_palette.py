@@ -2,19 +2,15 @@
 
 import matplotlib.pyplot as plt
 
-# Define an elegant color palette with main and darker versions
 PALETTE = {
-    'Blue': '#0076C2',
-    'Green': '#4CAF50',
-    'Orange': '#E0A458',
-    'Red': '#D32F2F',
-    'Dark Blue': '#005691',  # Darker version of Blue
-    'Dark Green': '#388E3C',  # Darker version of Green
-    'Dark Orange': '#D17C1B',  # Darker version of Orange
-    'Dark Red': '#B71C1C',  # Darker version of Red
-    'White': '#FFFFFF',
-    'Light Gray': '#A9A9A9',
-    'Dark Gray': '#696969'  # Slightly darker gray
+    'Black': '#000000',
+    'Orange': '#E69F00',
+    'Sky Blue': '#56B4E9',
+    'Bluish Green': '#009E73',
+    'Yellow': '#F0E442',
+    'Blue': '#0072B2',
+    'Vermillion': '#D55E00',
+    'Reddish Purple': '#CC79A7'
 }
 
 def hex_to_rgba(hex_color, alpha=1.0):
@@ -45,8 +41,23 @@ def visualize_palette():
     plt.show()
 
 def set_plot_style():
-    """Set the default style for plots using LaTeX."""
-    # plt.style.use('seaborn-whitegrid')
+    """Set the default style for plots using LaTeX and custom color palette."""
+    import matplotlib.pyplot as plt
+    from cycler import cycler
+
+    # Define the color palette as a list of colors
+    color_cycle = [
+        PALETTE['Black'],
+        PALETTE['Orange'],
+        PALETTE['Sky Blue'],
+        PALETTE['Bluish Green'],
+        PALETTE['Yellow'],
+        PALETTE['Blue'],
+        PALETTE['Vermillion'],
+        PALETTE['Reddish Purple']
+    ]
+
+    # Apply Seaborn style and custom settings
     plt.style.use('seaborn-v0_8-whitegrid')
     plt.rcParams.update({
         'text.usetex': True,
@@ -63,7 +74,8 @@ def set_plot_style():
         'figure.titlesize': 16,
         'pgf.texsystem': 'pdflatex',  # Use pdflatex
         'pgf.rcfonts': False,
-        'figure.figsize': (10, 6)  # Default figure size
+        'figure.figsize': (10, 6),  # Default figure size
+        'axes.prop_cycle': cycler('color', color_cycle)  # Set the custom color cycle
     })
 
 # Optionally, you can also include a function to apply the palette to a plot

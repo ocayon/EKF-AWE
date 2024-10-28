@@ -6,8 +6,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from awes_ekf.utils import calculate_reference_frame_euler
 import seaborn as sns
-from awes_ekf.plotting.color_palette import get_color_list, get_color
+from awes_ekf.plotting.color_palette import get_color_list, get_color, hex_to_rgba
 from awes_ekf.setup.settings import kappa, z0
+
+colors = get_color_list()
 
 def find_turn_law(flight_data):
 
@@ -49,113 +51,81 @@ def find_turn_law(flight_data):
 #     return yaw_rate
 
 
+def get_grey_shades(n):
+    """Generate n shades of grey."""
+    return [(i / (n + 1), i / (n + 1), i / (n + 1)) for i in range(1, n + 1)]
+
 def plot_wind_speed(
     results,
     flight_data,
     axs,
+    color = "b",
+    label_ekf = "EKF",
     lidar_heights=[],
-    IMU_0=False,
-    IMU_1=False,
-    EKF_tether=False,
+    lidar_data=True,
     EKF=True,
-    savefig=False,
+    ground=False,
 ):
     """
     Plot wind speed based on kite and KCU IMU data
     :param flight_data: flight data
     :return: wind speed plot
     """
+    grey_shades = get_grey_shades(3)  # Adjust the number of shades as needed
     palette = get_color_list()
     
+    if lidar_data:
+        i = 0
+        alpha = 0.7
+        linestyle = "--"
+        for column in flight_data.columns:
+            if "m_Wind_Speed_m_s" in column:
+                height = "".join(filter(str.isdigit, column))
+                vw_max_col = height + "m_Wind_Speed_max_m_s"
+                vw_min_col = height + "m_Wind_Speed_min_m_s"
+                label = "Lidar " + height + "m height"
+                height = int(height)
 
-    i = 1
-    for column in flight_data.columns:
-        if "m_Wind_Speed_m_s" in column:
-            height = "".join(filter(str.isdigit, column))
-            vw_max_col = height + "m_Wind_Speed_max_m_s"
-            vw_min_col = height + "m_Wind_Speed_min_m_s"
-            label = "Lidar " + height + "m height"
-            height = int(height)
+                if height in lidar_heights or lidar_heights == []:
+                    axs[0].plot(
+                        flight_data["time"],
+                        flight_data[column],
+                        color=grey_shades[i % len(grey_shades)],
+                        label=label,
+                        alpha=alpha,
+                        linestyle=linestyle,
+                    )
 
-            if height in lidar_heights or lidar_heights == []:
+            if "Wind_Direction" in column:
+                height = "".join(filter(str.isdigit, column))
+                label = "Lidar " + height + "m height"
+                height = int(height)
+                if height in lidar_heights or lidar_heights == []:
+                    axs[1].plot(
+                        flight_data["time"],
+                        360 - 90 - flight_data[column],
+                        color=grey_shades[i % len(grey_shades)],
+                        label=label,
+                        alpha=alpha,
+                        linestyle=linestyle,
+                    )
 
-                # axs[0].fill_between(
-                #     flight_data["time"],
-                #     flight_data[vw_min_col],
-                #     flight_data[vw_max_col],
-                #     color=palette[i % len(palette)],
-                #     alpha=0.3,
-                # )
-                axs[0].plot(
-                    flight_data["time"],
-                    flight_data[column],
-                    color=palette[i % len(palette)],
-                    label=label,
-                )
+            if "Z-wind_m_s" in column:
+                height = "".join(filter(str.isdigit, column))
+                label = "Lidar " + height + "m height"
+                height = int(height)
+                if height in lidar_heights or lidar_heights == []:
+                    axs[2].plot(
+                        flight_data["time"],
+                        -flight_data[column],
+                        color=grey_shades[i % len(grey_shades)],
+                        label=label,
+                        alpha=alpha,
+                        linestyle=linestyle,
+                    )
+                    i += 1
 
-        if "Wind_Direction" in column:
-            height = "".join(filter(str.isdigit, column))
-            label = "Lidar " + height + "m height"
-            height = int(height)
-            if height in lidar_heights or lidar_heights == []:
-                axs[1].plot(
-                    flight_data["time"],
-                    360 - 90 - flight_data[column],
-                    color=palette[i % len(palette)],
-                    label=label,
-                )
-
-        if "Z-wind_m_s" in column:
-            height = "".join(filter(str.isdigit, column))
-            label = "Lidar " + height + "m height"
-            height = int(height)
-            if height in lidar_heights or lidar_heights == []:
-                axs[2].plot(
-                    flight_data["time"],
-                    -flight_data[column],
-                    color=palette[i % len(palette)],
-                    label=label,
-                )
-                i += 1
-
-    if IMU_0:
-        from awes_ekf.postprocess.postprocessing import calculate_wind_speed_airborne_sensors
-        flight_data = calculate_wind_speed_airborne_sensors(results, flight_data)
-        vw_mod = np.sqrt(
-            flight_data["vwx_IMU_0"] ** 2
-            + flight_data["vwy_IMU_0"] ** 2
-            + flight_data["vwz_IMU_0"] ** 2
-        )
-        axs[0].plot(flight_data["time"], vw_mod, label="Pitot+Vanes", alpha=0.8)
-        vw_dir = np.arctan2(flight_data["vwy_IMU_0"], flight_data["vwx_IMU_0"])
-        axs[1].plot(flight_data["time"], np.degrees(vw_dir) % 360, alpha=0.8)
-        axs[2].plot(
-            flight_data["time"], flight_data["vwz_IMU_0"], label="IMU_0", alpha=0.5
-        )
-    if IMU_1:
-        vw_mod = np.sqrt(
-            flight_data["vwx_IMU_1"] ** 2
-            + flight_data["vwy_IMU_1"] ** 2
-            + flight_data["vwz_IMU_1"] ** 2
-        )
-        axs[0].plot(flight_data["time"], vw_mod, label="IMU_1", alpha=0.5)
-        vw_dir = np.arctan2(flight_data["vwy_IMU_1"], flight_data["vwx_IMU_1"])
-        axs[1].plot(flight_data["time"], np.degrees(vw_dir) % 360, alpha=0.5)
-        axs[2].plot(
-            flight_data["time"], flight_data["vwz_IMU_1"], label="IMU_1", alpha=0.5
-        )
-    if EKF_tether:
-        vw_mod = np.sqrt(
-            flight_data["vwx_EKF"] ** 2
-            + flight_data["vwy_EKF"] ** 2
-            + flight_data["vwz_EKF"] ** 2
-        )
-        axs[0].plot(flight_data["time"], vw_mod, label="EKF_tether", alpha=0.5)
-        vw_dir = np.arctan2(flight_data["vwy_EKF"], flight_data["vwx_EKF"])
-        axs[1].plot(flight_data["time"], np.degrees(vw_dir) % 360, alpha=0.5)
-        axs[2].plot(
-            flight_data["time"], flight_data["vwz_EKF"], label="EKF_tether", alpha=0.5
-        )
+    # Other plotting code remains the same
     if EKF:
         wvel = results["wind_speed_horizontal"]
         vw = np.vstack(
@@ -166,66 +136,49 @@ def plot_wind_speed(
             )
         ).T
         axs[0].plot(
-            flight_data["time"], np.linalg.norm(vw, axis=1), label="EKF", alpha=0.8
+            flight_data["time"], np.linalg.norm(vw, axis=1), label=label_ekf, alpha=0.8, color = color
         )
         axs[1].plot(
             flight_data["time"],
             np.degrees(results["wind_direction"]),
-            label="EKF",
+            label=label_ekf,
+            alpha=0.8,
+            color = color
+        )
+        axs[2].plot(flight_data["time"], results["wind_speed_vertical"], label=label_ekf, alpha=0.8, color = color)
+
+    if ground:
+    # Plotting Ground Wind Data
+        axs[0].plot(
+            flight_data["time"],
+            flight_data["ground_wind_speed"],
+            label="Ground",
+            color="grey",
             alpha=0.8,
         )
-        axs[2].plot(flight_data["time"], results["wind_speed_vertical"], label="EKF", alpha=0.8)
+        axs[1].plot(
+            flight_data["time"],
+            flight_data["ground_wind_direction"],
+            label="Ground",
+            color="grey",
+            alpha=0.8,
+        )
 
-    min_wdir = min(flight_data["ground_wind_direction"])
-    max_wdir = max(flight_data["ground_wind_direction"])
-
-    y1 = np.full(len(flight_data), min_wdir - 20)
-    y2 = np.full(len(flight_data), max_wdir + 20)
-    # mask = (flight_data['turn_straight'] == 'straight') & (flight_data['powered'] == 'powered')
-    # axs[1].fill_between(flight_data['time'], y1,y2,where=mask, color='blue', alpha=0.2, label='Straight')
-    # mask = (flight_data['turn_straight'] == 'turn') & (flight_data['powered'] == 'powered')
-    # axs[1].fill_between(flight_data['time'], y1,y2,where=mask, color='red', alpha=0.2, label='Turn')
-    # mask = (flight_data['powered'] == 'depowered')
-    # axs[1].fill_between(flight_data['time'], y1,y2,where=mask, color='green', alpha=0.2, label='Depowered')
-
-    axs[0].plot(
-        flight_data["time"],
-        flight_data["ground_wind_speed"],
-        label="Ground",
-        color="grey",
-        alpha=0.8,
-    )
-    axs[1].plot(
-        flight_data["time"],
-        flight_data["ground_wind_direction"],
-        label="Ground",
-        color="grey",
-        alpha=0.8,
-    )
-
+    # Set labels and other properties
     axs[0].set_ylim([0, 20])
-    # axs[0].legend()
     axs[0].set_ylabel("Wind speed (m/s)")
     axs[0].set_xlabel("Time (s)")
-    # axs[0].grid()
-    axs[1].legend()
     axs[1].set_ylabel("Wind direction (deg)")
     axs[1].set_xlabel("Time (s)")
-    # axs[1].set_ylim([175,275])
-    # axs[1].grid()
-    # axs[2].legend()
     axs[2].set_ylabel("Vertical Wind speed (m/s)")
     axs[2].set_xlabel("Time (s)")
-    # axs[2].grid()
+
     sns.set(style="whitegrid")
     # Enhance overall aesthetics
     for ax in axs:
         ax.grid(True, which="both", linestyle="--", linewidth=0.5)
         ax.set_axisbelow(True)
 
-    if savefig:
-        plt.tight_layout()
-        plt.savefig("wind_speed.png", dpi=300)
 
 
 def plot_wind_speed_height_bins(results, flight_data, lidar_heights=[], savefig=False):
@@ -785,7 +738,6 @@ def plot_prob_coeff_vs_aoa_ss(results, coeff, mask, aoa_method):
     plot_probability_density(aoa[mask], coeff[mask], fig, axs[0], xlabel="aoa")
     plot_probability_density(ss[mask], coeff[mask], fig, axs[1], "ss", "")
 
-
 def plot_time_series(
     flight_data, y, ax, color=None, ylabel=None, label=None, plot_phase=False, xlabel=None
 ):
@@ -810,9 +762,9 @@ def plot_time_series(
             y1,
             y2,
             where=mask,
-            color="blue",
+            color=colors[5],
             alpha=0.2,
-            label="Straight",
+            zorder = 0
         )
 
         # Mask and fill for "turn and powered" phase
@@ -824,9 +776,9 @@ def plot_time_series(
             y1,
             y2,
             where=mask,
-            color="red",
+            color=colors[7],
             alpha=0.2,
-            label="Turn",
+            zorder = 0
         )
 
         # Mask and fill for "depowered" phase
@@ -836,14 +788,14 @@ def plot_time_series(
             y1,
             y2,
             where=mask,
-            color="green",
-            alpha=0.2,
-            label="Depowered",
+            color='white',
+            zorder=0,
         )
 
         # Ensure that y-axis limits are reset correctly after fill_between
         ax.set_ylim([y1, y2])
 
+    return ax
 
 def plot_wind_profile(flight_data, results, savefig=False):
 
@@ -944,8 +896,8 @@ def plot_wind_profile_bins(flight_data, results, axs, step=20, savefig=False, co
         bin_centers,
         xerr=wvel_stds,
         fmt="o-",
-        color=get_color(color),
-        ecolor=get_color(color, alpha=0.5),
+        color=color,
+        ecolor=hex_to_rgba(color, 0.5),
         elinewidth=3,
         capsize=0,
         label=label,
@@ -962,8 +914,8 @@ def plot_wind_profile_bins(flight_data, results, axs, step=20, savefig=False, co
         bin_centers,
         xerr=wdir_stds,
         fmt="o-",
-        color=get_color(color),
-        ecolor=get_color(color, alpha=0.5),
+        color=color,
+        ecolor=hex_to_rgba(color, 0.5),
         elinewidth=3,
         capsize=0,
         label=label,
@@ -1291,7 +1243,7 @@ def plot_kite_reference_frame(results, flight_data, imus, frame_axis="xyz"):
     # plt.show()
 
 
-def plot_cl_curve(cl, cd, aoa, mask, axs, label=None, savefig=False):
+def plot_cl_curve(cl, cd, aoa, mask, axs, label=None, savefig=False, color=None):
     cl_wing = cl[mask]
     cd_wing = cd[mask]
     alpha = aoa[mask]
@@ -1301,52 +1253,43 @@ def plot_cl_curve(cl, cd, aoa, mask, axs, label=None, savefig=False):
     bin_indices = np.digitize(alpha, bins)  # Find the bin index for each alpha value
     num_bins = len(bins)
 
+    import scipy.stats as stats
+
     cl_wing_means = np.array([cl_wing[bin_indices == i].mean() for i in range(1, num_bins)])
     cd_wing_means = np.array([cd_wing[bin_indices == i].mean() for i in range(1, num_bins)])
 
-    cl_wing_stds = np.array([cl_wing[bin_indices == i].std() for i in range(1, num_bins)])
-    cd_wing_stds = np.array([cd_wing[bin_indices == i].std() for i in range(1, num_bins)])
+    # Calculate SEM (Standard Error of the Mean)
+    cl_wing_sems = np.array([cl_wing[bin_indices == i].std() / np.sqrt(np.sum(bin_indices == i)) for i in range(1, num_bins)])
+    cd_wing_sems = np.array([cd_wing[bin_indices == i].std() / np.sqrt(np.sum(bin_indices == i)) for i in range(1, num_bins)])
+
+    # Calculate the 95% confidence intervals
+    confidence_level = 0.99
+    z = stats.norm.ppf(0.5 + confidence_level / 2)  # Approx 1.96
+
+    cl_wing_cis = z * cl_wing_sems
+    cd_wing_cis = z * cd_wing_sems
+
     bin_centers = 0.5 * (bins[:-1] + bins[1:])
 
-    # Plot cl_wing and shade the area for std deviation
-    axs[0, 0].plot(bin_centers, cl_wing_means, "o-", markersize=8, linewidth=2, label=label)
-    axs[0, 0].fill_between(
-        bin_centers, cl_wing_means - cl_wing_stds, cl_wing_means + cl_wing_stds, alpha=0.2
+    # Plot cl_wing and shade the area for 95% confidence interval
+    axs[0].plot(bin_centers, cl_wing_means, "o-", markersize=8, linewidth=1.5, label=label, color=color)
+    axs[0].fill_between(
+        bin_centers, cl_wing_means - cl_wing_cis, cl_wing_means + cl_wing_cis, alpha=0.2, color=color
     )
 
-    axs[0, 0].set_ylabel("$C_L$", fontsize=14)
-    axs[0, 0].grid(True)
+    axs[0].set_ylabel("$C_L$", fontsize=14)
+    axs[0].set_xlabel(r"$\alpha_{w,b}$ [$^\circ$]", fontsize=14)
+    axs[0].grid(True)
 
-    # Plot cd_wing and shade the area for std deviation
-    axs[0, 1].plot(bin_centers, cd_wing_means, "o-", markersize=8, linewidth=2, label=label)
-    axs[0, 1].fill_between(
-        bin_centers, cd_wing_means - cd_wing_stds, cd_wing_means + cd_wing_stds, alpha=0.2
+    # Plot cd_wing and shade the area for 95% confidence interval
+    axs[1].plot(bin_centers, cd_wing_means, "o-", markersize=8, linewidth=1.5, label=label, color=color)
+    axs[1].fill_between(
+        bin_centers, cd_wing_means - cd_wing_cis, cd_wing_means + cd_wing_cis, alpha=0.2, color=color
     )
 
-    axs[0, 1].set_ylabel("$C_{D}$", fontsize=14)
-    axs[0, 1].grid(True)
-
-    axs[1, 0].plot(bin_centers, cl_wing_means**3 / cd_wing_means**2, "o-", label=label)
-    axs[1, 0].fill_between(
-        bin_centers,
-        (cl_wing_means - cl_wing_stds) ** 3 / (cd_wing_means + cd_wing_stds) ** 2,
-        (cl_wing_means + cl_wing_stds) ** 3 / (cd_wing_means - cd_wing_stds) ** 2,
-        alpha=0.2,
-    )
-    axs[1, 0].set_xlabel(r"$\alpha_{w,b}$ [$^\circ$]", fontsize=14)
-    axs[1, 0].set_ylabel("$C_L^3/C_D^2$", fontsize=14)
-    axs[1, 0].grid(True)
-
-    axs[1, 1].plot(bin_centers, cl_wing_means / cd_wing_means, "o-", label=label)
-    axs[1, 1].fill_between(
-        bin_centers,
-        (cl_wing_means - cl_wing_stds) / (cd_wing_means + cd_wing_stds),
-        (cl_wing_means + cl_wing_stds) / (cd_wing_means - cd_wing_stds),
-        alpha=0.2,
-    )
-    axs[1, 1].set_xlabel(r"$\alpha_{w,b}$ [$^\circ$]", fontsize=14)
-    axs[1, 1].set_ylabel("$C_L/C_D$", fontsize=14)
-    axs[1, 1].grid(True)
+    axs[1].set_ylabel("$C_{D}$", fontsize=14)
+    axs[1].set_xlabel(r"$\alpha_{w,b}$ [$^\circ$]", fontsize=14)
+    axs[1].grid(True)
 
 
 def plot_kinetic_energy_spectrum(results, flight_data, ax, savefig=False):
@@ -1373,7 +1316,7 @@ def plot_kinetic_energy_spectrum(results, flight_data, ax, savefig=False):
     pos_fft_freq = fft_freq[pos_freq]
 
     # Log-log plot
-    ax.loglog(pos_fft_freq, pos_energy_spectrum, label='Energy Spectrum')
+    ax.loglog(pos_fft_freq, pos_energy_spectrum, label='Energy Spectrum', color = colors[1])
     ax.set_xlabel('Frequency (Hz)')
     ax.set_ylabel('Power Spectral Density ($m^2/s^2$)')
 
@@ -1383,15 +1326,16 @@ def plot_kinetic_energy_spectrum(results, flight_data, ax, savefig=False):
     subrange_end = 2e-1   # Example end frequency
     subrange_mask = (pos_fft_freq > subrange_start) & (pos_fft_freq < subrange_end)
 
-    if np.any(subrange_mask):
-        slope, intercept, r_value, p_value, std_err = linregress(np.log(pos_fft_freq[subrange_mask]), np.log(pos_energy_spectrum[subrange_mask]))
-        plt.plot(pos_fft_freq[subrange_mask], np.exp(intercept) * pos_fft_freq[subrange_mask] ** slope, 'r--', label=f'Fitted Slope: {slope:.2f}')
-        print(f"The calculated slope is: {slope:.2f}")
-    else:
-        print("No data in the specified subrange. Please adjust the subrange criteria.")
+    # if np.any(subrange_mask):
+    slope, intercept, r_value, p_value, std_err = linregress(np.log(pos_fft_freq[subrange_mask]), np.log(pos_energy_spectrum[subrange_mask]))
+    #     plt.plot(pos_fft_freq[subrange_mask], np.exp(intercept) * pos_fft_freq[subrange_mask] ** slope, 'r--', label=f'Fitted Slope: {slope:.2f}')
+    #     print(f"The calculated slope is: {slope:.2f}")
+    # else:
+    #     print("No data in the specified subrange. Please adjust the subrange criteria.")
 
     slope = -5/3
-    plt.plot(pos_fft_freq[subrange_mask], np.exp(intercept) * pos_fft_freq[subrange_mask] ** slope, 'g--', label=f'Kolmogorov: -5/3')
+    freq = np.linspace(1e-3, 20, 100)
+    plt.plot(freq, np.exp(intercept) *freq ** slope, '--', label=f'Kolmogorov: -5/3', color = colors[0])
     plt.legend()
 
 def plot_turbulence_intensity(results,flight_data, height, ax, savefig=False):
@@ -1408,9 +1352,9 @@ def plot_turbulence_intensity(results,flight_data, height, ax, savefig=False):
         TI_160m.append(std/mean)
     #%%
     TI_160m_lidar = flight_data[str(height)+'m_Wind_Speed_Dispersion_m_s'][mask]/flight_data[str(height)+'m_Wind_Speed_m_s'][mask]
-    ax.plot(TI_160m)
-    ax.plot(TI_160m_lidar)
-    ax.legend(['EKF','Lidar'])
+    ax.plot(TI_160m, color = colors[1])
+    ax.plot(TI_160m_lidar, color = colors[0])
+    ax.legend(['EKF 0','Lidar'])
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Turbulence intensity')
 
@@ -1433,8 +1377,115 @@ def plot_turbulence_intensity_high_res(results,flight_data, height, ax, savefig=
         TI_160m.append(std/mean)
         TI_160m_lidar.append(std_lidar/mean_lidar)
     #%%
-    ax.plot(TI_160m)
-    ax.plot(TI_160m_lidar)
-    ax.legend(['EKF','Lidar'])
+    ax.plot(TI_160m, color = colors[1])
+    ax.plot(TI_160m_lidar, color = colors[0])
+    ax.legend(['EKF 0','Lidar'])
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Turbulence intensity')
+
+
+def plot_forces_dimensional(results,flight_data, kite,kcu):
+
+    # Sample data for different forces
+    forces = ['Tether force', 'Wing lift', 'Wing sideforce', 'Wing drag',  'Tether drag', 'KCU drag','KCU Inertia', 'Wing Inertia', 'KCU weight', 'Wing weight']
+    lift_force = 1.225*results['wing_lift_coefficient']*kite.area*results['kite_apparent_windspeed']**2/2
+    side_force = abs(results['wing_sideforce_coefficient']*kite.area*results['kite_apparent_windspeed']**2/2)
+    drag_force = results['wing_drag_coefficient']*kite.area*results['kite_apparent_windspeed']**2/2
+    kcu_inertia_force = kcu.mass*np.sqrt(flight_data["kite_acceleration_x"]**2+flight_data["kite_acceleration_y"]**2+flight_data["kite_acceleration_z"]**2)
+    wing_inertia_force = kite.mass*np.sqrt(flight_data["kite_acceleration_x"]**2+flight_data["kite_acceleration_y"]**2+flight_data["kite_acceleration_z"]**2)
+    kcu_drag_force = 0.5*1.225*results["kcu_drag_coefficient"]*kite.area*results['kite_apparent_windspeed']**2
+    tether_drag_force = 0.5*1.225*results["tether_drag_coefficient"]*kite.area*results['kite_apparent_windspeed']**2
+
+    mean_values = [flight_data['ground_tether_force'].mean(), 
+                        lift_force.mean(), 
+                        side_force.mean(), 
+                        drag_force.mean(), 
+                        tether_drag_force.mean(), 
+                        kcu_drag_force.mean(), 
+                        kcu_inertia_force.mean(), 
+                        wing_inertia_force.mean(), 
+                        kcu.mass*9.81, 
+                        kite.mass*9.81]
+    
+    min_values = [flight_data['ground_tether_force'].min(), 
+                        lift_force.min(), 
+                        side_force.min(), 
+                        drag_force.min(), 
+                        tether_drag_force.min(), 
+                        kcu_drag_force.min(),                        
+                        kcu_inertia_force.min(), 
+                        wing_inertia_force.min(), 
+                        kcu.mass*9.81, 
+                        kite.mass*9.81]
+    max_values = [flight_data['ground_tether_force'].max(),
+                        lift_force.max(), 
+                        side_force.max(), 
+                        drag_force.max(), 
+                        tether_drag_force.max(), 
+                        kcu_drag_force.max(), 
+                        kcu_inertia_force.max(),
+                        wing_inertia_force.max(),
+                        kcu.mass*9.81, 
+                        kite.mass*9.81]
+
+    # Calculate error values (difference between mean and min/max)
+    lower_error = np.array(mean_values) - np.array(min_values)
+    upper_error = np.array(max_values) - np.array(mean_values)
+    errors = [lower_error, upper_error]
+    # Plotting
+    plt.figure(figsize=(12, 5))
+    plt.errorbar(forces, mean_values,fmt='D', yerr=errors, capsize=5, elinewidth=2, markersize=8, color = colors[0])
+    plt.xticks(rotation=45, ha='right')  # Rotate labels diagonally
+    plt.ylabel('Magnitude (N)')
+    plt.grid(axis='y', linestyle='--', alpha=0.5)
+    plt.tight_layout()  # Adjust layout to fit labels
+    
+
+def plot_slack_tether_force(results, flight_data,kcu):
+    
+    colors = get_color_list()
+    # Assuming 'slack' is in the 'results' DataFrame and 'tether_force' is in 'flight_data'
+    time = flight_data['time']  # Replace with the appropriate time variable
+    # r = np.sqrt(results["kite_position_x"]**2 + results["kite_position_y"]**2 + results["kite_position_z"]**2)
+    # slack = flight_data['tether_length']+kcu.distance_kcu_kite-r
+    slack = results['slack']  # Replace with the appropriate slack variable
+    tether_force = flight_data['ground_tether_force']  # Replace with the appropriate tether force variable
+
+
+    fig, ax1 = plt.subplots(figsize=(12, 5))
+
+    # Plotting Slack on the first axis
+    ax1.set_xlabel('Time [s]')
+    ax1.set_ylabel('Slack [m]', color=colors[0])
+    ax1 = plot_time_series(flight_data, slack, ax1, color=colors[0], ylabel='Zag [m]', plot_phase=True)
+    ax1.tick_params(axis='y', labelcolor=colors[0])
+
+    # Creating a second y-axis for Tether Force
+    ax2 = ax1.twinx()
+    ax2.set_ylabel('Tether Force [N]', color=colors[1])
+    ax2.plot(time, tether_force, color=colors[1], linestyle='--')
+    ax2.tick_params(axis='y', labelcolor=colors[1])
+    
+
+    # Get the current handles and labels
+    handles, labels = ax1.get_legend_handles_labels()
+
+    from matplotlib.patches import Patch
+    # Create a new patch for the legend
+    reel_out_straight_patch = Patch(color=colors[5], alpha=0.2, label="Reel-out - Straight")
+    reel_out_turn_patch = Patch(color=colors[7], alpha=0.2, label="Reel-out - Turn")
+    reel_in_patch = Patch(color='white', alpha=1, edgecolor='black', label="Reel-in")
+
+    # Select starting from the second element
+    ax1.legend(
+        [reel_out_straight_patch, reel_out_turn_patch, reel_in_patch],
+        ["Reel-out - Straight", "Reel-out - Turn", "Reel-in"],
+        loc='upper left',
+        frameon=True,
+        bbox_to_anchor=(0.075, 1)  # Adjust the x-coordinate to move the legend to the right
+    )
+
+    fig.tight_layout()  # Adjust layout to prevent overlap
+
+    # Title and Grid
+    ax1.grid(True, linestyle='--', alpha=0.8)

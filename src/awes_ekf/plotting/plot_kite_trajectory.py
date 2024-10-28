@@ -144,7 +144,7 @@ def calculate_azimuth_elevation(x, y, z):
     
     return azimuth, elevation
 
-def plot_position_azimuth_elevation(results, flight_data):
+def plot_position_azimuth_elevation(results, flight_data, label = "EKF"):
     # Extract the EKF (estimated) data
     x_ekf = results["kite_position_x"]
     y_ekf = results["kite_position_y"]
@@ -163,15 +163,11 @@ def plot_position_azimuth_elevation(results, flight_data):
     azimuth_meas, elevation_meas = calculate_azimuth_elevation(x_meas, y_meas, z_meas)
 
     mean_wind_dir = np.mean(results["wind_direction"])
-    plt.figure()
-    from awes_ekf.plotting.plot_utils import plot_time_series
-    plot_time_series(flight_data,azimuth_ekf, plt.gca(), label="Estimated", ylabel="Wind direction [rad]", plot_phase=True)
     # Create the figure
-    fig = plt.figure(figsize=(8, 6))
-    plt.plot(np.rad2deg(azimuth_ekf-mean_wind_dir), np.rad2deg(elevation_ekf), label='Estimated')
-    plt.plot(np.rad2deg(azimuth_meas-mean_wind_dir), np.rad2deg(elevation_meas), label='Measured')
+    plt.plot(np.rad2deg(azimuth_ekf-mean_wind_dir), np.rad2deg(elevation_ekf), label=label)
+    plt.plot(np.rad2deg(azimuth_meas-mean_wind_dir), np.rad2deg(elevation_meas), label='GPS')
 
     # Set labels and legend
     plt.xlabel('Azimuth [deg]')
     plt.ylabel('Elevation [deg]')
-    plt.legend()
+

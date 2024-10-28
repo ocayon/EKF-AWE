@@ -6,6 +6,41 @@ from awes_ekf.load_data.read_data import read_results
 import awes_ekf.plotting.plot_utils as pu
 from awes_ekf.plotting.color_palette import get_color_list, visualize_palette, set_plot_style, get_color
 
+
+def remove_faulty_lidar_data(flight_data):
+    # Identify lidar heights from the columns
+    lidar_heights = []
+    for column in flight_data.columns:
+        if "m_Wind_Speed_m_s" in column:
+            height = "".join(filter(str.isdigit, column))
+            lidar_heights.append(int(height))
+    
+    # Create a mask for rows that need to be updated
+    faulty_indices = []
+
+    for index in flight_data.index:
+        for height in lidar_heights:
+            vel0 = flight_data.loc[index, f"{height}m_Wind_Speed_m_s"]
+            vel1 = flight_data.loc[index-1, f"{height}m_Wind_Speed_m_s"] if index > 0 else None
+            vel2 = flight_data.loc[index+1, f"{height}m_Wind_Speed_m_s"] if index < len(flight_data) - 1 else None
+            
+            # Check for faulty data
+            if vel0 != vel1 and vel0 != vel2:
+                faulty_indices.append((index, height))
+    
+    # Collect all changes and apply them at once to avoid fragmentation
+    for index, height in faulty_indices:
+        flight_data.loc[index, [
+            f"{height}m_Wind_Speed_m_s",
+            f"{height}m_Wind_Speed_max_m_s",
+            f"{height}m_Wind_Speed_min_m_s",
+            f"{height}m_Wind_Direction_deg",
+            f"{height}m_Z-wind_m_s"
+        ]] = np.nan
+
+    return flight_data
+
+
 set_plot_style()
 year = "2024"
 month = "03"
@@ -25,6 +60,11 @@ flight_data = flight_data.iloc[cut:-cut]
 results = results.reset_index(drop=True)
 flight_data = flight_data.reset_index(drop=True)
 
+fig, ax = plt.subplots(1, 1, figsize=(6, 4))
+pu.plot_kinetic_energy_spectrum(results, flight_data,ax, savefig=False)    
+plt.show()
+# plt.savefig("./results/plots_paper/kinetic_energy_spectrum_2019-10-08.pdf")
+
 fig, ax = plt.subplots(1, 1, figsize=(8, 6))
 pu.plot_turbulence_intensity(results, flight_data, 140, ax, savefig=False)
 plt.savefig("./results/plots_paper/turbulence_intensity_2024-03-12.pdf")
@@ -39,6 +79,9 @@ flight_data_subsets = [flight_data.iloc[i*chunk_size:(i+1)*chunk_size] for i in 
 # Create a figure with subplots for each subset
 fig, axs = plt.subplots(2, 6, figsize=(12,6))  # Adjust the layout as needed
 
+# Remove faulty lidar data
+flight_data = remove_faulty_lidar_data(flight_data)
+print("Removed faulty lidar data")
 # Flatten axs for easy iteration if using a 2D grid of subplots
 axs = axs.flatten()
 

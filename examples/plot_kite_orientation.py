@@ -27,8 +27,12 @@ def plot_kite_orientation(config_data: dict) -> None:
     )
     pu.plot_kite_reference_frame(results.iloc[0:2000], flight_data.iloc[0:2000], [])
 
-    for imu in config_data["kite"]["sensor_ids"]:
-        flight_data = remove_offsets_IMU_data_v3(results, flight_data, sensor=imu)
+    if config_data["kite"]["model_name"] == "v3":
+        results["kite_yaw_kin"] = results["kite_yaw_kin"]%(2*np.pi)
+        for imu in config_data["kite"]["sensor_ids"]:
+            flight_data = remove_offsets_IMU_data_v3(results, flight_data, sensor=imu)
+    else:
+        results["kite_yaw_kin"] = np.unwrap(results["kite_yaw_kin"])
 
 
     results, flight_data = cut_data(results, flight_data, [5000,15000])
@@ -54,21 +58,26 @@ def plot_kite_orientation(config_data: dict) -> None:
     # Calculate errors
     pitch_error = abs(flight_data["kite_pitch_0"] - results["kite_pitch"])
     roll_error = abs(flight_data["kite_roll_0"] - results["kite_roll"])
-    yaw_error = abs(flight_data[flight_data["us"]<0.3]["kite_yaw_0"] - results[flight_data["us"]<0.3]["kite_yaw"])
+    yaw_error = abs(flight_data["kite_yaw_0"] - results["kite_yaw"])
+    yaw_error_kin = abs(flight_data["kite_yaw_0"] - results["kite_yaw_kin"])
+
 
     mean_pitch_error = np.mean(pitch_error)
     mean_roll_error = np.mean(roll_error)
     mean_yaw_error = np.mean(yaw_error)
+    mean_yaw_error_kin = np.mean(yaw_error_kin)
 
     std_pitch_error = np.std(pitch_error)
     std_roll_error = np.std(roll_error)
     std_yaw_error = np.std(yaw_error)
+    std_yaw_error_kin = np.std(yaw_error_kin)
 
     print(
         f"Mean pitch error: {mean_pitch_error:.2f} deg, std: {std_pitch_error:.2f} deg"
     )
     print(f"Mean roll error: {mean_roll_error:.2f} deg, std: {std_roll_error:.2f} deg")
     print(f"Mean yaw error: {mean_yaw_error:.2f} deg, std: {std_yaw_error:.2f} deg")
+    print(f"Mean kinematic yaw error: {mean_yaw_error_kin:.2f} deg, std: {std_yaw_error_kin:.2f} deg")
 
     # %%
     fig, ax = plt.subplots()
@@ -159,7 +168,7 @@ def plot_kite_orientation(config_data: dict) -> None:
 if __name__ == "__main__":
     # Example usage
     plt.close("all")
-    config_file_name = "v9_config.yaml"
+    config_file_name = "v3_config.yaml"
     config = load_config("examples/" + config_file_name)
     plot_kite_orientation(config)
     plt.show()

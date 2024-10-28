@@ -13,6 +13,36 @@ def plot_kite_aero(config_data: dict):
     kite_sensors = config_data['kite']['sensor_ids']
     cycles_plotted = np.arange(6,70, step=1)
     # %% Plot results aerodynamic coefficients
+    kcu_steering = -flight_data["kcu_actual_depower"] / 100
+
+    # Define the bins (from min to max values, step 0.1)
+    bins = np.arange(kcu_steering.min(), kcu_steering.max() + 0.1, 0.1)
+    import pandas as pd
+    # Create a DataFrame for easy manipulation
+    data = pd.DataFrame({
+        'kcu_steering': kcu_steering,
+        'wing_sideforce_coefficient': results["wing_lift_coefficient"]
+    })
+
+    # Cut the data into bins and calculate the mean for each bin
+    data['kcu_steering_bin'] = pd.cut(data['kcu_steering'], bins)
+    binned_means = data.groupby('kcu_steering_bin')['wing_sideforce_coefficient'].mean()
+
+    # Get the center points of each bin for plotting
+    bin_centers = [interval.mid for interval in binned_means.index]
+
+    # Plotting the mean values for each bin
+    plt.figure(figsize=(8, 6))
+    plt.plot(bin_centers, binned_means, marker='o', linestyle='-')
+    plt.xlabel('KCU Actual Steering (Binned, 0.1 intervals)')
+    plt.ylabel('Mean Wing Sideforce Coefficient')
+    plt.title('Binned Mean Wing Sideforce Coefficient vs. KCU Actual Steering')
+    plt.grid(True)
+    plt.show()
+
+    plt.figure()
+    plt.scatter(-flight_data["kcu_actual_steering"]/100, results["wing_sideforce_coefficient"])
+    plt.show()
     pu.plot_aero_coeff_vs_aoa_ss(results, flight_data, cycles_plotted,kite_sensors,savefig=False) # Plot aero coeff vs aoa_ss
     pu.plot_aero_coeff_vs_up_us(results, flight_data, cycles_plotted,IMU_0=False,savefig=False) # Plot aero coeff vs up_used
 
@@ -121,7 +151,7 @@ def plot_kite_aero(config_data: dict):
 if __name__ == "__main__":
     # Example usage
     plt.close('all')
-    config_file_name = "v3_config.yaml"
+    config_file_name = "v9_config.yaml"
     config = load_config("examples/" + config_file_name)
     plot_kite_aero(config)
     plt.show()
