@@ -171,7 +171,7 @@ class PointMassEKF(Kite):
 
         Fg = ca.vertcat(0, 0, -self.mass * g)
         rp = self.v
-        if self.thrust:
+        if self.simConfig.obsData.kite_thrust_force:
             vp = (-tether_force + L + D + S + Fg + self.thrust) / self.mass
         else:
             vp = (-tether_force + L + D + S + Fg) / self.mass

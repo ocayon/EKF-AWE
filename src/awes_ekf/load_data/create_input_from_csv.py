@@ -60,8 +60,13 @@ def create_input_from_csv(
     tether_length = np.array(flight_data["tether_length"])
 
     # Airflow measurements
-    ground_windspeed = np.array(flight_data["ground_wind_speed"])
-    ground_winddir = np.array(flight_data["ground_wind_direction"])
+    try:
+        ground_windspeed = np.array(flight_data["ground_wind_speed"])
+        ground_winddir = np.array(flight_data["ground_wind_direction"])
+    except KeyError:
+        print("No wind data found")
+        ground_windspeed = np.zeros(n_intervals)
+        ground_winddir = np.zeros(n_intervals)
 
     try:
         kite_apparent_windspeed = np.array(flight_data["kite_apparent_windspeed"])
@@ -86,8 +91,14 @@ def create_input_from_csv(
         kite_angle_of_attack = np.zeros(n_intervals)
 
     tether_reelout_speed = np.array(flight_data["tether_reelout_speed"])
-    tether_elevation_ground = np.array(flight_data["tether_elevation_ground"])
-    tether_azimuth_ground = np.array(flight_data["tether_azimuth_ground"])
+
+    try:
+        tether_elevation_ground = np.array(flight_data["tether_elevation_ground"])
+        tether_azimuth_ground = np.array(flight_data["tether_azimuth_ground"])
+    except KeyError:
+        print("No tether elevation or azimuth data found")
+        tether_elevation_ground = np.zeros(n_intervals)
+        tether_azimuth_ground = np.zeros(n_intervals)
 
     try:
         kite_thrust_force = np.array(

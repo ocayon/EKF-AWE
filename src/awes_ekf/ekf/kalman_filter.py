@@ -201,7 +201,7 @@ class ExtendedKalmanFilter:
         if self.simConfig.obsData.kcu_velocity:
             input = np.concatenate((input, input_class.kcu_velocity))
         if self.simConfig.obsData.kite_thrust_force:
-            input = np.concatenate((input, input_class.thrust_force))
+            input = np.concatenate((input, input_class.kite_thrust_force))
 
         self.u = input
 

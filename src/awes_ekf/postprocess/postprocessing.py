@@ -204,8 +204,12 @@ def postprocess_results(
 
     results["wind_direction"] = results["wind_direction"] % (2 * np.pi)
 
-    kite_sensors = config_data["kite"]["sensor_ids"]
-    kcu_sensors = config_data["kcu"].get("sensor_ids", [])
+    kite_sensors = config_data["kite"].get("sensor_ids", [])
+    
+    if kcu:
+        kcu_sensors = config_data["kcu"].get("sensor_ids", [])
+    else:
+        kcu_sensors = []
 
     flight_data["tether_length"] = flight_data["tether_length"] + results["tether_length_offset"]
     for imu in kite_sensors:
@@ -250,7 +254,7 @@ def postprocess_results(
         flight_data["bridle_sideslip_angle"] = np.zeros(len(flight_data))
 
     results["time"] = flight_data["time"]
-    results["unix_time"] = flight_data["unix_time"]
+    # results["unix_time"] = flight_data["unix_time"]
     # Smooth a_kite
     window_size = 10
     a_kite[:, 0] = np.convolve(
@@ -325,9 +329,18 @@ def postprocess_results(
             airflow_angles = calculate_airflow_angles(dcm, va_kite[i])
             results.loc[i, "wing_angle_of_attack_imu_" + str(imu)] = airflow_angles[0]  # Angle of attack
             results.loc[i, "wing_sideslip_angle_imu_" + str(imu)] = airflow_angles[1]  # Sideslip angle
+
+        if len(kite_sensors) == 0:
+            dcm = calculate_reference_frame_euler(
+                results["kite_roll"].iloc[i],
+                results["kite_pitch"].iloc[i],
+                results["kite_yaw"].iloc[i],
+                eulerFrame="NED",
+                outputFrame="ENU",
+            )
     # It is correct but I am calculating the small earth frame heading in the absolut azimuth and then translating it by the fd kite azimuth(respect to wind direction)
     # It would make more sense to calculate it in the fd azimuth and then translating it by the wind direction (potato potato but still)
-        heading.append(calculate_heading(dcm, fd["kite_azimuth"], res["tether_elevation"], res["tether_azimuth"]))
+        # heading.append(calculate_heading(dcm, fd["kite_azimuth"], res["tether_elevation"], res["tether_azimuth"]))
         
         at = (
             np.dot(a_kite[i], np.array(v_kite[i]) / np.linalg.norm(v_kite[i]))
@@ -368,7 +381,7 @@ def postprocess_results(
     results["roll_rate"] = omega_p
     results["pitch_rate"] = omega_q
     results["yaw_rate"] = omega_r
-    results["kite_heading"] = heading
+    # results["kite_heading"] = heading
 
     if len(kite_sensors) > 0:
         results, flight_data = correct_aoa_ss_measurements(results, flight_data)
