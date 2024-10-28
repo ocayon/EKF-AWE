@@ -174,9 +174,10 @@ class AnalyzeAweFromCsvLog:
         import numpy as np
         # TODO: Add a timeseries class
         for k, ekf_input in enumerate(ekf_input_list):
-            # if k > 4000 and k< 5000:
+            # if ekf_input.kite_acceleration[2]>17:
             #     ekf_input.kite_position = np.array([np.nan, np.nan, np.nan])
             #     ekf_input.kite_velocity = np.array([np.nan, np.nan, np.nan])
+            #     print("Acceleration is too high to get good GPS data")
             try:
                 ekf, ekf_ouput = propagate_state_EKF(
                     ekf, ekf_input, simConfig, tether, kite, kcu

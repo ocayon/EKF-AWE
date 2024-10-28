@@ -64,9 +64,13 @@ def initialize_ekf(ekf_input_list, simConfig, tuningParams, x0, kite, kcu, tethe
                 start_time = time.time()
                 mins = 0
                 for k in range(offset_sim_length):
-                    ekf_copy, ekf_ouput = propagate_state_EKF(
-                        ekf_copy, ekf_input_list[k], simConfig_copy, tether, kite, kcu
-                    )
+                    try:
+                        ekf_copy, ekf_ouput = propagate_state_EKF(
+                            ekf_copy, ekf_input_list[k], simConfig_copy, tether, kite, kcu
+                        )
+                    except Exception as e:
+                        print(f"Error at timestep {k}: {e}")
+                        break
                     # Store results
                     ekf_output_list.append(ekf_ouput)
                     # Print progress
@@ -85,7 +89,7 @@ def initialize_ekf(ekf_input_list, simConfig, tuningParams, x0, kite, kcu, tethe
                 converged_idx = int(5*60/simConfig_copy.ts)
                 estimated_variable = np.array([ekf_output.__dict__[variable] for ekf_output in ekf_output_list])
                 measured_variable = np.array([ekf_input.__dict__[variable] for ekf_input in ekf_input_list[:offset_sim_length]])
-                offset = find_offset(estimated_variable[converged_idx::], measured_variable[converged_idx::], offset_range=[-15,15])
+                offset = find_offset(estimated_variable[converged_idx::], measured_variable[converged_idx:len(ekf_input_list)], offset_range=[-15,15])
                 print(f"Offset for {variable}: {offset}")
 
                 # Update offset
