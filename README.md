@@ -8,12 +8,12 @@ This repository provides tools to process flight data and apply an Extended Kalm
 
 1. **Clone the repository**:
     ```bash
-    git clone https://github.com/ocayon/Vortex-Step-Method
+    git clone https://github.com/ocayon/EKF-AWE
     ```
 
 2. **Navigate to the repository folder**:
     ```bash
-    cd Vortex-Step-Method
+    cd EKF-AWE
     ```
 
 3. **Create a virtual environment**:
