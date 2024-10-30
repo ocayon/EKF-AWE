@@ -68,6 +68,7 @@ This repository provides tools to process flight data and apply an Extended Kalm
 - `scipy`
 - `seaborn`
 - `dataclasses`
+- `h5py`
 
 ---
 ## Example Usage
