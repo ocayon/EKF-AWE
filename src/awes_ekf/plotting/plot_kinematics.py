@@ -92,7 +92,7 @@ def plot_kite_orientation(results, flight_data, config_data):
             flight_data,
             np.degrees(flight_data["kcu_roll_" + str(imu)]),
             axs[0],
-            label="KCU " + str(imu),
+            label="IMU KCU ",
             plot_phase=False
         )
     plot_time_series(

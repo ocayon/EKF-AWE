@@ -3,8 +3,8 @@ __pycache__/
 caca_turn.py
 Scipy_implementation.py
 cd_kcu.py
-data/v9/
-data/kitekraft/
+data/flight_logs/v9/
+data/flight_logs/kitekraft/
 data/config/v9_config.yaml
 data/config/kft_config.yaml
 data/data_preprocessors/process_KFT_data.py

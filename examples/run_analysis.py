@@ -234,7 +234,7 @@ class AnalyzeAweFromCsvLog:
 
 
 def main() -> None:
-    default_log_dir = Path('./data/v3/')
+    default_log_dir = Path('./data/flight_logs/v3/')
 
     log_dir = Path(
         input(f"Enter the directory with the flight logs [default: {default_log_dir}]: ").strip() or default_log_dir)
