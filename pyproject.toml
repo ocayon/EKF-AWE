@@ -24,4 +24,5 @@ dependencies = [
     "scipy",
     "seaborn",
     "dataclasses",
+    "h5py",
 ]
