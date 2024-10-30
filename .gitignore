@@ -18,3 +18,4 @@ venv/
 processed_data/
 ./ekf_debug.logunwanted_file.txt
 ekf_debug.log
+.DS_Store   
