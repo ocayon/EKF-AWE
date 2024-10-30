@@ -1,6 +1,33 @@
-# Extended Kalman Filtering for Airborne Wind Energy Systems
+# Extended Kalman Filter for Airborne Wind Energy Systems (AWES)
 
-This repository provides tools to process flight data and apply an Extended Kalman Filter (EKF) to estimate the state of a kite system in Airborne Wind Energy Systems (AWES). The code is developed in Python, utilizing libraries like `pandas` for data handling, `casadi` for symbolic operations, and `NumPy` for numerical computations.
+This repository provides tools to process flight data and apply an Extended Kalman Filter (EKF) to estimate the dynamic state of a kite system in Airborne Wind Energy Systems (AWES). The EKF processes essential flight data inputs and generates accurate estimates of the kite's state, helping researchers and engineers model and analyze kite-based wind energy systems effectively.
+
+## Key Features
+
+- **State Estimation**: Uses flight data to calculate the position, velocity, and other key states of the kite system.
+- **Aerodynamic and Tether Modeling**: Models aerodynamic coefficients, tether shape, and forces to provide a complete system view.
+- **Wind Estimation**: Outputs wind velocity as part of the EKF-based estimation process.
+
+## Minimum Required Inputs
+
+To effectively estimate the kite’s state, the following inputs are required:
+
+- **Kite Position**
+- **Kite Velocity**
+- **Tether Force**
+- **Tether Reel-Out Speed**
+- **Kite Acceleration** (optional, if a Kite Control Unit (KCU) is present and modeled)
+
+## Outputs
+
+The EKF processing produces the following outputs:
+
+- **Kite Position and Velocity Estimations**
+- **Aerodynamic Coefficients**
+- **Tether Shape and Force**
+- **Wind Velocity**
+- **Additional Derived Metrics**
+
 
 ---
 
