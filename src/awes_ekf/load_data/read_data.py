@@ -29,6 +29,10 @@ def read_results(year, month, day, kite_model, addition="", path_to_main=""):
     date = str(year) + "-" + str(month) + "-" + str(day)
     file_name = str(kite_model) + "_" + date
     hdf5_path = path_to_main + path + file_name + addition + ".h5"
+    ekf_output_df, flight_data_df, config_data = read_results_from_hdf5(hdf5_path)
+    return ekf_output_df, flight_data_df, config_data
+
+def read_results_from_hdf5(hdf5_path):
     with h5py.File(hdf5_path, 'r') as hf:
         # Read the ekf_output_df DataFrame
         ekf_group = hf['ekf_output']

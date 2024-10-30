@@ -1,9 +1,7 @@
-import enum
 import os.path
 import time as time
 import sys
 from datetime import datetime
-import matplotlib.pyplot as plt
 from pathlib import Path
 from dataclasses import dataclass
 
@@ -22,14 +20,10 @@ from awes_ekf.load_data.save_data import save_results
 from awes_ekf.setup.kite import PointMassEKF
 from awes_ekf.setup.tether import Tether
 from awes_ekf.setup.kcu import KCU
-from awes_ekf.ekf.ekf_output import convert_ekf_output_to_df, EKFOutput
+from awes_ekf.ekf.ekf_output import convert_ekf_output_to_df
 from awes_ekf.postprocess.postprocessing import postprocess_results
-from data.process_KP_data import ProcessKpData
-from data.process_KFT_data import ProcessKiteKraftData
-from plot_wind_results import plot_wind_results
-from plot_kite_trajectory import plot_kite_trajectories
-from plot_kite_aero import plot_kite_aero
-from plot_kite_orientation import plot_kite_orientation
+import importlib
+
 
 def list_available_flights(log_directory: Path, file_extension: str = ".csv") -> list:
     """
@@ -50,59 +44,55 @@ def list_available_flights(log_directory: Path, file_extension: str = ".csv") ->
     
     return flight_logs
 
-class LogProvider(enum.Enum):
-    Kitepower = 1
-    Kitekraft = 2
-
-
-@dataclass
-class AWESModel:
-    model_name: str
-    log_provider: LogProvider
-
 
 class AnalyzeAweFromCsvLog:
-    class AnalysisMode(enum.Enum):
-        Analyze   = 1
-        PlotWind  = 2
-        PlotAero  = 3
-        PlotOther = 4
 
-    def __init__(self, awes_model: AWESModel,
+    def __init__(self, config_data: dict,
                  date: datetime,
-                 analysis_mode: AnalysisMode,
                  log_directory: Path):
-        self.config_data = load_config("examples/" + self.get_config_file_name(awes_model)) # Todo: In this function we should have a check if the config has all required data.
+        
+        self.config_data = config_data
         self.update_configuration_for_execution(date.strftime("%Y-%m-%d"))
 
-        self.log_provider = awes_model.log_provider
-
-        self.analysis_mode = analysis_mode
         self.log_directory = log_directory
 
         self.run()
-
-    @staticmethod
-    def get_config_file_name(awes_model: AWESModel) -> str:
-        config_file_mapping = {
-            (LogProvider.Kitepower, 'v3'): 'v3_config.yaml',
-            (LogProvider.Kitepower, 'v9'): 'v9_config.yaml',
-            (LogProvider.Kitekraft, 'v1'): 'kft_config.yaml'
-        }
-        try:
-            return config_file_mapping[(awes_model.log_provider, awes_model.model_name)]
-        except KeyError:
-            raise ValueError(
-                f"No configuration file found for {awes_model.log_provider} with model {awes_model.model_name}")
 
     def update_configuration_for_execution(self, date: str) -> None:
         self.config_data['year'], self.config_data['month'], self.config_data['day'] = date.split('-')
 
     def pre_process_log(self) -> None:
-        if self.log_provider == LogProvider.Kitepower:
-            ProcessKpData(config_data=self.config_data, log_directory=self.log_directory)
-        elif self.log_provider == LogProvider.Kitekraft:
-            ProcessKiteKraftData(config_data=self.config_data, log_directory=self.log_directory)
+        # Directory where data transformer scripts are stored
+        transformer_directory = "data/data_preprocessors/"
+        
+        # List all Python files in the transformers directory
+        transformer_files = [f for f in os.listdir(transformer_directory) if f.endswith(".py") and f.startswith("process_")]
+        
+        # Prompt user to select a transformer script
+        print("Available data pre-process scripts:")
+        for index, filename in enumerate(transformer_files, start=1):
+            print(f"{index}: {filename}")
+        
+        # Get user selection
+        selection = int(input("Select a pre-process script by number: ")) - 1
+        
+        # Ensure selection is valid
+        if 0 <= selection < len(transformer_files):
+            selected_file = transformer_files[selection]
+            module_name = selected_file[:-3]  # Remove '.py' extension for import
+            
+            # Dynamically import the selected module
+            module = importlib.import_module(f"data.data_preprocessors.{module_name}")
+            
+            # Call the transform_data function from the selected module
+            if hasattr(module, "process_data"):
+                module.process_data(config_data=self.config_data, log_directory=self.log_directory)
+            else:
+                raise AttributeError(f"The module {module_name} does not contain a 'process_data' function.")
+            
+            print(f"Data pre-processed using: {selected_file}")
+        else:
+            raise ValueError("Invalid selection. Please choose a valid file number.")
             
     def filter_by_time(self, start_minute: int, end_minute: int) -> None:
         """Filter the flight data by the given start and end minute."""
@@ -236,42 +226,15 @@ class AnalyzeAweFromCsvLog:
         save_results(ekf_output_df, flight_data, kite_model, year, month, day, self.config_data, addition="")
 
     def run(self):
-        if self.analysis_mode == AnalyzeAweFromCsvLog.AnalysisMode.Analyze:
-            self.pre_process_log()
-            self.run_analysis()
-        elif self.analysis_mode == AnalyzeAweFromCsvLog.AnalysisMode.PlotWind:
-            plot_wind_results(self.config_data)
-            plt.show()
-        elif self.analysis_mode == AnalyzeAweFromCsvLog.AnalysisMode.PlotAero:
-            plot_kite_aero(self.config_data) #Todo: doesn't seem to work for all v9 files
-            plt.show()
-        elif self.analysis_mode == AnalyzeAweFromCsvLog.AnalysisMode.PlotOther:
-            plot_kite_orientation(self.config_data)
-            plot_kite_trajectories(self.config_data)  # Todo: doesn't seem to work for all v9 files
-            plt.show()
+
+        self.pre_process_log()
+        self.run_analysis()
 
 
-def get_awes_model_from_string(awes_model_str: str) -> AWESModel:
-    if awes_model_str.startswith('kp'):
-        log_provider = LogProvider.Kitepower
-    elif awes_model_str.startswith('kft'):
-        log_provider = LogProvider.Kitekraft
-    else:
-        raise ValueError(f"Invalid awes_model_str: {awes_model_str}")
-
-    parts = awes_model_str.split('-')
-    if len(parts) < 2:
-        raise ValueError(f"Invalid awes_model_str format: {awes_model_str}")
-
-    model_name = parts[1]
-    return AWESModel(model_name=model_name, log_provider=log_provider)
 
 
 def main() -> None:
-    default_model_str = 'kp-v9'
-    default_date = datetime.strptime('2023-11-27', '%Y-%m-%d').date()
-    default_run_option = 'analyze'
-    default_log_dir = Path('./data/v9/')
+    default_log_dir = Path('./data/v3/')
 
     log_dir = Path(
         input(f"Enter the directory with the flight logs [default: {default_log_dir}]: ").strip() or default_log_dir)
@@ -295,47 +258,15 @@ def main() -> None:
     except ValueError:
         print(f"Error: Invalid or missing date format in the filename: {date_str}")
 
-    # Query for the system model
-    valid_model_str = ['kp-v3', 'kp-v9', 'kft-v1']
-    awes_model_str = input(
-        f"Enter the system model (options: {', '.join(valid_model_str)}) [default: {default_model_str}]: ").strip()
-    if not awes_model_str:
-        awes_model_str = default_model_str
-    if awes_model_str not in valid_model_str:
-        print(f"Error: Invalid system model. Valid options are: {', '.join(valid_model_str)}")
-        sys.exit(1)
-    awes_model = get_awes_model_from_string(awes_model_str)
-
-    # Query for the run option
-    valid_options = ['analyze', 'plot-wind', 'plot-aero', 'plot-other']
-    run_option = input(
-        f"Enter the run option (options: {', '.join(valid_options)}) [default: {default_run_option}]: ").strip()
-    if not run_option:
-        run_option = default_run_option
-    if run_option not in valid_options:
-        print(f"Error: Invalid run option. Valid options are: {', '.join(valid_options)}")
-        sys.exit(1)
-
-    if run_option == 'analyze':
-        analysis_mode = AnalyzeAweFromCsvLog.AnalysisMode.Analyze
-    elif run_option == 'plot-wind':
-        analysis_mode = AnalyzeAweFromCsvLog.AnalysisMode.PlotWind
-    elif run_option == 'plot-aero':
-        analysis_mode = AnalyzeAweFromCsvLog.AnalysisMode.PlotAero
-    elif run_option == 'plot-other':
-        analysis_mode = AnalyzeAweFromCsvLog.AnalysisMode.PlotOther
-
-    
+    config_data = load_config() # Todo: In this function we should have a check if the config has all required data.
 
     print("Starting analysis with:")
-    print(f"System Model: {awes_model_str}")
+    print(f"Kite Model: {config_data['kite']['model_name']}")
     print(f"Date: {date_str}, Time: {time_str}")
-    print(f"Run Option: {run_option}")
     print(f"Log directory: {log_dir}")
     
-    AnalyzeAweFromCsvLog(awes_model=awes_model,
+    AnalyzeAweFromCsvLog(config_data=config_data,
                          date=date,
-                         analysis_mode=analysis_mode,
                          log_directory=log_dir)
 
 

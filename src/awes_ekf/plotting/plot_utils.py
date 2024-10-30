@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from awes_ekf.utils import calculate_reference_frame_euler
 import seaborn as sns
-from awes_ekf.plotting.color_palette import get_color_list, get_color, hex_to_rgba
+from awes_ekf.plotting.color_palette import get_color_list, get_color, hex_to_rgba, set_plot_style_no_latex
 from awes_ekf.setup.settings import kappa, z0
 
 colors = get_color_list()
@@ -1000,87 +1000,8 @@ def plot_wind_profile_bins(flight_data, results, axs, step=20, savefig=False, co
 
     return axs
 
-def interpolate_lidar_data(flight_data, results):
-
-    lidar_heights = []
-
-    for column in flight_data.columns:
-        if "Wind_Speed_m_s" in column:
-            height = "".join(filter(str.isdigit, column))
-            lidar_heights.append(int(height))
-    # Sort the lidar heights
-    lidar_heights = sorted(lidar_heights)
-    # lidar_heights = lidar_heights[::-1]
-
-    interp_wind_speeds = []
-    interp_wind_speeds_max = []
-    interp_wind_speeds_min = []
-    interp_wind_directions = []
-    interp_z_winds = []
-    for index in flight_data.index:
-        wind_speeds = []
-        wind_speeds_max = []
-        wind_speeds_min = []
-        wind_directions = []
-        z_wind = []
-        for height in lidar_heights:
-            wind_speeds.append(flight_data[str(height)+"m_Wind_Speed_m_s"].iloc[index])
-            wind_speeds_max.append(flight_data[str(height)+"m_Wind_Speed_max_m_s"].iloc[index])
-            wind_speeds_min.append(flight_data[str(height)+"m_Wind_Speed_min_m_s"].iloc[index])
-            wind_directions.append(flight_data[str(height)+"m_Wind_Direction_deg"].iloc[index])
-            z_wind.append(flight_data[str(height)+"m_Z-wind_m_s"].iloc[index])
-
-        z_pos = results["kite_position_z"].iloc[index]
-
-        interp_wind_speeds.append(log_interp(z_pos, lidar_heights, wind_speeds))
-        interp_wind_speeds_max.append(log_interp(z_pos, lidar_heights, wind_speeds_max))
-        interp_wind_speeds_min.append(log_interp(z_pos, lidar_heights, wind_speeds_min))
-        interp_wind_directions.append(np.interp(z_pos, lidar_heights, wind_directions))
-        interp_z_winds.append(np.interp(z_pos, lidar_heights, z_wind))
-
-    flight_data["interp_wind_speed"] = interp_wind_speeds
-    flight_data["interp_wind_speed_max"] = interp_wind_speeds_max
-    flight_data["interp_wind_speed_min"] = interp_wind_speeds_min
-    flight_data["interp_wind_direction"] = interp_wind_directions
-    flight_data["interp_z_wind"] = interp_z_winds
-
-    return flight_data
 
 
-def log_interp(height, heights, values):
-    """
-    Interpolate or extrapolate values on a log scale.
-    
-    :param height: Height to interpolate or extrapolate.
-    :param heights: Known heights corresponding to the values.
-    :param values: Known values at the given heights.
-    :return: Interpolated or extrapolated value at the specified height.
-    """
-    # Ensure inputs are numpy arrays
-    heights = np.array(heights)
-    values = np.array(values)
-    
-    # Sort heights and values just in case they are not sorted
-    sorted_indices = np.argsort(heights)
-    heights = heights[sorted_indices]
-    values = values[sorted_indices]
-    
-    if height <= heights.min():
-        # Extrapolate below the minimum height
-        uf = values[0]*kappa/np.log(heights[0]/z0)
-        return uf/kappa*np.log(height/z0)
-    elif height >= heights.max():
-        # Extrapolate above the maximum height
-       uf = values[-1]*kappa/np.log(heights[-1]/z0)
-       return uf/kappa*np.log(height/z0)
-    else:
-        # Interpolate within the range
-        lower_idx = np.where(heights <= height)[0].max()
-        upper_idx = np.where(heights >= height)[0].min()
-        z1, z2 = heights[lower_idx], heights[upper_idx]
-        u1, u2 = values[lower_idx], values[upper_idx]
-        return u1 + (np.log(height) - np.log(z1)) / (np.log(z2) - np.log(z1)) * (u2 - u1)
-    
 
 
 def plot_wind_speed_log_interpolation(results, flight_data, axs,savefig=False):
@@ -1262,7 +1183,7 @@ def plot_cl_curve(cl, cd, aoa, mask, axs, label=None, savefig=False, color=None)
     cl_wing_sems = np.array([cl_wing[bin_indices == i].std() / np.sqrt(np.sum(bin_indices == i)) for i in range(1, num_bins)])
     cd_wing_sems = np.array([cd_wing[bin_indices == i].std() / np.sqrt(np.sum(bin_indices == i)) for i in range(1, num_bins)])
 
-    # Calculate the 95% confidence intervals
+    # Calculate the 99% confidence intervals
     confidence_level = 0.99
     z = stats.norm.ppf(0.5 + confidence_level / 2)  # Approx 1.96
 
@@ -1441,51 +1362,159 @@ def plot_forces_dimensional(results,flight_data, kite,kcu):
     plt.tight_layout()  # Adjust layout to fit labels
     
 
-def plot_slack_tether_force(results, flight_data,kcu):
+from matplotlib.widgets import Slider
+from mpl_toolkits.mplot3d import Axes3D
+import matplotlib.gridspec as gridspec
+
+def personalized_plot(results, flight_data, config_data):
+    """
+    Interactive 3D and time series plot function that allows users to select variables and vectors to plot.
     
-    colors = get_color_list()
-    # Assuming 'slack' is in the 'results' DataFrame and 'tether_force' is in 'flight_data'
-    time = flight_data['time']  # Replace with the appropriate time variable
-    # r = np.sqrt(results["kite_position_x"]**2 + results["kite_position_y"]**2 + results["kite_position_z"]**2)
-    # slack = flight_data['tether_length']+kcu.distance_kcu_kite-r
-    slack = results['slack']  # Replace with the appropriate slack variable
-    tether_force = flight_data['ground_tether_force']  # Replace with the appropriate tether force variable
-
-
-    fig, ax1 = plt.subplots(figsize=(12, 5))
-
-    # Plotting Slack on the first axis
-    ax1.set_xlabel('Time [s]')
-    ax1.set_ylabel('Slack [m]', color=colors[0])
-    ax1 = plot_time_series(flight_data, slack, ax1, color=colors[0], ylabel='Zag [m]', plot_phase=True)
-    ax1.tick_params(axis='y', labelcolor=colors[0])
-
-    # Creating a second y-axis for Tether Force
-    ax2 = ax1.twinx()
-    ax2.set_ylabel('Tether Force [N]', color=colors[1])
-    ax2.plot(time, tether_force, color=colors[1], linestyle='--')
-    ax2.tick_params(axis='y', labelcolor=colors[1])
+    Parameters:
+        results (DataFrame): Data frame containing all result variables (e.g., kite position, velocity).
+        flight_data (DataFrame): Data frame containing flight data, including time.
+        config_data (dict): Configuration dictionary for any additional settings or plotting preferences.
+    """
     
+    # Display available variables to the user and get input
+    available_vars = list(results.columns)
+    print("Available variables to plot:", ", ".join(available_vars))
+    selected_vars = input("Enter the variables to plot, separated by commas: ").split(',')
+    selected_vars = [var.strip() for var in selected_vars if var.strip() in available_vars]
+    
+    if not selected_vars:
+        print("No valid variables selected. Exiting plot function.")
+        return
+    
+    # Set up the vector plot options based on user input or default settings
+    vector_names = config_data.get("vector_names", [])
+    labels = [[var] for var in selected_vars]  # Default labels are just variable names
 
-    # Get the current handles and labels
-    handles, labels = ax1.get_legend_handles_labels()
+    # Extract time and position data
+    t = flight_data['time'].values
+    x = results['kite_position_x'].values
+    y = results['kite_position_y'].values
+    z = results['kite_position_z'].values
 
-    from matplotlib.patches import Patch
-    # Create a new patch for the legend
-    reel_out_straight_patch = Patch(color=colors[5], alpha=0.2, label="Reel-out - Straight")
-    reel_out_turn_patch = Patch(color=colors[7], alpha=0.2, label="Reel-out - Turn")
-    reel_in_patch = Patch(color='white', alpha=1, edgecolor='black', label="Reel-in")
+    # Calculate vectors if specified
+    vecs = []
+    if "kite_velocity" in vector_names:
+        kite_velocity = np.vstack((
+            results['kite_velocity_x'].values,
+            results['kite_velocity_y'].values,
+            results['kite_velocity_z'].values
+        )).T
+        vecs.append(kite_velocity)
 
-    # Select starting from the second element
-    ax1.legend(
-        [reel_out_straight_patch, reel_out_turn_patch, reel_in_patch],
-        ["Reel-out - Straight", "Reel-out - Turn", "Reel-in"],
-        loc='upper left',
-        frameon=True,
-        bbox_to_anchor=(0.075, 1)  # Adjust the x-coordinate to move the legend to the right
-    )
+    # Gather selected variables for plotting
+    variables = [results[var].values for var in selected_vars]
+    
+    # Setup figure and layout
+    n = len(variables)
+    fig = plt.figure(figsize=(14, 8))
+    gs = gridspec.GridSpec(n, 2, width_ratios=[1, 1], height_ratios=[0.5 for _ in range(n)])
 
-    fig.tight_layout()  # Adjust layout to prevent overlap
+    # 3D plot of the trajectory
+    ax_3d = fig.add_subplot(gs[0:3, 0], projection="3d")
+    ax_3d.plot(x, y, z, label="Trajectory")
+    red_point_3d, = ax_3d.plot([x[0]], [y[0]], [z[0]], "ro")
+    ax_3d.set_xlabel("X")
+    ax_3d.set_ylabel("Y")
+    ax_3d.set_zlabel("Z")
+    ax_3d.set_title("Kite Trajectory")
+    ax_3d.legend()
 
-    # Title and Grid
-    ax1.grid(True, linestyle='--', alpha=0.8)
+    # Time series plots for each selected variable
+    ax_vars = []
+    for i, variable in enumerate(variables):
+        ax = fig.add_subplot(gs[i, 1:])
+        label = labels[i][0]  # Use provided label or default to variable name
+        line, = ax.plot(t, variable, label=label)
+        red_point, = ax.plot([t[0]], [variable[0]], 'ro')
+        ax.set_ylabel(label)
+        if i == len(variables) - 1:
+            ax.set_xlabel("Time")
+        ax.legend()
+        ax.grid(True)
+        ax_vars.append((line, red_point))
+
+    # Vector plots in 3D
+    arrows = []
+    for vec in vecs:
+        arrow = ax_3d.quiver(x[0], y[0], z[0], vec[0, 0], vec[0, 1], vec[0, 2], color="r", length=30)
+        arrows.append(arrow)
+
+    # Slider for time
+    slider_ax_time = fig.add_axes([0.1, 0.05, 0.3, 0.03], facecolor="lightgoldenrodyellow")
+    time_slider = Slider(slider_ax_time, "Time", t[0], t[-1], valinit=t[0], orientation="horizontal")
+
+    # Slider for elevation angle
+    slider_ax_elev = fig.add_axes([0.1, 0.1, 0.3, 0.03], facecolor="lightgoldenrodyellow")
+    elev_slider = Slider(slider_ax_elev, "Elevation", 0, 90, valinit=30, orientation="horizontal")
+
+    # Slider for azimuth angle
+    slider_ax_azim = fig.add_axes([0.1, 0.15, 0.3, 0.03], facecolor="lightgoldenrodyellow")
+    azim_slider = Slider(slider_ax_azim, "Azimuth", 0, 360, valinit=30, orientation="horizontal")
+
+    # Update function for the sliders
+    def update_time(val):
+        current_time = time_slider.val
+        idx = (np.abs(t - current_time)).argmin()
+
+        # Update red point position in 3D plot
+        red_point_3d.set_data([x[idx]], [y[idx]])
+        red_point_3d.set_3d_properties([z[idx]])
+
+        # Remove old arrows
+        for arrow in arrows:
+            arrow.remove()
+        arrows.clear()
+        for vec in vecs:
+            arrow = ax_3d.quiver(x[idx], y[idx], z[idx], vec[idx, 0], vec[idx, 1], vec[idx, 2], color="r", length=30)
+            arrows.append(arrow)
+
+        # Update red point position in 2D plots
+        for line, red_point in ax_vars:
+            var = line.get_ydata()
+            red_point.set_data([t[idx]], [var[idx]])
+
+        fig.canvas.draw_idle()
+
+    def update_view(val):
+        ax_3d.view_init(elev=elev_slider.val, azim=azim_slider.val)
+        fig.canvas.draw_idle()
+
+    # Connect sliders to update functions
+    time_slider.on_changed(update_time)
+    elev_slider.on_changed(update_view)
+    azim_slider.on_changed(update_view)
+
+    plt.show()
+
+def plot_ekf_performance(results, flight_data, config_data):
+    
+    """
+    Plots the time series of NIS, Mahalanobis Distance, and Norm of Normalized Residuals.
+
+    Parameters:
+        flight_data (DataFrame): Data frame containing flight data, including time.
+        results (DataFrame): Data frame with results, including NIS, Mahalanobis Distance,
+                            and Norm of Normalized Residuals.
+    """
+    set_plot_style_no_latex()
+    fig, ax = plt.subplots(1, 1, figsize=(12, 6))
+
+    # Plot NIS, Mahalanobis Distance, and Norm of Normalized Residuals
+    plot_time_series(flight_data, results["nis"], ax)
+    plot_time_series(flight_data, results["mahalanobis_distance"], ax)
+    plot_time_series(flight_data, results["norm_epsilon_norm"], ax, plot_phase=True)
+    
+    # Customize plot
+    ax.legend(["NIS", "Mahalanobis Distance", "Norm of Normalized Residuals"])
+    ax.set_title("Time Series of NIS, Mahalanobis Distance, and Norm of Normalized Residuals")
+    ax.set_xlabel("Time")
+    ax.set_ylabel("Value")
+
+    
+    plt.tight_layout()
+    plt.show()

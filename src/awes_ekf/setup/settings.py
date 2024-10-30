@@ -1,6 +1,7 @@
 import yaml
 import numpy as np
 from dataclasses import dataclass
+import os
 
 # %% Define atmospheric parameters
 rho = 1.225  # Air density [kg/m^3]
@@ -10,9 +11,43 @@ z0 = 0.1  # Surface roughness [m]
 
 
 # Load the configuration file
-def load_config(filepath):
-    with open(filepath, "r") as file:
-        return yaml.safe_load(file)
+def load_config():
+    # Set the directory path where configuration files are stored
+    config_directory = "data/config/"
+    
+    # List all files in the config directory
+    config_files = os.listdir(config_directory)
+    
+    # Prompt user to select a file from the list
+    print("Available configuration files:")
+    for index, filename in enumerate(config_files, start=1):
+        print(f"{index}: {filename}")
+    
+    # Get user selection
+    selection = int(input("Select a configuration file by number: ")) - 1
+    
+    # Ensure selection is valid
+    if 0 <= selection < len(config_files):
+        selected_file = config_files[selection]
+        config_path = os.path.join(config_directory, selected_file)
+        
+        # Load the configuration file
+        with open(config_path, "r") as file:
+            config_data = yaml.safe_load(file)
+        
+        # Optional: Check if the config has all required data
+        if not validate_config(config_data):
+            raise ValueError("Configuration file is missing required data.")
+        
+        print(f"Configuration loaded from: {selected_file}")
+        return config_data
+    else:
+        raise ValueError("Invalid selection. Please choose a valid file number.")
+
+def validate_config(config_data):
+    # Placeholder validation function to ensure required fields are present
+    required_keys = ["simulation_parameters", "tuning_parameters", "kite", "kcu","tether"]  # Example keys
+    return all(key in config_data for key in required_keys)
 
 
 class SimulationConfig:

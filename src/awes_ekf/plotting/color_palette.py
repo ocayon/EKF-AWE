@@ -78,6 +78,42 @@ def set_plot_style():
         'axes.prop_cycle': cycler('color', color_cycle)  # Set the custom color cycle
     })
 
+def set_plot_style_no_latex():
+    """Set the default style for plots without requiring LaTeX."""
+    import matplotlib.pyplot as plt
+    from cycler import cycler
+
+    # Define the color palette as a list of colors
+    color_cycle = [
+        PALETTE['Black'],
+        PALETTE['Orange'],
+        PALETTE['Sky Blue'],
+        PALETTE['Bluish Green'],
+        PALETTE['Yellow'],
+        PALETTE['Blue'],
+        PALETTE['Vermillion'],
+        PALETTE['Reddish Purple']
+    ]
+
+    # Apply Seaborn style and custom settings
+    plt.style.use('seaborn-v0_8-whitegrid')
+    plt.rcParams.update({
+        'text.usetex': False,  # Disable LaTeX
+        'font.family': 'serif',
+        'font.serif': ['DejaVu Serif'],  # Use a serif font that is similar to LaTeX’s default font
+        'axes.titlesize': 14,
+        'axes.labelsize': 12,
+        'axes.linewidth': 1,
+        'lines.linewidth': 1,
+        'lines.markersize': 6,
+        'xtick.labelsize': 10,
+        'ytick.labelsize': 10,
+        'legend.fontsize': 10,
+        'figure.titlesize': 16,
+        'figure.figsize': (10, 6),  # Default figure size
+        'axes.prop_cycle': cycler('color', color_cycle)  # Set the custom color cycle
+    })
+
 # Optionally, you can also include a function to apply the palette to a plot
 def apply_palette(ax, colors):
     """Apply the color palette to a matplotlib axis."""

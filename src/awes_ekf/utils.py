@@ -333,7 +333,7 @@ def rotation_matrix_azth_from_wind(beta,phi):
 
 def calculate_weighted_least_squares(y, A, W=None):
     if W is None:
-        x_hat = np.linalg.inv(A) @ y
+        x_hat = np.linalg.inv(A.T @ A) @ A.T @ y
     else:
         x_hat = np.linalg.inv(A.T @ W @ A) @ A.T @ W @ y
     return x_hat
@@ -341,7 +341,7 @@ def calculate_weighted_least_squares(y, A, W=None):
 def calculate_turn_rate_law(results, flight_data, model = 'simple', steering_offset = False, mass=15, area=19.75, span=10, coeffs = None):
     from scipy.sparse import eye
 
-    us = -flight_data["kcu_actual_steering"]/100
+    us = flight_data["kcu_actual_steering"]/100
     va = results["kite_apparent_windspeed"]
     v = np.sqrt(results["kite_velocity_x"]**2 + results["kite_velocity_y"]**2 + results["kite_velocity_z"]**2)
     yaw = flight_data["kite_yaw_0"]

@@ -1,12 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-from awes_ekf.setup.settings import load_config
 from awes_ekf.load_data.read_data import read_results
 import awes_ekf.plotting.plot_utils as pu
-from awes_ekf.plotting.plot_kite_trajectory import calculate_azimuth_elevation
+from awes_ekf.plotting.plot_kinematics import calculate_azimuth_elevation
 from awes_ekf.setup.settings import kappa, z0
-from awes_ekf.plotting.color_palette import get_color_list, visualize_palette, set_plot_style, get_color
+from awes_ekf.plotting.color_palette import get_color_list,  set_plot_style
 
 def cut_data(results, flight_data, range):
     results = results.iloc[range[0]:range[1]]
@@ -28,10 +27,9 @@ res_va, fd_va, _ = read_results(year, month, day, kite_model,addition='_va')
 res_log, fd_log, _ = read_results(year, month, day, kite_model,addition='_log')
 res_min, fd_min, config = read_results(year, month, day, kite_model,addition='_min')
 
-print(config['simulation_parameters']['measurements'])
 #%% Plot orientation
 from awes_ekf.postprocess.postprocessing import remove_offsets_IMU_data
-from awes_ekf.plotting.plot_orientation import plot_kite_orientation
+from awes_ekf.plotting.plot_kinematics import plot_kite_orientation
 
 mask = flight_data["cycle"].isin([64,65])
 mask_min = fd_min["cycle"].isin([64,65])
@@ -119,13 +117,12 @@ ax.legend(
 plt.show()
 
 results["kite_yaw_kin"] = np.unwrap(results["kite_yaw_kin"])
-plot_kite_orientation(results[mask], flight_data[mask], kite_imus=config_data["kite"]["sensor_ids"])
+plot_kite_orientation(results[mask], flight_data[mask], config_data)
 plt.savefig("./results/plots_paper/kite_orientation_2023-11-27.pdf")
 plt.show()
 
 colors = get_color_list()
 # Plot position and velocity
-from awes_ekf.plotting.plot_kite_trajectory import plot_position_azimuth_elevation
 fig, axs = plt.subplots(2, 1, figsize=(6, 10))
 mean_wind_dir = np.mean(results[mask]["wind_direction"])
 azimuth, elevation = calculate_azimuth_elevation(res_min[mask_min]["kite_position_x"], res_min[mask_min]["kite_position_y"], res_min[mask_min]["kite_position_z"])

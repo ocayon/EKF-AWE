@@ -3,12 +3,14 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from awes_ekf.postprocess.postprocessing import remove_offsets_IMU_data_v3
 from awes_ekf.load_data.read_data import read_results
-from awes_ekf.plotting.plot_utils import plot_time_series, plot_kinetic_energy_spectrum, plot_forces_dimensional, plot_slack_tether_force
-from awes_ekf.plotting.plot_orientation import plot_kite_orientation
-from awes_ekf.plotting.plot_kite_trajectory import calculate_azimuth_elevation
+from awes_ekf.plotting.plot_utils import plot_time_series, plot_kinetic_energy_spectrum, plot_forces_dimensional
+from awes_ekf.plotting.plot_kinematics import plot_kite_orientation
+from awes_ekf.plotting.plot_tether import plot_slack_tether_force
+from awes_ekf.plotting.plot_kinematics import calculate_azimuth_elevation
 from awes_ekf.plotting.color_palette import get_color_list, visualize_palette, set_plot_style, get_color
 from awes_ekf.setup.settings import  SimulationConfig
 from awes_ekf.setup.kite import PointMassEKF
+from awes_ekf.utils import calculate_turn_rate_law, find_time_delay
 from awes_ekf.setup.kcu import KCU
 
 def cut_data(results, flight_data, range):
@@ -93,11 +95,14 @@ results["kite_pitch"] = np.convolve(results["kite_pitch"], np.ones(10)/10, mode=
 results["kite_roll"] = np.convolve(results["kite_roll"], np.ones(10)/10, mode="same")
 # results["kite_yaw"] = np.convolve(results["kite_yaw"], np.ones(10)/10, mode="same")
 results["kite_yaw_kin"] = results["kite_yaw_kin"]%(2*np.pi)
-plot_kite_orientation(results[mask], flight_data[mask], kite_imus=[0, 1])
+plot_kite_orientation(results[mask], flight_data[mask], config_data)
 plt.tight_layout()
 plt.savefig("./results/plots_paper/kite_orientation_2019-10-08.pdf")
 # plt.show()
-
+signal_delay, corr = find_time_delay(flight_data["kite_yaw_0"], results["kite_yaw_kin"])
+time_delay = signal_delay*0.1
+print("Time delay yaw: ", time_delay)
+plt.show()
 
 plt.figure()
 plot_time_series(flight_data[mask], results[mask]["kite_apparent_windspeed"], plt.gca(), label="Yaw kite", plot_phase=True)
@@ -192,7 +197,7 @@ plt.savefig("./results/plots_paper/polars_2019-10-08.pdf")
 
 results, flight_data = cut_data(results, flight_data, [18000, len(results)-18000])
 
-from awes_ekf.utils import calculate_turn_rate_law, find_time_delay
+
 # Turn rate law
 ts = config_data["simulation_parameters"]["timestep"]
 flight_data["kite_yaw_rate"] = flight_data["kite_yaw_rate_1"]
