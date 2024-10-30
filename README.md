@@ -81,13 +81,13 @@ An example dataset is provided for the LEI V3 kite from Kitepower, flown on `201
 
 To analyze this dataset:
    - Run `run_analysis.py` and select the folder with `2019-10-08_11.csv`, `v3_config.yaml` and `process_v3_data.py`.
-```bash
-python examples\run_analysis.py
-```
+    ```bash
+    python examples\run_analysis.py
+    ```
    - Run `plot_analysis.py` to visualize the results.
-```bash
-python examples\plot_analysis.py
-```
+    ```bash
+    python examples\plot_analysis.py
+    ```
 
 ## New Dataset Analysis
 
