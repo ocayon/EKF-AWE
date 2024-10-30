@@ -1,6 +1,33 @@
-# Extended Kalman Filtering for Airborne Wind Energy Systems
+# Extended Kalman Filter for Airborne Wind Energy Systems (AWES)
 
-This repository provides tools to process flight data and apply an Extended Kalman Filter (EKF) to estimate the state of a kite system in Airborne Wind Energy Systems (AWES). The code is developed in Python, utilizing libraries like `pandas` for data handling, `casadi` for symbolic operations, and `NumPy` for numerical computations.
+This repository provides tools to process flight data and apply an Extended Kalman Filter (EKF) to estimate the dynamic state of a kite system in Airborne Wind Energy Systems (AWES). The EKF processes essential flight data inputs and generates accurate estimates of the kite's state, helping researchers and engineers model and analyze kite-based wind energy systems effectively.
+
+## Key Features
+
+- **State Estimation**: Uses flight data to calculate the position, velocity, and other key states of the kite system.
+- **Aerodynamic and Tether Modeling**: Models aerodynamic coefficients, tether shape, and forces to provide a complete system view.
+- **Wind Estimation**: Outputs wind velocity as part of the EKF-based estimation process.
+
+## Minimum Required Inputs
+
+To effectively estimate the kite’s state, the following inputs are required:
+
+- **Kite Position**
+- **Kite Velocity**
+- **Tether Force**
+- **Tether Reel-Out Speed**
+- **Kite Acceleration** (optional, if a Kite Control Unit (KCU) is present and modeled)
+
+## Outputs
+
+The EKF processing produces the following outputs:
+
+- **Kite Position and Velocity Estimations**
+- **Aerodynamic Coefficients**
+- **Tether Shape and Force**
+- **Wind Velocity**
+- **Additional Derived Metrics**
+
 
 ---
 
@@ -35,7 +62,7 @@ This repository provides tools to process flight data and apply an Extended Kalm
      ```
    - **Windows**:
      ```bash
-     ./venv/Scripts/activate
+     .\venv\Scripts\activate
      ```
 
 5. **Install the required dependencies**:
@@ -68,10 +95,28 @@ This repository provides tools to process flight data and apply an Extended Kalm
 - `scipy`
 - `seaborn`
 - `dataclasses`
+- `h5py`
 
 ---
+## Example Usage
 
-## Usage
+An example dataset is provided for the LEI V3 kite from Kitepower, flown on `2019-10-08`.
+- **Flight Data**: `2019-10-08_11.csv` in `data\flight_logs\v3`
+- **Configuration File**: `v3_config.yaml` in `data\config`
+- **Processing Script**: `process_v3_data.py` in `data\data_postprocessors`
+
+
+To analyze this dataset:
+   - Run `run_analysis.py` and select the file `2019-10-08_11.csv`, `v3_config.yaml` and `process_v3_data.py`.
+```bash
+python examples\run_analysis.py
+```
+   - Run `plot_analysis.py` to visualize the results.
+```bash
+python examples\plot_analysis.py
+```
+
+## New Dataset Analysis
 
 To analyze an AWES dataset, follow these steps:
 
@@ -87,17 +132,6 @@ To analyze an AWES dataset, follow these steps:
 ### 3. Plot Data
    - Run `plot_analysis.py` and select the processed flight data file for visualization.
 
-### Example Usage
-
-An example dataset is provided for the LEI V3 kite from Kitepower, flown on `2019-10-08`.
-
-- **Configuration File**: `v3_config.yaml` in `data/config`
-- **Processing Script**: `process_v3_data.py` in `data/data_postprocessors`
-- **Flight Data**: `2019-10-08_11.csv` in `data`
-
-To analyze this dataset:
-   - Run `run_analysis.py` and select `v3_config.yaml`, `process_v3_data.py`, and `2019-10-08_11.csv`.
-   - Run `plot_analysis.py` to visualize the results.
 
 ---
 
