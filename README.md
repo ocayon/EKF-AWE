@@ -35,7 +35,7 @@ This repository provides tools to process flight data and apply an Extended Kalm
      ```
    - **Windows**:
      ```bash
-     ./venv/Scripts/activate
+     .\venv\Scripts\activate
      ```
 
 5. **Install the required dependencies**:
@@ -70,8 +70,25 @@ This repository provides tools to process flight data and apply an Extended Kalm
 - `dataclasses`
 
 ---
+## Example Usage
 
-## Usage
+An example dataset is provided for the LEI V3 kite from Kitepower, flown on `2019-10-08`.
+- **Flight Data**: `2019-10-08_11.csv` in `data\flight_logs\v3`
+- **Configuration File**: `v3_config.yaml` in `data\config`
+- **Processing Script**: `process_v3_data.py` in `data\data_postprocessors`
+
+
+To analyze this dataset:
+   - Run `run_analysis.py` and select the folder with `2019-10-08_11.csv`, `v3_config.yaml` and `process_v3_data.py`.
+    ```bash
+    python examples\run_analysis.py
+    ```
+   - Run `plot_analysis.py` to visualize the results.
+    ```bash
+    python examples\plot_analysis.py
+    ```
+
+## New Dataset Analysis
 
 To analyze an AWES dataset, follow these steps:
 
@@ -87,17 +104,6 @@ To analyze an AWES dataset, follow these steps:
 ### 3. Plot Data
    - Run `plot_analysis.py` and select the processed flight data file for visualization.
 
-### Example Usage
-
-An example dataset is provided for the LEI V3 kite from Kitepower, flown on `2019-10-08`.
-
-- **Configuration File**: `v3_config.yaml` in `data/config`
-- **Processing Script**: `process_v3_data.py` in `data/data_postprocessors`
-- **Flight Data**: `2019-10-08_11.csv` in `data`
-
-To analyze this dataset:
-   - Run `run_analysis.py` and select `v3_config.yaml`, `process_v3_data.py`, and `2019-10-08_11.csv`.
-   - Run `plot_analysis.py` to visualize the results.
 
 ---
 
