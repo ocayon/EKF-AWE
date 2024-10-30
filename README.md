@@ -35,7 +35,7 @@ This repository provides tools to process flight data and apply an Extended Kalm
      ```
    - **Windows**:
      ```bash
-     .\venv\Scripts\activate
+     ./venv/Scripts/activate
      ```
 
 5. **Install the required dependencies**:
