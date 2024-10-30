@@ -1,106 +1,147 @@
 # Extended Kalman Filtering for Airborne Wind Energy Systems
 
-This script processes flight data and applies an Extended Kalman Filter (EKF) to estimate the state of a kite system. The code is written in Python and utilizes the pandas library for data handling, casadi for symbolic operations and NumPy for numerical operations.
+This repository provides tools to process flight data and apply an Extended Kalman Filter (EKF) to estimate the state of a kite system in Airborne Wind Energy Systems (AWES). The code is developed in Python, utilizing libraries like `pandas` for data handling, `casadi` for symbolic operations, and `NumPy` for numerical computations.
+
+---
 
 ## Installation Instructions
-1. Clone the repository:
+
+1. **Clone the repository**:
     ```bash
     git clone https://github.com/ocayon/Vortex-Step-Method
     ```
 
-2. Navigate to the repository folder:
+2. **Navigate to the repository folder**:
     ```bash
     cd Vortex-Step-Method
     ```
-    
-3. Create a virtual environment:
-   
-   Linux or Mac:
-    ```bash
-    python3 -m venv venv
-    ```
-    
-    Windows:
-    ```bash
-    python -m venv venv
-    ```
-    
-5. Activate the virtual environment:
 
-   Linux or Mac:
-    ```bash
-    source venv/bin/activate
-    ```
+3. **Create a virtual environment**:
 
-    Windows
-    ```bash
-    .\venv\Scripts\activate
-    ```
+   - **Linux or Mac**:
+     ```bash
+     python3 -m venv venv
+     ```
+   - **Windows**:
+     ```bash
+     python -m venv venv
+     ```
 
-6. Install the required dependencies:
+4. **Activate the virtual environment**:
 
-   For users:
-    ```bash
-    pip install .
-    ```
-        
-   For developers:
-    ```bash
-    pip install -e .[dev]
-    ```
+   - **Linux or Mac**:
+     ```bash
+     source venv/bin/activate
+     ```
+   - **Windows**:
+     ```bash
+     .\venv\Scripts\activate
+     ```
 
-7. To deactivate the virtual environment:
+5. **Install the required dependencies**:
+
+   - For users:
+     ```bash
+     pip install .
+     ```
+   - For developers:
+     ```bash
+     pip install -e .[dev]
+     ```
+
+6. **To deactivate the virtual environment**:
     ```bash
     deactivate
     ```
-### Dependencies
-- numpy
-- matplotlib
-- casadi>3.6.0
-- pandas
-- pytest
-- pyyaml
-- control
-- scipy
-- seaborn
-- dataclasses
 
-## Usages
+---
 
+## Dependencies
+
+- `numpy`
+- `matplotlib`
+- `casadi>=3.6.0`
+- `pandas`
+- `pytest`
+- `pyyaml`
+- `control`
+- `scipy`
+- `seaborn`
+- `dataclasses`
+
+---
+
+## Usage
+
+To analyze an AWES dataset, follow these steps:
+
+### 1. Add Necessary Files
+   - **Configuration File**: Add a `.yaml` configuration file for the kite you want to analyze in `data/config`.
+   - **Processing Script**: Add a data processing script to `data/data_postprocessors` that processes raw flight data and saves it to `postprocess_data`, following the naming conventions in `doc/inputs`.
+   - **Flight Data**: Create a folder in `data` and add the raw flight data. File names should start with the format `YYYY-MM-DD_HH` (e.g., `2019-10-08_11.csv`).
+
+### 2. Run Analysis
+   - Run `run_analysis.py` from the `examples` folder.
+   - When prompted, select the configuration file, processing script, and flight data file.
+
+### 3. Plot Data
+   - Run `plot_analysis.py` and select the processed flight data file for visualization.
+
+### Example Usage
+
+An example dataset is provided for the LEI V3 kite from Kitepower, flown on `2019-10-08`.
+
+- **Configuration File**: `v3_config.yaml` in `data/config`
+- **Processing Script**: `process_v3_data.py` in `data/data_postprocessors`
+- **Flight Data**: `2019-10-08_11.csv` in `data`
+
+To analyze this dataset:
+   - Run `run_analysis.py` and select `v3_config.yaml`, `process_v3_data.py`, and `2019-10-08_11.csv`.
+   - Run `plot_analysis.py` to visualize the results.
+
+---
 
 ## Contributing Guide
-We welcome contributions to this project! Whether you're reporting a bug, suggesting a feature, or writing code, here’s how you can contribute:
 
-1. **Create an issue** on GitHub
-2. **Create a branch** from this issue
-   ```bash
-   git checkout -b issue_number-new-feature
-   ```
-3. --- Implement your new feature---
-4. Verify nothing broke using **pytest**
-```
-  pytest
-```
-5. **Commit your changes** with a descriptive message
-```
-  git commit -m "#<number> <message>"
-```
-6. **Push your changes** to the github repo:
-   git push origin branch-name
-   
-7. **Create a pull-request**, with `base:develop`, to merge this feature branch
-8. Once the pull request has been accepted, **close the issue**
+Contributions are welcome! Here’s how you can contribute:
+
+1. **Create an issue** on GitHub for any bugs or feature requests.
+2. **Create a branch** from this issue:
+    ```bash
+    git checkout -b issue_number-new-feature
+    ```
+3. Implement your feature or fix.
+4. Verify functionality using **pytest**:
+    ```bash
+    pytest
+    ```
+5. **Commit your changes** with a descriptive message:
+    ```bash
+    git commit -m "#<issue_number> <message>"
+    ```
+6. **Push your changes** to GitHub:
+    ```bash
+    git push origin branch-name
+    ```
+7. **Create a pull request** with `base:develop` to merge your feature branch.
+8. Once the pull request is accepted, **close the issue**.
+
+---
 
 ## Citation
-If you use this project in your research, please consider citing it. 
-Citation details can be found in the [CITATION.cff](CITATION.cff) file included in this repository.
+
+If you use this project in your research, please consider citing it. Citation details can be found in the [CITATION.cff](CITATION.cff) file.
+
+---
 
 ## License
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+---
 
 ### Copyright
-Copyright (c) 2022 Oriol Cayon
+  
+&copy; 2024 Oriol Cayon, TU Delft  
 
-Copyright (c) 2024 Oriol Cayon, Jelle Poland, TU Delft
-
-Prof.dr. H.G.C. (Henri) Werij, Dean of Faculty of Aerospace Engineering
+Prof. Dr. H.G.C. (Henri) Werij, Dean of Faculty of Aerospace Engineering
