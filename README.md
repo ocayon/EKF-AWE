@@ -122,7 +122,7 @@ To analyze an AWES dataset, follow these steps:
 
 ### 1. Add Necessary Files
    - **Configuration File**: Add a `.yaml` configuration file for the kite you want to analyze in `data/config`.
-   - **Processing Script**: Add a data processing script to `data/data_postprocessors` that processes raw flight data and saves it to `postprocess_data`, following the naming conventions in `doc/inputs`.
+   - **Processing Script**: Add a data processing script to `data/data_postprocessors` that processes raw flight data and saves it to `postprocess_data`, following the naming conventions in `docs/CSV_Input_File_Specifications.md`.
    - **Flight Data**: Create a folder in `data` and add the raw flight data. File names should start with the format `YYYY-MM-DD_HH` (e.g., `2019-10-08_11.csv`).
 
 ### 2. Run Analysis
