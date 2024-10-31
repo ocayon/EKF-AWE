@@ -30,7 +30,6 @@ def initialize_ekf(ekf_input_list, simConfig, tuningParams, x0, kite, kcu, tethe
     ekf = ExtendedKalmanFilter(
         tuningParams.stdv_dynamic_model,
         tuningParams.stdv_measurements,
-        simConfig.ts,
         dyn_model,
         obs_model,
         kite,
@@ -53,7 +52,7 @@ def initialize_ekf(ekf_input_list, simConfig, tuningParams, x0, kite, kcu, tethe
             if variable in offset_variables and simConfig_copy.obsData.__dict__[variable]:
                 print(f"Finding offset for {variable}")
                 ekf_output_list = []
-                offset_sim_length = int(10*60/simConfig_copy.ts)
+                offset_sim_length = int(6000)
                 ekf_output_list = []
                 simConfig_copy.obsData.__dict__[variable] = False
                 simConfig_copy.enforce_vertical_wind_to_0 = True
@@ -64,6 +63,10 @@ def initialize_ekf(ekf_input_list, simConfig, tuningParams, x0, kite, kcu, tethe
                 start_time = time.time()
                 mins = 0
                 for k in range(offset_sim_length):
+                    ekf_copy, ekf_ouput = propagate_state_EKF(
+                            ekf_copy, ekf_input_list[k], simConfig_copy, tether, kite, kcu
+                        )
+                    
                     try:
                         ekf_copy, ekf_ouput = propagate_state_EKF(
                             ekf_copy, ekf_input_list[k], simConfig_copy, tether, kite, kcu
@@ -86,7 +89,7 @@ def initialize_ekf(ekf_input_list, simConfig, tuningParams, x0, kite, kcu, tethe
                 #TODO: Define universal namings and create timeseries class
                 if variable == "bridle_angle_of_attack":
                     variable = "kite_angle_of_attack"
-                converged_idx = int(5*60/simConfig_copy.ts)
+                converged_idx = int(3000)
                 estimated_variable = np.array([ekf_output.__dict__[variable] for ekf_output in ekf_output_list])
                 measured_variable = np.array([ekf_input.__dict__[variable] for ekf_input in ekf_input_list[:offset_sim_length]])
                 offset = find_offset(estimated_variable[converged_idx::], measured_variable[converged_idx:len(ekf_input_list)], offset_range=[-15,15])
@@ -130,7 +133,7 @@ def update_state_ekf_tether(ekf, tether, kite, kcu, ekf_input, simConfig):
     # Update state with Kalmann filter
     ############################################################
     # Predict next step
-    ekf.predict()
+    ekf.predict(ekf_input.timestep)
     # Update next step
     ekf.update()
 

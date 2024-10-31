@@ -162,6 +162,8 @@ plt.savefig("./results/plots_paper/aero_coefficients_2019-10-08.pdf")
 # plt.show()
 
 mask_polar = (flight_data["cycle"]>10)&(flight_data["cycle"]<70)
+mask_turn = (flight_data["turn_straight"]=="turn")&mask_polar
+mask_straight = (flight_data["turn_straight"]=="straight")&mask_polar
 # Plot curves 
 from awes_ekf.plotting.plot_utils import plot_cl_curve
 fig, axs = plt.subplots(1, 2, figsize=(14, 6), sharex=True)
@@ -170,7 +172,10 @@ cd_roullier = np.loadtxt("./processed_data/previous_analysis/cd_roullier_mean.cs
 cl_rans = np.loadtxt("./processed_data/previous_analysis/RANS_CL_alpha_struts.csv", delimiter=",")
 cd_rans = np.loadtxt("./processed_data/previous_analysis/RANS_CD_alpha_struts.csv", delimiter=",")
 VSM_coeffs = pd.read_csv("./processed_data/previous_analysis/VSM_aero_coeffs_V3.csv")
+
 plot_cl_curve(np.sqrt((results["wing_lift_coefficient"]**2+results["wing_sideforce_coefficient"]**2)), results["wing_drag_coefficient"], results['wing_angle_of_attack_bridle'], mask_polar,axs, label = "Wing", color=colors[0])
+plot_cl_curve(np.sqrt((results["wing_lift_coefficient"]**2+results["wing_sideforce_coefficient"]**2)), results["wing_drag_coefficient"], results['wing_angle_of_attack_bridle'], mask_turn,axs, label = "Wing Turn", color=colors[2])
+plot_cl_curve(np.sqrt((results["wing_lift_coefficient"]**2+results["wing_sideforce_coefficient"]**2)), results["wing_drag_coefficient"], results['wing_angle_of_attack_bridle'], mask_straight,axs, label = "Wing Straight", color=colors[3])
 plot_cl_curve(np.sqrt((results["wing_lift_coefficient"]**2+results["wing_sideforce_coefficient"]**2)), results["wing_drag_coefficient"]+results["kcu_drag_coefficient"]+results["tether_drag_coefficient"], results['wing_angle_of_attack_bridle'], mask_polar,axs, label = "Wing+KCU+tether", color=colors[1])
 axs[0].plot(cl_roullier[:,0], cl_roullier[:,1], label="Exp. Roullier", linewidth=1.5, color = colors[2])
 axs[1].plot(cd_roullier[:,0], cd_roullier[:,1], label="Exp. Roullier", linewidth=1.5,color = colors[2])

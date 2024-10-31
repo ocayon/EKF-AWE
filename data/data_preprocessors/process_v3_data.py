@@ -157,6 +157,8 @@ def process_data(config_data: dict, log_directory: Path) -> pd.DataFrame:
     flight_data["kite_airspeed_temperature"] = log["airspeed_temperature"]
 
     flight_data["kite_heading"] = log["kite_heading"]
+    flight_data["kite_elevation"] = log["kite_elevation"]
+    flight_data["kite_course"] = log["kite_course"]
     flight_data["kite_azimuth"] = -log["kite_azimuth"]
 
     # Time and date data

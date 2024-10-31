@@ -21,7 +21,7 @@ def plot_aerodynamics(results, flight_data, config_data):
 
 def plot_identify_turn_dynamics(results, flight_data, config_data):
     # Turn rate law
-    ts = config_data["simulation_parameters"]["timestep"]
+    ts = np.mean(np.diff(flight_data["time"]))
 
     if "kite_yaw_rate" not in flight_data.columns:
         if "kite_yaw_rate_1" in flight_data.columns:
