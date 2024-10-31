@@ -63,10 +63,6 @@ def initialize_ekf(ekf_input_list, simConfig, tuningParams, x0, kite, kcu, tethe
                 start_time = time.time()
                 mins = 0
                 for k in range(offset_sim_length):
-                    ekf_copy, ekf_ouput = propagate_state_EKF(
-                            ekf_copy, ekf_input_list[k], simConfig_copy, tether, kite, kcu
-                        )
-                    
                     try:
                         ekf_copy, ekf_ouput = propagate_state_EKF(
                             ekf_copy, ekf_input_list[k], simConfig_copy, tether, kite, kcu

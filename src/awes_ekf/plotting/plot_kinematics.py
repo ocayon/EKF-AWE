@@ -75,9 +75,14 @@ def plot_kite_orientation(results, flight_data, config_data):
         if "pitch" in column or "roll" in column or "yaw" in column:
             flight_data.loc[:, column] = np.unwrap((flight_data[column]) % (2*np.pi))
 
-    
-    kite_imus = config_data["kite"].get("sensor_ids", [])
-    kcu_imus = config_data["kcu"].get("sensor_ids", [])
+    try:
+        kite_imus = config_data["kite"].get("sensor_ids", [])
+    except:
+        kite_imus = []
+    try:
+        kcu_imus = config_data["kcu"].get("sensor_ids", [])
+    except:
+        kcu_imus = []
     # Plot roll
     for imu in kite_imus:
         plot_time_series(
