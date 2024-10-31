@@ -53,17 +53,9 @@ def plot_wind_timeseries(results, flight_data):
 
     # Set x-axis limits
     axs[0].set_xlim([flight_data["time"].iloc[0], flight_data["time"].iloc[-1]])
-    time_of_day = pd.to_datetime(flight_data["time_of_day"], format="%H:%M:%S.%f").dt.strftime("%H:%M")
-
-    # Set x-ticks: 4 evenly spaced points + the last time point
-    tick_indices = list(range(0, len(flight_data), len(flight_data) // 4))
-    if tick_indices[-1] != len(flight_data) - 1:
-        tick_indices.append(len(flight_data) - 1)
-
-    # Set x-ticks and labels
-    axs[2].set_xticks(flight_data["time"].iloc[tick_indices])
-    axs[2].set_xticklabels(time_of_day.iloc[tick_indices], rotation=45, ha="right")
-
+    
+    # Set axis labels
+    axs[2].set_xlabel("Time (s)")
     axs[0].set_ylabel("Wind speed [m/s]")
     axs[1].set_ylabel("Wind direction [deg]")
     axs[2].set_ylabel("Vertical wind speed [m/s]")

@@ -752,48 +752,50 @@ def plot_time_series(
     if plot_phase:
         # Set y1 and y2 to cover the entire y-axis
         y1, y2 = ax.get_ylim()
+        try:
+            # Mask and fill for "straight and powered" phase
+            mask = (abs(flight_data["us"]) < 0.4) & (
+                flight_data["powered"] == "powered"
+            )
+            ax.fill_between(
+                t,
+                y1,
+                y2,
+                where=mask,
+                color=colors[5],
+                alpha=0.2,
+                zorder = 0
+            )
 
-        # Mask and fill for "straight and powered" phase
-        mask = (abs(flight_data["us"]) < 0.4) & (
-            flight_data["powered"] == "powered"
-        )
-        ax.fill_between(
-            t,
-            y1,
-            y2,
-            where=mask,
-            color=colors[5],
-            alpha=0.2,
-            zorder = 0
-        )
+            # Mask and fill for "turn and powered" phase
+            mask = (abs(flight_data["us"]) > 0.4) & (
+                flight_data["powered"] == "powered"
+            )
+            ax.fill_between(
+                t,
+                y1,
+                y2,
+                where=mask,
+                color=colors[7],
+                alpha=0.2,
+                zorder = 0
+            )
 
-        # Mask and fill for "turn and powered" phase
-        mask = (abs(flight_data["us"]) > 0.4) & (
-            flight_data["powered"] == "powered"
-        )
-        ax.fill_between(
-            t,
-            y1,
-            y2,
-            where=mask,
-            color=colors[7],
-            alpha=0.2,
-            zorder = 0
-        )
+            # Mask and fill for "depowered" phase
+            mask = flight_data["powered"] == "depowered"
+            ax.fill_between(
+                t,
+                y1,
+                y2,
+                where=mask,
+                color='white',
+                zorder=0,
+            )
 
-        # Mask and fill for "depowered" phase
-        mask = flight_data["powered"] == "depowered"
-        ax.fill_between(
-            t,
-            y1,
-            y2,
-            where=mask,
-            color='white',
-            zorder=0,
-        )
-
-        # Ensure that y-axis limits are reset correctly after fill_between
-        ax.set_ylim([y1, y2])
+            # Ensure that y-axis limits are reset correctly after fill_between
+            ax.set_ylim([y1, y2])
+        except:
+            pass
 
     return ax
 

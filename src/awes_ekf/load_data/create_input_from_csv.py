@@ -103,29 +103,28 @@ def create_input_from_csv(
             raise ValueError("No apparent wind speed data found, but required by the config file")
         kite_apparent_windspeed = np.zeros(n_intervals)
 
-    if kcu is not None:
-        try:
-            depower_input = np.array(flight_data["kcu_actual_depower"]) / max(
-                abs(flight_data["kcu_actual_depower"])
-            )
-        except:
-            print("No depower input data found")
-            depower_input = np.zeros(n_intervals)
-
-        try:
-            steering_input = flight_data["kcu_actual_steering"] / max(
-                abs(flight_data["kcu_actual_steering"])
-            )
-        except KeyError:
-            print("No steering input data found")
-            steering_input = np.zeros(n_intervals)
+    try:
+        depower_input = np.array(flight_data["kcu_actual_depower"]) / max(
+            abs(flight_data["kcu_actual_depower"])
+        )
+    except:
+        print("No depower input data found")
+        depower_input = np.zeros(n_intervals)
 
     try:
-        kite_angle_of_attack = np.array(flight_data["bridle_angle_of_attack"])
+        steering_input = flight_data["kcu_actual_steering"] / max(
+            abs(flight_data["kcu_actual_steering"])
+        )
     except KeyError:
-        if simConfig.obsData.kite_angle_of_attack:
+        print("No steering input data found")
+        steering_input = np.zeros(n_intervals)
+
+    try:
+        bridle_angle_of_attack = np.array(flight_data["bridle_angle_of_attack"])
+    except KeyError:
+        if simConfig.obsData.bridle_angle_of_attack:
             raise ValueError("No angle of attack data found, but required by the config file")
-        kite_angle_of_attack = np.zeros(n_intervals)
+        bridle_angle_of_attack = np.zeros(n_intervals)
 
     try:
         tether_reelout_speed = np.array(flight_data["tether_reelout_speed"])
@@ -135,13 +134,13 @@ def create_input_from_csv(
     try:
         tether_elevation_ground = np.array(flight_data["tether_elevation_ground"])
     except KeyError:
-        if simConfig.obsData.tether_elevation_ground:
+        if simConfig.obsData.tether_elevation:
             raise ValueError("No tether elevation data found, but required by the config file")
         tether_elevation_ground = np.zeros(n_intervals)
     try:
         tether_azimuth_ground = np.array(flight_data["tether_azimuth_ground"])
     except KeyError:
-        if simConfig.obsData.tether_azimuth_ground:
+        if simConfig.obsData.tether_azimuth:
             raise ValueError("No tether azimuth data found, but required by the config file")
         tether_azimuth_ground = np.zeros(n_intervals)
         
@@ -202,7 +201,7 @@ def create_input_from_csv(
                 tether_force=tether_force[i],
                 kite_apparent_windspeed=kite_apparent_windspeed[i],
                 tether_length=tether_length[i],
-                bridle_angle_of_attack=kite_angle_of_attack[i],
+                bridle_angle_of_attack=bridle_angle_of_attack[i],
                 kcu_velocity=kcu_velocity[i],
                 tether_reelout_speed=tether_reelout_speed[i],
                 tether_elevation_ground = tether_elevation_ground[i],

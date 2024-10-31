@@ -4,7 +4,6 @@ day: '08'                           # Day of the flight
 
 simulation_parameters:
   debug: false                      # Debug mode
-  timestep: 0.1                       # Timestep in seconds
   n_tether_elements: 10                # Number of tether elements
   doIEKF: true                        # Use iterated extended Kalman filter
   epsilon: 1e-6                       # Tolerance for the IEKF

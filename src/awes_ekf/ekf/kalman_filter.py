@@ -16,7 +16,7 @@ logging.basicConfig(
 # %%
 class ExtendedKalmanFilter:
     def __init__(
-        self, stdv_dynamic_model, stdv_measurements, ts, dyn_model, obs_model, kite, tether, kcu, simConfig
+        self, stdv_dynamic_model, stdv_measurements, dyn_model, obs_model, kite, tether, kcu, simConfig
     ):  
         self.simConfig = simConfig
         self.stdv_dynamic_model = stdv_dynamic_model
@@ -26,7 +26,6 @@ class ExtendedKalmanFilter:
         self.doIEKF = simConfig.doIEKF
         self.epsilon = simConfig.epsilon
         self.max_iterations = simConfig.max_iterations
-        self.ts = ts
         self.n = len(stdv_dynamic_model)
         self.P_k1_k1 = np.eye(self.n) * 1**2
         self.simConfig = simConfig
@@ -69,7 +68,7 @@ class ExtendedKalmanFilter:
         self.R = self.get_observation_noise_covariance(value)
 
 
-    def predict(self):
+    def predict(self,ts):
 
         # Calculate Jacobians
         self.Fx = np.array(self.calc_Fx(self.x_k1_k, self.u, self.x_k1_k))
@@ -80,7 +79,7 @@ class ExtendedKalmanFilter:
         sys_ct = control.ss(
             self.Fx, np.zeros([nx, nx]), np.zeros(nx), np.zeros(nx)
         )  # If process noise input matrix wants to be added ->control.ss(self.Fx, self.G, np.zeros(nx), np.zeros(nx))
-        sys_dt = control.sample_system(sys_ct, self.ts, method="zoh")
+        sys_dt = control.sample_system(sys_ct, ts, method="zoh")
         self.Phi = sys_dt.A
         # self.Gamma = sys_dt.B
         # Calculate covariance prediction error
