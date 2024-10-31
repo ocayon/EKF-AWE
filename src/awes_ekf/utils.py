@@ -3,11 +3,55 @@ import casadi as ca
 from typing import Union
 from awes_ekf.setup.settings import kappa, z0
 
+a = 6378137.0  # earth semi-major axis in meters
+f = 1 / 298.257223563  # flattening
+b = a * (1 - f)  # semi-minor axis
+e_sq = 1 - (b**2 / a**2)  # eccentricity squared
+
+
+# Convert latitude, longitude, and altitude to ECEF (vectorized for arrays)
+def llh_to_ecef(lat, lon, alt):
+    lat, lon = np.radians(lat), np.radians(lon)
+    N = a / np.sqrt(1 - e_sq * np.sin(lat)**2)
+    X = (N + alt) * np.cos(lat) * np.cos(lon)
+    Y = (N + alt) * np.cos(lat) * np.sin(lon)
+    Z = (N * (1 - e_sq) + alt) * np.sin(lat)
+    return X, Y, Z
+
+# Convert ECEF to ENU (vectorized for arrays)
+def llh_to_enu(ref_lat, ref_lon, ref_alt, lats, lons, alts):
+    # Step 1: Convert reference point to ECEF
+    X_ref, Y_ref, Z_ref = llh_to_ecef(ref_lat, ref_lon, ref_alt)
+
+    # Step 2: Convert all points of interest to ECEF
+    X, Y, Z = llh_to_ecef(lats, lons, alts)
+
+    # Step 3: Calculate delta coordinates (arrays)
+    dX = X - X_ref
+    dY = Y - Y_ref
+    dZ = Z - Z_ref
+
+    # Step 4: Apply rotation matrix to get ENU (arrays)
+    ref_lat, ref_lon = np.radians(ref_lat), np.radians(ref_lon)
+    R = np.array([[-np.sin(ref_lon), np.cos(ref_lon), 0],
+                  [-np.sin(ref_lat) * np.cos(ref_lon), -np.sin(ref_lat) * np.sin(ref_lon), np.cos(ref_lat)],
+                  [np.cos(ref_lat) * np.cos(ref_lon), np.cos(ref_lat) * np.sin(ref_lon), np.sin(ref_lat)]])
+
+    enu = np.dot(R, np.array([dX, dY, dZ]))
+    
+    # Each row corresponds to East, North, Up for each point
+    east = enu[0, :]
+    north = enu[1, :]
+    up = enu[2, :]
+    
+    return east, north, up
+
 # %% Function definitions
 
 def calculate_log_wind_velocity(uf, wdir, wvel_z, z):
     wvel = uf / kappa * np.log(z / z0)
     vw = np.array([wvel * np.cos(wdir), wvel * np.sin(wdir), wvel_z])
+    return vw
 
 
 
@@ -24,7 +68,7 @@ def project_onto_plane(
     Returns:
     array-like: The projected vector onto the plane.
     """
-    if type(vector) == ca.SX:
+    if type(vector) == ca.SX or type(plane_normal) == ca.SX:
         return vector - ca.dot(vector, plane_normal) * plane_normal
 
     return vector - np.dot(vector, plane_normal) * plane_normal
@@ -277,3 +321,74 @@ def calculate_reference_frame_euler(
             rotation_matrix = rotate_ENU2NED(rotation_matrix)
 
     return rotation_matrix
+
+def rotation_matrix_azth_from_wind(beta,phi):
+    return np.array([
+                [-np.sin(phi), np.cos(phi), 0],
+                [-np.sin(beta) * np.cos(phi), -np.sin(beta) * np.sin(phi), np.cos(beta)],
+                [np.cos(beta) * np.cos(phi), np.cos(beta) * np.sin(phi), np.sin(beta)]
+            ])
+
+
+
+def calculate_weighted_least_squares(y, A, W=None):
+    if W is None:
+        x_hat = np.linalg.inv(A.T @ A) @ A.T @ y
+    else:
+        x_hat = np.linalg.inv(A.T @ W @ A) @ A.T @ W @ y
+    return x_hat
+
+def calculate_turn_rate_law(results, flight_data, model = 'simple', steering_offset = False, mass=15, area=19.75, span=10, coeffs = None):
+    from scipy.sparse import eye
+
+    us = flight_data["kcu_actual_steering"]/100
+    va = results["kite_apparent_windspeed"]
+    v = np.sqrt(results["kite_velocity_x"]**2 + results["kite_velocity_y"]**2 + results["kite_velocity_z"]**2)
+    yaw = flight_data["kite_yaw_0"]
+    beta = results["kite_elevation"]
+    yaw_rate = flight_data["kite_yaw_rate"]
+    radius = results["radius_turn"]
+
+    if model == 'simple':
+        c1 = us*va
+        A = np.vstack([c1]).T
+        W = eye(len(us))
+    elif model == 'simple_weight':
+        c1 = us*va
+        c2 = np.sin(yaw)*np.cos(beta)/va
+        A = np.vstack([c1,c2]).T
+        W = eye(len(us))
+    elif model == 'full':
+        c1 = us*(va)/span
+        c2 = ( mass*v**2/(1.225*area*span**2*va*radius)-mass*9.81*np.sin(yaw)*np.cos(beta)/(1.225*area*span**2*va))
+        A = np.vstack([c1,c2]).T
+        W = eye(len(us))
+
+
+    if steering_offset:
+        c3 = va.to_numpy()
+        A = np.hstack([A, c3.reshape(-1, 1)])
+    
+
+    if coeffs is None:
+        coeffs = calculate_weighted_least_squares(yaw_rate, A, W)
+        yaw_rate = A@coeffs
+        return yaw_rate, coeffs
+    
+    yaw_rate = A@coeffs
+
+    return yaw_rate
+
+
+
+def find_time_delay(signal_1,signal_2):
+    # Compute the cross-correlation
+    cross_corr = np.correlate(signal_1, signal_2, mode='full')
+
+    # Find the index of the maximum value in the cross-correlation
+    max_corr_index = np.argmax(cross_corr)
+
+    # Compute the time delay
+    time_delay = (max_corr_index - (len(signal_1) - 1))
+
+    return time_delay, cross_corr

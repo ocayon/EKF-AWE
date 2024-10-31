@@ -4,9 +4,11 @@ from awes_ekf.ekf import ExtendedKalmanFilter, DynamicModel, ObservationModel
 from awes_ekf.setup.kite import Kite
 from awes_ekf.setup.kcu import KCU
 from awes_ekf.ekf.ekf_output import create_ekf_output
+from awes_ekf.postprocess.postprocessing import find_offset
+import time
+import copy
 
-
-def initialize_ekf(ekf_input, simConfig, tuningParams, x0, kite, kcu, tether):
+def initialize_ekf(ekf_input_list, simConfig, tuningParams, x0, kite, kcu, tether, find_offsets=True):
     """
     Initialize the Extended Kalman Filter with system components and models.
 
@@ -37,11 +39,69 @@ def initialize_ekf(ekf_input, simConfig, tuningParams, x0, kite, kcu, tether):
         simConfig,
     )
     # Initialize input vector
-    ekf.update_input_vector(ekf_input)
+    ekf.update_input_vector(ekf_input_list[0])
     # Initialize state vector
     ekf.x_k1_k1 = x0
 
-    return ekf
+    #Copy ekf using deepcopy
+    ekf_copy = copy.deepcopy(ekf)
+    simConfig_copy = copy.deepcopy(simConfig)
+    if find_offsets:
+        offset_variables = ["kite_apparent_windspeed", "bridle_angle_of_attack"]
+        # Find offsets
+        for variable in simConfig_copy.obsData.__dict__.keys():
+            if variable in offset_variables and simConfig_copy.obsData.__dict__[variable]:
+                print(f"Finding offset for {variable}")
+                ekf_output_list = []
+                offset_sim_length = int(10*60/simConfig_copy.ts)
+                ekf_output_list = []
+                simConfig_copy.obsData.__dict__[variable] = False
+                simConfig_copy.enforce_vertical_wind_to_0 = True
+                obs_model = ObservationModel(dyn_model.x, dyn_model.u, simConfig_copy, kite, tether, kcu)
+                tuningParams.update_observation_vector(simConfig_copy)
+                ekf_copy.stdv_measurements = tuningParams.stdv_measurements
+                ekf_copy.obs_model = obs_model
+                start_time = time.time()
+                mins = 0
+                for k in range(offset_sim_length):
+                    try:
+                        ekf_copy, ekf_ouput = propagate_state_EKF(
+                            ekf_copy, ekf_input_list[k], simConfig_copy, tether, kite, kcu
+                        )
+                    except Exception as e:
+                        print(f"Error at timestep {k}: {e}")
+                        break
+                    # Store results
+                    ekf_output_list.append(ekf_ouput)
+                    # Print progress
+                    if k % 600 == 0:
+                        elapsed_time = time.time() - start_time
+                        start_time = time.time()  # Record end time
+                        mins += 1
+                        print(
+                            f"Real time: {mins} minutes.  Elapsed time: {elapsed_time:.2f} seconds"
+                        )   
+
+                # Find offset
+                #TODO: Define universal namings and create timeseries class
+                if variable == "bridle_angle_of_attack":
+                    variable = "kite_angle_of_attack"
+                converged_idx = int(5*60/simConfig_copy.ts)
+                estimated_variable = np.array([ekf_output.__dict__[variable] for ekf_output in ekf_output_list])
+                measured_variable = np.array([ekf_input.__dict__[variable] for ekf_input in ekf_input_list[:offset_sim_length]])
+                offset = find_offset(estimated_variable[converged_idx::], measured_variable[converged_idx:len(ekf_input_list)], offset_range=[-15,15])
+                print(f"Offset for {variable}: {offset}")
+
+                # Update offset
+                for i in range(len(ekf_input_list)):
+                    ekf_input_list[i].__dict__[variable] += offset
+                    
+
+
+                
+
+
+    return ekf, ekf_input_list
 
 
 def update_state_ekf_tether(ekf, tether, kite, kcu, ekf_input, simConfig):
@@ -77,13 +137,17 @@ def update_state_ekf_tether(ekf, tether, kite, kcu, ekf_input, simConfig):
     ekf_output = create_ekf_output(
         ekf.x_k1_k1, ekf.u, ekf_input, tether, kite, simConfig
     )
+    
+    for key, value in ekf.debug_info.items():
+        ekf_output.__dict__[key] = value
+
 
     return ekf, ekf_output
 
 
 def propagate_state_EKF(ekf, ekf_input, simConfig, tether, kite, kcu):
     # Predict step
-    ekf.x_k1_k = kite.propagate(ekf.x_k1_k1, ekf.u, ekf_input.ts)
+    ekf.x_k1_k = kite.propagate(ekf.x_k1_k1, ekf.u, ekf_input.timestep)
 
     ## Update step
     ekf, ekf_ouput = update_state_ekf_tether(

@@ -34,7 +34,7 @@ class ObservationModel:
             vw = calculate_log_wind_velocity(
                 previous_state_map["uf_0"],
                 previous_state_map["wdir_0"],
-                previous_state_map["vwz_0"],
+                previous_state_map["vw_2_0"],
                 previous_state_map["r_2_0"],
             )
         else:
@@ -49,13 +49,13 @@ class ObservationModel:
             v_kite,
             vw,
         )
-        if self.simConfig.obsData.kite_acc:
+        if self.simConfig.obsData.kite_acceleration:
             a_kite = np.array([input_map[f"a_kite_{i}"] for i in range(3)])
             args += (a_kite,)
-        if self.simConfig.obsData.kcu_acc:
+        if self.simConfig.obsData.kcu_acceleration:
             a_kcu = np.array([input_map[f"a_kcu_{i}"] for i in range(3)])
             args += (a_kcu,)
-        if self.simConfig.obsData.kcu_vel:
+        if self.simConfig.obsData.kcu_velocity:
             v_kcu = np.array([input_map[f"v_kcu_{i}"] for i in range(3)])
             args += (v_kcu,)
 
@@ -67,7 +67,7 @@ class ObservationModel:
             vw = calculate_log_wind_velocity(
                 self.x[index_map["uf"]],
                 self.x[index_map["wdir"]],
-                self.x[index_map["z"]],
+                self.x[index_map["vw_2"]],
                 self.x[index_map["r_2"]],
             )
         else:
@@ -82,22 +82,25 @@ class ObservationModel:
         airflow_angles = calculate_airflow_angles(dcm_b2vel, vw - v_kite)
 
         h = ca.SX()
-        h = ca.vertcat(r_kite)
-        h = ca.vertcat(h, v_kite)
+        if self.simConfig.obsData.kite_position:
+            h = ca.vertcat(r_kite)
+        if self.simConfig.obsData.kite_velocity:
+            h = ca.vertcat(h, v_kite)
         h = ca.vertcat(h, (r_kite - r_tether_model))
+        # Convert into a for
         if self.simConfig.model_yaw:
             h = ca.vertcat(h, self.x[index_map["yaw"]])
         if self.simConfig.obsData.tether_length:
-            h = ca.vertcat(h, self.x[index_map["tether_length"]]-self.x[index_map["tether_offset"]])
+            h = ca.vertcat(h, self.x[index_map["tether_length"]]-self.x[index_map["tether_length_offset"]])
         if self.simConfig.obsData.tether_elevation:
-            h = ca.vertcat(h, self.x[index_map["elevation_first_tether_element"]])
+            h = ca.vertcat(h, self.x[index_map["elevation_first_tether_element"]]-self.x[index_map["tether_elevation_offset"]])
         if self.simConfig.obsData.tether_azimuth:
-            h = ca.vertcat(h, self.x[index_map["azimuth_first_tether_element"]])
-        if self.simConfig.enforce_z_wind:
+            h = ca.vertcat(h, self.x[index_map["azimuth_first_tether_element"]] - self.x[index_map["tether_azimuth_offset"]])
+        if self.simConfig.enforce_vertical_wind_to_0:
             h = ca.vertcat(h, self.x[index_map["vw_2"]])
-        if self.simConfig.obsData.apparent_windspeed:
+        if self.simConfig.obsData.kite_apparent_windspeed:
             h = ca.vertcat(h, ca.norm_2(va))
-        if self.simConfig.obsData.angle_of_attack:
+        if self.simConfig.obsData.bridle_angle_of_attack:
             h = ca.vertcat(h, airflow_angles[0])
 
         return h

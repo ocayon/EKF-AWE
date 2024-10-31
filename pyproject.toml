@@ -2,10 +2,14 @@
 requires = ["setuptools>=61.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
+# Use flit to build your project if setuptools not working
+# requires = ["flit>=3.4", "wheel"]
+# build-backend = "flit_core.buildapi"
+
 [project]
 name = "awes_ekf"
-version = "1.0.0"
-description = "Read the latest Real Python tutorials"
+version = "1.1.0"
+description = "This repository provides tools to process flight data and apply an Extended Kalman Filter (EKF) to estimate the state of a kite system in Airborne Wind Energy Systems (AWES). The code is developed in Python, utilizing libraries like pandas for data handling, casadi for symbolic operations, and NumPy for numerical computations."
 readme = "README.md"
 authors = [{ name = "Oriol Cayon", email = "o.cayon@tudelft.nl" }]
 requires-python = ">=3.6"
@@ -18,4 +22,7 @@ dependencies = [
     "pyyaml",
     "control",
     "scipy",
+    "seaborn",
+    "dataclasses",
+    "h5py",
 ]
