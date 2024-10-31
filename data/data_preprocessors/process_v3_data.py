@@ -13,7 +13,7 @@ def load_log_file(log_directory: Path, log_date: str) -> pd.DataFrame:
             break
     delimiter = detect_delimiter(log_path)
     log = pd.read_csv(log_path, delimiter=delimiter, low_memory=False)
-    log = log[log["kite_height"] > 80]  # Select indexes where kite is flying
+    log = log[log["kite_height"] > 50]  # Select indexes where kite is flying
     return log
 
 def detect_delimiter(file_path: str) -> str:
@@ -113,7 +113,7 @@ def process_data(config_data: dict, log_directory: Path) -> pd.DataFrame:
     window_size = 20
     dt = log["time"].iloc[1] - log["time"].iloc[0]
     log = log.reset_index()
-    log = log.interpolate()
+    log.loc[:, log.select_dtypes(include=[float, int]).columns] = log.select_dtypes(include=[float, int]).interpolate()
 
     flight_data = pd.DataFrame()
     try:

@@ -12,30 +12,43 @@ def create_input_from_csv(
     n_intervals = len(flight_data)
 
     # Kite measurements
-    kite_position = np.array(
-        [
-            flight_data["kite_position_x"],
-            flight_data["kite_position_y"],
-            flight_data["kite_position_z"],
-        ]
-    ).T
-    kite_velocity = np.array(
-        [
-            flight_data["kite_velocity_x"],
-            flight_data["kite_velocity_y"],
-            flight_data["kite_velocity_z"],
-        ]
-    ).T
-    kite_acceleration = np.array(
-        [
-            flight_data["kite_acceleration_x"],
-            flight_data["kite_acceleration_y"],
-            flight_data["kite_acceleration_z"],
-        ]
-    ).T
+    try:
+        kite_position = np.array(
+            [
+                flight_data["kite_position_x"],
+                flight_data["kite_position_y"],
+                flight_data["kite_position_z"],
+            ]
+        ).T
+    except KeyError:
+        raise ValueError("No kite position data found")
+    
+    try:
+        kite_velocity = np.array(
+            [
+                flight_data["kite_velocity_x"],
+                flight_data["kite_velocity_y"],
+                flight_data["kite_velocity_z"],
+            ]
+        ).T
+    except KeyError:
+        raise ValueError("No kite velocity data found")
+
+    try:
+        kite_acceleration = np.array(
+            [
+                flight_data["kite_acceleration_x"],
+                flight_data["kite_acceleration_y"],
+                flight_data["kite_acceleration_z"],
+            ]
+        ).T
+    except KeyError:
+        if simConfig.obsData.kite_acceleration:
+            raise ValueError("No kite acceleration data found, but required by the config file")
+        kite_acceleration = np.zeros((n_intervals, 3))
 
     # KCU measurements
-    if kcu_sensor is not None:
+    try:
         kcu_velocity = np.array(
             [
                 flight_data["kcu_velocity_x"],
@@ -43,6 +56,11 @@ def create_input_from_csv(
                 flight_data["kcu_velocity_z"],
             ]
         ).T
+    except KeyError:
+        if simConfig.obsData.kcu_velocity:
+            raise ValueError("No KCU velocity data found, but required by the config file")
+        kcu_velocity = np.zeros((n_intervals, 3))
+    try:
         kcu_acceleration = np.array(
             [
                 flight_data["kcu_acceleration_x"],
@@ -50,56 +68,83 @@ def create_input_from_csv(
                 flight_data["kcu_acceleration_z"],
             ]
         ).T
-    else:
-        print("No KCU sensor found")
-        kcu_velocity = np.zeros((n_intervals, 3))
+    except KeyError:
+        if simConfig.obsData.kcu_acceleration:
+            raise ValueError("No KCU acceleration data found, but required by the config file")
         kcu_acceleration = np.zeros((n_intervals, 3))
 
+
     # Tether measurements
-    tether_force = np.array(flight_data["ground_tether_force"])
-    tether_length = np.array(flight_data["tether_length"])
+    try:
+        tether_force = np.array(flight_data["ground_tether_force"])
+    except KeyError:
+        raise ValueError("No tether force data found")
+    
+    try:
+        tether_length = np.array(flight_data["tether_length"])
+    except KeyError:
+        if simConfig.obsData.tether_length:
+            raise ValueError("No tether length data found, but required by the config file")
+        tether_length = np.zeros(n_intervals)
 
     # Airflow measurements
     try:
         ground_windspeed = np.array(flight_data["ground_wind_speed"])
         ground_winddir = np.array(flight_data["ground_wind_direction"])
     except KeyError:
-        print("No wind data found")
+        print("No ground wind speed or direction data found, initializing to zero")
         ground_windspeed = np.zeros(n_intervals)
         ground_winddir = np.zeros(n_intervals)
-
+        
     try:
         kite_apparent_windspeed = np.array(flight_data["kite_apparent_windspeed"])
     except KeyError:
-        print("No apparent wind speed data found")
+        if simConfig.obsData.kite_apparent_windspeed:
+            raise ValueError("No apparent wind speed data found, but required by the config file")
         kite_apparent_windspeed = np.zeros(n_intervals)
 
     if kcu is not None:
-        depower_input = np.array(flight_data["kcu_actual_depower"]) / max(
-            abs(flight_data["kcu_actual_depower"])
-        )
-    else:
-        depower_input = np.zeros(n_intervals)
+        try:
+            depower_input = np.array(flight_data["kcu_actual_depower"]) / max(
+                abs(flight_data["kcu_actual_depower"])
+            )
+        except:
+            print("No depower input data found")
+            depower_input = np.zeros(n_intervals)
+
+        try:
+            steering_input = flight_data["kcu_actual_steering"] / max(
+                abs(flight_data["kcu_actual_steering"])
+            )
+        except KeyError:
+            print("No steering input data found")
+            steering_input = np.zeros(n_intervals)
 
     try:
         kite_angle_of_attack = np.array(flight_data["bridle_angle_of_attack"])
-
-        kite_angle_of_attack = kite_angle_of_attack
-
     except KeyError:
-        print("No angle of attack data found")
+        if simConfig.obsData.kite_angle_of_attack:
+            raise ValueError("No angle of attack data found, but required by the config file")
         kite_angle_of_attack = np.zeros(n_intervals)
 
-    tether_reelout_speed = np.array(flight_data["tether_reelout_speed"])
+    try:
+        tether_reelout_speed = np.array(flight_data["tether_reelout_speed"])
+    except KeyError:
+        raise ValueError("No tether reelout speed data found, but required by the config file")
 
     try:
         tether_elevation_ground = np.array(flight_data["tether_elevation_ground"])
+    except KeyError:
+        if simConfig.obsData.tether_elevation_ground:
+            raise ValueError("No tether elevation data found, but required by the config file")
+        tether_elevation_ground = np.zeros(n_intervals)
+    try:
         tether_azimuth_ground = np.array(flight_data["tether_azimuth_ground"])
     except KeyError:
-        print("No tether elevation or azimuth data found")
-        tether_elevation_ground = np.zeros(n_intervals)
+        if simConfig.obsData.tether_azimuth_ground:
+            raise ValueError("No tether azimuth data found, but required by the config file")
         tether_azimuth_ground = np.zeros(n_intervals)
-
+        
     try:
         kite_thrust_force = np.array(
             [
@@ -109,15 +154,18 @@ def create_input_from_csv(
             ]
         ).T
     except KeyError:
-        print("No thrust force data found")
+        if simConfig.obsData.kite_thrust_force:
+            raise ValueError("No thrust force data found, but required by the config file")
         kite_thrust_force = np.zeros((n_intervals, 3))
+        
 
     try:
         kite_yaw = np.unwrap(
             np.array(flight_data["kite_yaw_" + str(kite_sensor)] - np.pi / 2)
         )
     except KeyError:
-        print("No kite yaw data found")
+        if simConfig.model_yaw:
+            raise ValueError("No kite yaw data found, but required by the config file")
         kite_yaw = np.zeros(n_intervals)
 
     init_wind_dir = np.mean(ground_winddir[0:3000])
@@ -133,13 +181,7 @@ def create_input_from_csv(
                 init_wind_dir = np.deg2rad(360 - 90 - flight_data[column].iloc[1400])
                 break
 
-    try:
-        steering_input = flight_data["kcu_actual_steering"] / max(
-            abs(flight_data["kcu_actual_steering"])
-        )
-    except KeyError:
-        print("No steering input data found")
-        steering_input = np.zeros(n_intervals)
+
 
     timestep = np.gradient(flight_data["time"].values)
 
@@ -148,11 +190,6 @@ def create_input_from_csv(
     wvel0 = uf / kappa * np.log(kite_position[0][2] / z0)
     if np.isnan(wvel0):
         raise ValueError("Initial wind velocity is NaN")
-    vw0 = [
-        wvel0 * np.cos(init_wind_dir),
-        wvel0 * np.sin(init_wind_dir),
-        0,
-    ]  # Initial wind velocity
 
     ekf_input_list = []
     for i in range(len(flight_data)):

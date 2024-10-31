@@ -459,7 +459,6 @@ class Tether:
             xtol=1e-5,
             ftol=1e-5,
         )
-        print(opt_res.success)
         self.opt_guess = opt_res.x
         tetherInput.tether_length = opt_res.x[2]
         tetherInput.tether_elevation = opt_res.x[0]
