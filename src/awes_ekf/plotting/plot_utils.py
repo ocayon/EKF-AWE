@@ -1378,16 +1378,24 @@ def personalized_plot(results, flight_data, config_data):
         config_data (dict): Configuration dictionary for any additional settings or plotting preferences.
     """
     
-    # Display available variables to the user and get input
-    available_vars = list(results.columns)
-    print("Available variables to plot:", ", ".join(available_vars))
-    selected_vars = input("Enter the variables to plot, separated by commas: ").split(',')
-    selected_vars = [var.strip() for var in selected_vars if var.strip() in available_vars]
-    
+    # For 'results' dataset
+    available_vars_res = list(results.columns)
+    print("Available variables in 'results' to plot:", ", ".join(available_vars_res))
+    selected_vars_res = input("Enter the variables to plot from 'results', separated by commas: ").split(',')
+    selected_vars_res = [var.strip() for var in selected_vars_res if var.strip() in available_vars_res]
+
+    # For 'flight_data' dataset
+    available_vars_fd = list(flight_data.columns)
+    print("Available variables in 'flight_data' to plot:", ", ".join(available_vars_fd))
+    selected_vars_fd = input("Enter the variables to plot from 'flight_data', separated by commas: ").split(',')
+    selected_vars_fd = [var.strip() for var in selected_vars_fd if var.strip() in available_vars_fd]
+
+    # Combine selected variables if any were chosen
+    selected_vars = selected_vars_res + selected_vars_fd
     if not selected_vars:
         print("No valid variables selected. Exiting plot function.")
         return
-    
+
     # Set up the vector plot options based on user input or default settings
     vector_names = config_data.get("vector_names", [])
     labels = [[var] for var in selected_vars]  # Default labels are just variable names
@@ -1409,7 +1417,8 @@ def personalized_plot(results, flight_data, config_data):
         vecs.append(kite_velocity)
 
     # Gather selected variables for plotting
-    variables = [results[var].values for var in selected_vars]
+    variables = [results[var].values if var in available_vars_res else flight_data[var].values 
+                for var in selected_vars]
     
     # Setup figure and layout
     n = len(variables)
