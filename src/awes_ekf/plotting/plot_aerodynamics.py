@@ -13,7 +13,8 @@ def plot_aerodynamics(results, flight_data, config_data):
     
     plot_aerodynamic_coefficients(flight_data, results, config_data)
 
-    plot_polars(results, flight_data)
+    date = config_data["year"] + "-" + config_data["month"] + "-" + config_data["day"]
+    plot_polars(results, flight_data, date=date, model=config_data["kite"]["model_name"])
 
     if "kcu_actual_steering" in flight_data.columns:
         plot_identify_turn_dynamics(results, flight_data, config_data)
@@ -91,21 +92,65 @@ def plot_identify_turn_dynamics(results, flight_data, config_data):
     plt.ylabel('Kite Yaw Rate [rad/s]')
     plt.legend()
     plt.tight_layout()
+    # Define least squares function
+    def least_squares(x, y, A_matrix):
+        m = len(y)
+        n = A_matrix.shape[1]
+        x_hat = np.linalg.inv(A_matrix.T @ A_matrix) @ A_matrix.T @ y
+        residuals = y - np.dot(A_matrix, x_hat).reshape(-1)
+        sigma_squared = (residuals.T @ residuals) / (m - n)
+        measurement_error = np.sqrt(sigma_squared)
+        print("Measurement error:", measurement_error)
+        Qx = sigma_squared * np.linalg.inv(A_matrix.T @ A_matrix)
+        return x_hat, Qx, measurement_error
 
-    # Linear regression on side force
-    x = flight_data["kcu_actual_steering_delay"] / 100
-    y = results["wing_sideforce_coefficient"]
-    slope, intercept, _, _, _ = linregress(flight_data["kcu_actual_steering_delay"] / 100, results["wing_sideforce_coefficient"])
-    regression_line = slope * np.linspace(-0.37, 0.37, 10) + intercept
+    # Define a function for fitting and plotting with filled bounds
+    def plot_fit(flight_data, results, condition):
+        # Filter data based on condition
+        mask = flight_data["kcu_actual_steering_delay"] < 0 if condition == "<0" else flight_data["kcu_actual_steering_delay"] > 0
+        x = np.array(flight_data[mask]["kcu_actual_steering_delay"]) / 100
+        y = np.array(results[mask]["wing_sideforce_coefficient"])
+        
+        # Construct A_matrix and fit parameters
+        A_matrix = np.vstack([x, np.ones(len(x))]).T
+        x_hat, Qx, error = least_squares(x, y, A_matrix)
+        
+        # Set x_range for each condition
+        x_range = np.linspace(-0.4, 0, 100) if condition == "<0" else np.linspace(0, 0.4, 100)
+        fit_line = x_hat[0] * x_range + x_hat[1] 
+        upper_bound = fit_line + error
+        lower_bound = fit_line - error
+
+        
+
+        # Plotting
+        plt.scatter(flight_data[mask]["kcu_actual_steering"] / 100, y, alpha=0.2, color=colors[2])
+        plt.scatter(flight_data[mask]["kcu_actual_steering_delay"] / 100, y, alpha=0.2, color=colors[3])
+
+        # Linear fit line
+        plt.plot(x_range, fit_line, linestyle="--", color=colors[0])
+
+        # Fill between upper and lower bounds
+        plt.fill_between(x_range, lower_bound, upper_bound, alpha=0.6, color=colors[0])
+
+        fit_us0 = fit_line[-1] if condition == "<0" else fit_line[0]
+        # Add thicker gridlines at y=0 and x=0
+        plt.axhline(fit_us0, linewidth=1.5, linestyle="--", color = colors[5])
+        plt.axhline(0, color="black", linewidth=0.5)
+        
+
+        # Labels and legend
+        plt.xlabel(r'$u_\mathrm{s}$')
+        plt.ylabel(r'$C_S$')
+        plt.legend()
+        plt.tight_layout()
+
 
     plt.figure(figsize=(6, 4))
-    plt.scatter(flight_data["kcu_actual_steering"] / 100, y, alpha=0.2, label='EKF', color=colors[2])
-    plt.scatter(flight_data["kcu_actual_steering_delay"] / 100, y, alpha=0.2, label='EKF - Delay Corrected', color=colors[3])
-    plt.plot(np.linspace(-0.37, 0.37, 10), regression_line, label=f'Linear fit: y = {slope:.2f}x + {intercept:.2f}', linestyle='--')
-    plt.xlabel(r'$u_\mathrm{s}$')
-    plt.ylabel(r'$C_S$')
-    plt.legend()
-    plt.tight_layout()
+    # Call the function for each condition
+    plot_fit(flight_data, results, condition="<0")
+    plot_fit(flight_data, results, condition=">0")
+    plt.legend(["Linear Fit", "EKF", "EKF Delay Corrected"])
 
     # Print mean errors and standard deviations
     print("Mean error yaw rate (standard):", mean_error_standard)
@@ -114,11 +159,11 @@ def plot_identify_turn_dynamics(results, flight_data, config_data):
     print("Std error yaw rate (offset-corrected):", np.std(error_offset))
 
     # Sideforce time series plot
-    fit_sideforce = slope * flight_data["kcu_actual_steering_delay"] / 100 + intercept
+    # fit_sideforce = slope * flight_data["kcu_actual_steering_delay"] / 100 + intercept
     fig, axs = plt.subplots(3, 1, figsize=(12, 8), sharex=True)
     plot_time_series(flight_data, results["wing_sideforce_coefficient"], axs[0], ylabel="$C_{S}$", plot_phase=False, label="EKF 0")
-    axs[0].plot(flight_data["time"], slope * flight_data["kcu_actual_steering"] / 100 + intercept, label="Linear Fit", linestyle="--")
-    axs[0].plot(flight_data["time"], fit_sideforce, label="Linear Fit - Delay Corrected", linestyle="--")
+    # axs[0].plot(flight_data["time"], slope * flight_data["kcu_actual_steering"] / 100 + intercept, label="Linear Fit", linestyle="--")
+    # axs[0].plot(flight_data["time"], fit_sideforce, label="Linear Fit - Delay Corrected", linestyle="--")
     axs[0].legend(frameon=True)
 
     # Yaw Rate Comparison
@@ -159,6 +204,8 @@ def plot_aerodynamic_coefficients(flight_data, results, config_data):
     plot_time_series(flight_data, results["wing_drag_coefficient"], axs[1], label="$C_\mathrm{D}$")
     if "kcu_drag_coefficient" in results.columns:
         plot_time_series(flight_data, results["kcu_drag_coefficient"], axs[1], label="$C_\mathrm{D,kcu}$")
+    if "bridles_drag_coefficient" in results.columns:
+        plot_time_series(flight_data, results["bridles_drag_coefficient"], axs[1], label="$C_\mathrm{D,bridles}$")
     if "tether_drag_coefficient" in results.columns:
         plot_time_series(flight_data, results["tether_drag_coefficient"], axs[1], label="$C_\mathrm{D,t}$", plot_phase=True, ylabel="$C_D$")
     axs[1].legend()
@@ -184,12 +231,12 @@ def plot_aerodynamic_coefficients(flight_data, results, config_data):
     # Adjust layout
     plt.tight_layout()
 
-def plot_polars(results, flight_data, label="Wing"):
+def plot_polars(results, flight_data, date="", model = "",label="Wing"):
     # Attempt to find angle of attack data in preferred order and notify which is used
-    if "wing_angle_of_attack_bridle" in results.columns:
+    if "wing_angle_of_attack_bridle" in results.columns and results["wing_angle_of_attack_bridle"].notna().any():
         alpha = results["wing_angle_of_attack_bridle"]
         aoa_label = "Wing AoA (Bridle)"
-    elif "wing_angle_of_attack" in results.columns:
+    elif "wing_angle_of_attack" in results.columns and results["wing_angle_of_attack"].notna().any():
         alpha = results["wing_angle_of_attack"]
         aoa_label = "Wing AoA"
     elif "kite_angle_of_attack" in results.columns:
@@ -274,6 +321,15 @@ def plot_polars(results, flight_data, label="Wing"):
             ax.axvline(x=mean_aoa_pow, linestyle='--', label='Mean reel-out AoA')
             ax.axvline(x=mean_aoa_dep, linestyle='--', label='Mean reel-in AoA')
 
+    
+    for i in range(2):
+        for j in range(2):
+            axs[i, j].set_xlim([mean_aoa_dep -2, mean_aoa_pow + 2])
+    
     # Add legend to the first subplot
     axs[0, 0].legend(loc="lower right")
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])  # Adjust layout for suptitle
+
+    # Save polars as csv
+    polars = np.vstack([bin_centers, cl_wing_means, cd_wing_means]).T
+    np.savetxt("results/polars/polar_"+model+"_"+date+".csv", polars, delimiter=",", header="aoa,cl,cd", comments="")

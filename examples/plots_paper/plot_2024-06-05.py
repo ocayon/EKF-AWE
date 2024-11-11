@@ -61,6 +61,10 @@ plt.xlabel("Time [s]")
 plt.legend()
 plt.show()
 
+fig, ax = plt.subplots(1, 1, figsize=(10, 6))
+pu.plot_kinetic_energy_spectrum(results_min, flight_data_min, ax, savefig=False)
+plt.show()
+
 ### Step 2: Turbulence Intensity Plot
 fig, ax = plt.subplots(1, 1, figsize=(7, 6))
 pu.plot_turbulence_intensity_high_res(results_min, flight_data_min, 120, ax, savefig=False)
@@ -98,8 +102,6 @@ for i in range(num_subsets):
     pu.plot_wind_profile_bins(subsets["flight_data_log"][i], subsets["results_log"][i], [axs[i], axs[i + 6]], step=10, color=colors[4], lidar_data=False, label="EKF 2")
     pu.plot_wind_profile_bins(subsets["flight_data_vwz0"][i], subsets["results_vwz0"][i], [axs[i], axs[i + 6]], step=10, color=colors[3], lidar_data=False, label="EKF 4")
     pu.plot_wind_profile_bins(subsets["flight_data_tether"][i], subsets["results_tether"][i], [axs[i], axs[i + 6]], step=10, color=colors[2], lidar_data=True, label="EKF 5")
-    
-    
     
     # Extract and round time to the nearest 5-minute interval
     original_time = subsets["flight_data_min"][i]["time_of_day"].iloc[0]

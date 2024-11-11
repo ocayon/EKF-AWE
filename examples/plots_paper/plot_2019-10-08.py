@@ -40,7 +40,6 @@ colors = get_color_list()
 
 fig, ax = plt.subplots(1, 1, figsize=(10, 5))
 plot_time_series(flight_data[mask], results[mask]["norm_epsilon_norm"], ax, plot_phase=True, color = colors[0])
-ax.legend()
 ax.set_xlabel("Time [s]")
 ax.set_ylabel("Norm of Normalized Residuals")
 plt.tight_layout()
@@ -174,8 +173,8 @@ cd_rans = np.loadtxt("./processed_data/previous_analysis/RANS_CD_alpha_struts.cs
 VSM_coeffs = pd.read_csv("./processed_data/previous_analysis/VSM_aero_coeffs_V3.csv")
 
 plot_cl_curve(np.sqrt((results["wing_lift_coefficient"]**2+results["wing_sideforce_coefficient"]**2)), results["wing_drag_coefficient"], results['wing_angle_of_attack_bridle'], mask_polar,axs, label = "Wing", color=colors[0])
-plot_cl_curve(np.sqrt((results["wing_lift_coefficient"]**2+results["wing_sideforce_coefficient"]**2)), results["wing_drag_coefficient"], results['wing_angle_of_attack_bridle'], mask_turn,axs, label = "Wing Turn", color=colors[2])
-plot_cl_curve(np.sqrt((results["wing_lift_coefficient"]**2+results["wing_sideforce_coefficient"]**2)), results["wing_drag_coefficient"], results['wing_angle_of_attack_bridle'], mask_straight,axs, label = "Wing Straight", color=colors[3])
+# plot_cl_curve(np.sqrt((results["wing_lift_coefficient"]**2+results["wing_sideforce_coefficient"]**2)), results["wing_drag_coefficient"], results['wing_angle_of_attack_bridle'], mask_turn,axs, label = "Wing Turn", color=colors[2])
+# plot_cl_curve(np.sqrt((results["wing_lift_coefficient"]**2+results["wing_sideforce_coefficient"]**2)), results["wing_drag_coefficient"], results['wing_angle_of_attack_bridle'], mask_straight,axs, label = "Wing Straight", color=colors[3])
 plot_cl_curve(np.sqrt((results["wing_lift_coefficient"]**2+results["wing_sideforce_coefficient"]**2)), results["wing_drag_coefficient"]+results["kcu_drag_coefficient"]+results["tether_drag_coefficient"], results['wing_angle_of_attack_bridle'], mask_polar,axs, label = "Wing+KCU+tether", color=colors[1])
 axs[0].plot(cl_roullier[:,0], cl_roullier[:,1], label="Exp. Roullier", linewidth=1.5, color = colors[2])
 axs[1].plot(cd_roullier[:,0], cd_roullier[:,1], label="Exp. Roullier", linewidth=1.5,color = colors[2])

@@ -32,7 +32,7 @@ def plot_kinematics(results, flight_data, config_data):
     axs[1].plot(flight_data["time"], r, label="EKF",linewidth=1)
     r = np.sqrt(flight_data["kite_position_x"]**2 + flight_data["kite_position_y"]**2+ flight_data["kite_position_z"]**2)
     axs[1].plot(flight_data["time"], r, label="Measured")
-    axs[1].plot(flight_data["time"], flight_data["tether_length"]+11.5, label="Measured tether length")
+    axs[1].plot(flight_data["time"], flight_data["tether_length"]+config_data['kcu']['distance_kcu_kite'], label="Measured tether length")
     axs[1].legend()
     axs[1].set_xlabel("Time [s]")
     axs[1].set_ylabel("Radial Distance/Tether Length [m]")
