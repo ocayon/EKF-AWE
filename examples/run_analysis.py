@@ -4,6 +4,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 from dataclasses import dataclass
+import readline
 
 # Todo: this python path update is added because of the import from data.process_KP_data. We could move process_KP_data
 #  to the examples dir to avoid this.
@@ -116,6 +117,9 @@ class AnalyzeAweFromCsvLog:
 
 
         flight_data = read_processed_flight_data(year, month, day, kite_model)
+        duration = flight_data["time"].max() - flight_data["time"].min()
+        duration = duration/60 # in minutes
+        print(f"Duration of the flight: {duration:.2f} minutes.")
         start_minute = int(input("Enter the start minute for analysis or skip: ").strip() or 0)
         end_minute = int(input("Enter the end minute for analysis or skip: ").strip() or 0)
         dt = flight_data["time"].diff().mean()
@@ -161,13 +165,14 @@ class AnalyzeAweFromCsvLog:
         start_time = time.time()
         mins = -1
         k_nis = 1000
+        flight_time = 0
         import numpy as np
         # TODO: Add a timeseries class
         for k, ekf_input in enumerate(ekf_input_list):
             # if ekf_input.kite_acceleration[2]>17:
             #     ekf_input.kite_position = np.array([np.nan, np.nan, np.nan])
             #     ekf_input.kite_velocity = np.array([np.nan, np.nan, np.nan])
-            #     print("Acceleration is too high to get good GPS data")
+            #     print("Acceleration is too high to 1get good GPS data")
             try:
                 ekf, ekf_ouput = propagate_state_EKF(
                     ekf, ekf_input, simConfig, tether, kite, kcu
@@ -195,9 +200,10 @@ class AnalyzeAweFromCsvLog:
                 )
                 flight_data.drop(k, inplace=True)
                 continue
-
+            
+            flight_time += ekf_input.timestep
             # Print progress
-            if k % 600 == 0:
+            if np.round(flight_time, 2) % 60 == 0:
                 elapsed_time = time.time() - start_time
                 start_time = time.time()  # Record end time
                 mins += 1
@@ -235,9 +241,21 @@ class AnalyzeAweFromCsvLog:
 
 def main() -> None:
     default_log_dir = Path('./data/flight_logs/v3/')
+    
+    from prompt_toolkit import prompt
+    from prompt_toolkit.completion import PathCompleter
 
-    log_dir = Path(
-        input(f"Enter the directory with the flight logs [default: {default_log_dir}]: ").strip() or default_log_dir)
+    # Set up a PathCompleter to enable tab-completion for file paths
+    path_completer = PathCompleter(expanduser=False)  # Enables ~ expansion
+
+    # Prompt the user with tab-completion support for nested directories
+    user_input = prompt(
+        f"Enter the directory with the flight logs [default: {default_log_dir}]: ",
+        completer=path_completer
+    ).strip()
+    
+    # Use the default if the user didn't provide input
+    log_dir = Path(user_input) if user_input else default_log_dir
     
     # List available flights and select one
     available_flights = list_available_flights(log_dir)
