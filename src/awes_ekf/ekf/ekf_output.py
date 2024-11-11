@@ -76,6 +76,9 @@ class EKFOutput:
     kcu_drag_coefficient: float = (
         None  # Drag coefficient of the KCU nondimensionalized with kite area
     )
+    bridles_drag_coefficient: float = (
+        None  # Drag coefficient of the bridles nondimensionalized with kite area
+    )
 
     # Steering and control parameters
     steering_law_coefficient: float = None  # Steering law parameter (-)
@@ -136,6 +139,7 @@ def create_ekf_output(x, u, ekf_input, tether, kite, simConfig):
     euler_angles_kin = calculate_euler_from_reference_frame(rotate_ENU2NED(dcm_b2vel))
     drag_coefficient_kcu = float(tether.cd_kcu(*args))
     drag_coefficient_tether = float(tether.cd_tether(*args))
+    drag_coefficient_bridles = float(tether.cd_bridles(*args))
     tether_force_kite = np.linalg.norm(tether.tether_force_kite(*args))
 
     z_axis_kite = dcm_b2w[:, 2]
@@ -181,6 +185,7 @@ def create_ekf_output(x, u, ekf_input, tether, kite, simConfig):
         tether_elevation=elevation_0,
         tether_azimuth=azimuth_0,
         kcu_drag_coefficient=drag_coefficient_kcu,
+        bridles_drag_coefficient=drag_coefficient_bridles,
         tether_drag_coefficient=drag_coefficient_tether,
         kite_thrust_force=x[state_index_map.get("kite_thrust_force", 0)],
         tether_roll=euler_angles1[0],

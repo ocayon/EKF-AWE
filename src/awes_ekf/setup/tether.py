@@ -59,6 +59,7 @@ class Tether:
         self.tether_frame = res["tether_frame"]
         self.cd_kcu = res["cd_kcu"]
         self.cd_tether = res["cd_tether"]
+        self.cd_bridles = res["cd_bridles"]
         self.CL = res["CL"]
         self.CD = res["CD"]
         self.CS = res["CS"]
@@ -208,8 +209,7 @@ class Tether:
                     dj = -0.5 * tether_drag_basis
             else:
                 if last_element:
-                    # dj = -0.25*rho*L_blines*d_bridle*vaj_sq*cd_t # Bridle lines drag
-                    dj = 0
+                    dj = -.5 * drag_bridles
 
                 elif self.n_elements == 1:
                     dj = -0.25 * tether_drag_basis
@@ -224,8 +224,9 @@ class Tether:
                         0.5 * rho * kite.area * ca.norm_2(vaj) ** 2
                     )
                 elif kcu_element:
+                    drag_bridles = 0.5*rho*kcu.total_length_bridle_lines*kcu.diameter_bridle_lines*vaj_sq*CD_tether # Bridle lines drag
                     dj = -0.25 * tether_drag_basis
-                    
+                    dj += -0.5 * drag_bridles
                     # D_turbine = 0.5*rho*ca.norm_2(vaj)**2*ca.pi*0.2**2*1
                     dp= -.5*rho*ca.norm_2(vajp)*vajp*kcu.cdp*kcu.Ap  # Adding kcu drag perpendicular to kcu
                     dt= -.5*rho*ca.norm_2(vajn)*vajn*kcu.cdt*kcu.At  # Adding kcu drag parallel to kcu
@@ -242,7 +243,7 @@ class Tether:
                     # L_kcu = 0.5 * rho * ca.norm_2(vaj) ** 2 * kcu.Ap * cl_kcu
                     # D_kcu = 0.5 * rho * ca.norm_2(vaj) ** 2 * cd_kcu * kcu.Ap
                     # dj += L_kcu * dir_L + D_kcu * dir_D  # + D_turbine*dir_D
-
+                    
                 else:
                     dir_D = -vaj / ca.norm_2(vaj)
                     dir_L = ej - ca.dot(ej, dir_D) * dir_D
@@ -365,8 +366,10 @@ class Tether:
         # Parasitic drag of tether and KCU
         if kcu is not None:
             cd_kcu = D_kcu / (0.5 * rho * ca.norm_2(vaj) ** 2 * kite.area)
+            cd_bridles = ca.norm_2(drag_bridles) / (0.5 * rho * ca.norm_2(vaj) ** 2 * kite.area)
         else:
             cd_kcu = 0
+            cd_bridles = 0
         cd_tether = drag_tether / (0.5 * rho * ca.norm_2(vaj) ** 2 * kite.area)
 
         args = [
@@ -395,6 +398,7 @@ class Tether:
             "bridle_frame_vk": ca.Function("bridle_frame_vk", args, [dcm_b2vel]),
             "tether_frame": ca.Function("tether_frame", args, [dcm_t2w]),
             "cd_kcu": ca.Function("cd_kcu", args, [cd_kcu]),
+            "cd_bridles": ca.Function("cd_bridles", args, [cd_bridles]),
             "cd_tether": ca.Function("cd_tether", args, [cd_tether]),
             "CL": ca.Function("CL", args, [CL]),
             "CD": ca.Function("CD", args, [CD]),
