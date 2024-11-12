@@ -211,7 +211,8 @@ class ExtendedKalmanFilter:
         # Append values to the NumPy array
         if simConfig.obsData.kite_position:
             z = np.append(z, input_class.kite_position)
-        z = np.append(z, input_class.kite_velocity)
+        if simConfig.obsData.kite_velocity:
+            z = np.append(z, input_class.kite_velocity)
         z = np.append(z, np.zeros(3))  # Add zeros for the least-squares problem
         # TODO: Convert this into dict to loop through and avoid hardcoding
         if simConfig.model_yaw:
