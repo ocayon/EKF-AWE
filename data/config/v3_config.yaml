@@ -23,7 +23,7 @@ simulation_parameters:
     kcu_position: false                    # KCU position measurement
     kcu_velocity: false                    # KCU velocity measurement
     kcu_acceleration: false                    # KCU acceleration measurement
-    kite_apparent_windspeed: true         # Apparent wind speed measurement
+    kite_apparent_windspeed: false         # Apparent wind speed measurement
     bridle_angle_of_attack: false            # Angle of attack measurement
     bridle_angle_of_sideslip: false             # Sideslip angle measurement
     kite_yaw_angle: false                  # Yaw angle measurement
@@ -75,10 +75,3 @@ tuning_parameters:
     tether_azimuth: 0.0873 # 5 degrees in radians
     tether_length: 0.1
     yaw: 0.0873
-
-postprocess:
-  # Posprocessing settings
-  remove_IMU_offsets: true  # Remove IMU offsets, only for soft wing with KCU
-  correct_IMU_deformation: true # Correct IMU deformation, only for soft wing with KCU
-  remove_vane_offsets: true # Remove vane offsets, only for soft wing with KCU
-  estimate_kite_angle: true # Estimate kite angle, only for soft wing with KCU
