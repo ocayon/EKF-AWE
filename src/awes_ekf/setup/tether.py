@@ -41,7 +41,7 @@ class Tether:
         else:
             raise ValueError("Invalid tether material")
 
-        self.cf = 0.02
+        self.cf = 0.01  # Skin-friction drag coefficient
         self.diameter = diameter
         self.n_elements = n_elements
         self.elastic = elastic
@@ -129,7 +129,7 @@ class Tether:
 
         velocities = ca.SX.zeros((n_elements + 1, 3))
         accelerations = ca.SX.zeros((n_elements + 1, 3))
-        non_conservative_forces = ca.SX.zeros((n_elements + 1, 3))
+
         drag_tether = 0
         stretched_tether_length = l_s  # Stretched
         for j in range(n_elements):  # Iterate over point masses.
@@ -184,91 +184,62 @@ class Tether:
                 )
 
             # Determine flow at point mass j.
-            vaj = vj - vwj  # Apparent wind velocity
+            vaj = vwj -vj  # Apparent wind velocity
 
             vajp = ca.dot(vaj, ej) * ej  # Parallel to tether element
             # TODO: check whether to use vajn
             vajn = vaj - vajp  # Perpendicular to tether element
 
-            vaj_sq = ca.norm_2(vaj) * vaj
+            vaj_sq = ca.norm_2(vaj)**2
 
             # Determina angle between  va and tether
-            theta = calculate_angle_2vec(-vaj, ej)
-            # vaj_sq = ca.norm_2(vajn)*vajn
-            CD_tether = self.cd * ca.sin(theta) ** 3 + self.cf
-            # CL_tether = self.cd*ca.sin(theta)**2*ca.cos(theta)
-            tether_drag_basis = rho * l_unstrained * self.diameter * CD_tether * vaj_sq
+            theta = calculate_angle_2vec(vaj, ej)
+            cd_t = self.cd * ca.sin(theta) ** 3 + np.pi*self.cf*ca.cos(theta)**3
+            cl_t = self.cd * ca.sin(theta) ** 2 * ca.cos(theta)-np.pi*self.cf*ca.sin(theta)*ca.cos(theta)**2
+            dir_D = vaj / ca.norm_2(vaj) # Drag direction
+            dir_L = -(ej - ca.dot(ej, dir_D) * dir_D) # Lift direction
+            dynamic_pressure_area = 0.5 * rho * ca.norm_2(vaj) ** 2 * l_unstrained * self.diameter
+
+            # Calculate lift and drag using the common factor
+            lift_j = dynamic_pressure_area * cl_t * dir_L
+            drag_j = dynamic_pressure_area * cd_t * dir_D
 
             # Determine drag at point mass j.
             if kcu is None:
                 if self.n_elements == 1:
-                    dj = -0.125 * tether_drag_basis
+                    faj = 0.5 * lift_j + 0.5 * drag_j
                 elif last_element:
-                    dj = -0.25 * tether_drag_basis  # TODO: add bridle drag
+                    faj = 0.5 * drag_j + 0.5 * lift_j
                 else:
-                    dj = -0.5 * tether_drag_basis
+                    faj = 0.5 * drag_j + 0.5 * lift_j
             else:
                 if last_element:
-                    dj = -.5 * drag_bridles
+                    faj = 0.5*drag_bridles +0.5*lift_bridles
 
                 elif self.n_elements == 1:
-                    dj = -0.25 * tether_drag_basis
-                    dp = (
-                        -0.5 * rho * ca.norm_2(vajp) * vajp * kcu.cdp * kcu.Ap
-                    )  # Adding kcu drag perpendicular to kcu
-                    dt = (
-                        -0.5 * rho * ca.norm_2(vajn) * vajn * kcu.cdt * kcu.At
-                    )  # Adding kcu drag parallel to kcu
-                    dj += dp + dt
-                    cd_kcu = (ca.norm_2(dp + dt)) / (
-                        0.5 * rho * kite.area * ca.norm_2(vaj) ** 2
-                    )
+                    faj = 0.5 * drag_j + 0.5 * lift_j
+                    dp_kcu= .5*rho*ca.norm_2(vajp)*vajp*kcu.cdp*kcu.Ap  # Adding kcu drag perpendicular to kcu
+                    dt_kcu= .5*rho*ca.norm_2(vajn)*vajn*kcu.cdt*kcu.At  # Adding kcu drag parallel to kcu
+                    faj += dp_kcu + dt_kcu + 0.5*drag_bridles + 0.5*lift_bridles+0.5*drag_j+0.5*lift_j
+
                 elif kcu_element:
-                    drag_bridles = 0.5*rho*kcu.total_length_bridle_lines*kcu.diameter_bridle_lines*vaj_sq*CD_tether # Bridle lines drag
-                    dj = -0.25 * tether_drag_basis
-                    dj += -0.5 * drag_bridles
-                    # D_turbine = 0.5*rho*ca.norm_2(vaj)**2*ca.pi*0.2**2*1
-                    dp= -.5*rho*ca.norm_2(vajp)*vajp*kcu.cdp*kcu.Ap  # Adding kcu drag perpendicular to kcu
-                    dt= -.5*rho*ca.norm_2(vajn)*vajn*kcu.cdt*kcu.At  # Adding kcu drag parallel to kcu
+                    drag_bridles = 0.5*rho*kcu.total_length_bridle_lines*kcu.diameter_bridle_lines*vaj_sq*cd_t # Bridle lines drag
+                    drag_bridles = drag_bridles * dir_D
+                    lift_bridles = 0.5*rho*kcu.total_length_bridle_lines*kcu.diameter_bridle_lines*vaj_sq*cl_t # Bridle lines lift
+                    lift_bridles = lift_bridles * dir_L
+                    
+                    dp_kcu= .5*rho*ca.norm_2(vajp)*vajp*kcu.cdp*kcu.Ap  # Adding kcu drag perpendicular to kcu
+                    dt_kcu= .5*rho*ca.norm_2(vajn)*vajn*kcu.cdt*kcu.At  # Adding kcu drag parallel to kcu
                     th = -0.5*rho*vaj_sq*ca.pi*0.2**2*0.4       # Add thrust of a wind turbine if present
-                    D_kcu = ca.norm_2(dp+dt)
-                    dj += dp+dt
-                    # Approach described in Hoerner, taken from Paul Thedens dissertation
-                    # theta = ca.pi / 2 - theta
-                    # cd_kcu = kcu.cdt * ca.sin(theta) ** 3 + self.cf
-                    # cl_kcu = kcu.cdt * ca.sin(theta) ** 2 * ca.cos(theta)
-                    # dir_D = -vaj / ca.norm_2(vaj)
-                    # dir_L = ej - ca.dot(ej, dir_D) * dir_D
-                    # print(cd_kcu)
-                    # L_kcu = 0.5 * rho * ca.norm_2(vaj) ** 2 * kcu.Ap * cl_kcu
-                    # D_kcu = 0.5 * rho * ca.norm_2(vaj) ** 2 * cd_kcu * kcu.Ap
-                    # dj += L_kcu * dir_L + D_kcu * dir_D  # + D_turbine*dir_D
+                    # D_turbine = 0.5*rho*ca.norm_2(vaj)**2*ca.pi*0.2**2*1
+                    D_kcu = ca.norm_2(dp_kcu+dt_kcu)
+                    faj = dp_kcu+dt_kcu+0.5*drag_bridles+0.5*lift_bridles+0.5*drag_j+0.5*lift_j
                     
                 else:
-                    dir_D = -vaj / ca.norm_2(vaj)
-                    dir_L = ej - ca.dot(ej, dir_D) * dir_D
-                    cd_t = self.cd * ca.sin(theta) ** 3 + self.cf
-                    cl_t = self.cd * ca.sin(theta) ** 2 * ca.cos(theta)
-                    L_t = (
-                        0.5
-                        * rho
-                        * ca.norm_2(vaj) ** 2
-                        * l_unstrained
-                        * self.diameter
-                        * cl_t
-                    )
-                    D_t = (
-                        0.5
-                        * rho
-                        * ca.norm_2(vaj) ** 2
-                        * l_unstrained
-                        * self.diameter
-                        * cd_t
-                    )
-                    dj = L_t * dir_L + D_t * dir_D
+                    faj = lift_j  + drag_j 
 
-                    drag_tether += D_t
-
+                    drag_tether += ca.norm_2(drag_j)
+  
             if kcu is None:
                 if last_element:
                     point_mass = m_s / 2 + kite.mass
@@ -288,7 +259,7 @@ class Tether:
             fgj[2] = -point_mass * g
             if not last_element:
                 next_tension = (
-                    point_mass * aj + tensions[j, :].T - fgj - dj
+                    point_mass * aj + tensions[j, :].T - fgj - faj
                 )  # a_kite gave better fit
                 tensions[j + 1, :] = next_tension
 
@@ -312,7 +283,7 @@ class Tether:
                     + tensions[j + 1, :] / ca.norm_2(tensions[j + 1, :]) * l_s
                 )
             elif last_element:
-                next_tension = tensions[j, :].T - fgj - dj  # a_kite gave better fit
+                next_tension = tensions[j, :].T - fgj - faj  # a_kite gave better fit
                 if self.obsData.kite_acceleration:
                     next_tension += point_mass * aj
                 aerodynamic_force = next_tension
