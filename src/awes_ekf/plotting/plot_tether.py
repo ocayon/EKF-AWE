@@ -82,20 +82,20 @@ def plot_slack_tether_force(results, flight_data,kcu = None):
     # Get the current handles and labels
     handles, labels = ax1.get_legend_handles_labels()
 
-    from matplotlib.patches import Patch
-    # Create a new patch for the legend
-    reel_out_straight_patch = Patch(color=colors[5], alpha=0.2, label="Reel-out - Straight")
-    reel_out_turn_patch = Patch(color=colors[7], alpha=0.2, label="Reel-out - Turn")
-    reel_in_patch = Patch(facecolor='white', alpha=1, edgecolor='black', label="Reel-in")
+    # from matplotlib.patches import Patch
+    # # Create a new patch for the legend
+    # reel_out_straight_patch = Patch(color=colors[5], alpha=0.2, label="Reel-out - Straight")
+    # reel_out_turn_patch = Patch(color=colors[7], alpha=0.2, label="Reel-out - Turn")
+    # reel_in_patch = Patch(facecolor='white', alpha=1, edgecolor='black', label="Reel-in")
 
     # Select starting from the second element
-    ax1.legend(
-        [reel_out_straight_patch, reel_out_turn_patch, reel_in_patch],
-        ["Reel-out - Straight", "Reel-out - Turn", "Reel-in"],
-        loc='upper left',
-        frameon=True,
-        bbox_to_anchor=(0.075, 1)  # Adjust the x-coordinate to move the legend to the right
-    )
+    # ax1.legend(
+    #     [reel_out_straight_patch, reel_out_turn_patch, reel_in_patch],
+    #     ["Reel-out - Straight", "Reel-out - Turn", "Reel-in"],
+    #     loc='upper left',
+    #     frameon=True,
+    #     bbox_to_anchor=(0.075, 1)  # Adjust the x-coordinate to move the legend to the right
+    # )
 
     fig.tight_layout()  # Adjust layout to prevent overlap
 

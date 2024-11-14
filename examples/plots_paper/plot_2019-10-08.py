@@ -40,6 +40,18 @@ colors = get_color_list()
 
 fig, ax = plt.subplots(1, 1, figsize=(10, 5))
 plot_time_series(flight_data[mask], results[mask]["norm_epsilon_norm"], ax, plot_phase=True, color = colors[0])
+from matplotlib.patches import Patch
+# Create a new patch for the legend
+reel_out_straight_patch = Patch(color=colors[5], alpha=0.2, label="Reel-out - Straight")
+reel_out_turn_patch = Patch(color=colors[7], alpha=0.2, label="Reel-out - Turn")
+reel_in_patch = Patch(facecolor='white', alpha=1, edgecolor='black', label="Reel-in")
+ax.legend(
+        [reel_out_straight_patch, reel_out_turn_patch, reel_in_patch],
+        ["Reel-out - Straight", "Reel-out - Turn", "Reel-in"],
+        loc='upper left',
+        frameon=True,
+        bbox_to_anchor=(0.075, 1)  # Adjust the x-coordinate to move the legend to the right
+    )
 ax.set_xlabel("Time [s]")
 ax.set_ylabel("Norm of Normalized Residuals")
 plt.tight_layout()

@@ -99,7 +99,7 @@ ax.legend()
 ax.set_xlabel("Time [s]")
 ax.set_ylabel("Norm of Normalized Residuals")
 plt.tight_layout()
-plt.savefig("./results/plots_paper/norm_residuals_2023-11-27.pdf")
+
 from matplotlib.patches import Patch
 # Create a new patch for the legend
 reel_out_straight_patch = Patch(color=colors[5], alpha=0.2, label="Reel-out - Straight")
@@ -114,6 +114,7 @@ ax.legend(
     frameon=True,
     bbox_to_anchor=(0.075, 1)  # Adjust the x-coordinate to move the legend to the right
 )
+plt.savefig("./results/plots_paper/norm_residuals_2023-11-27.pdf")
 plt.show()
 
 results["kite_yaw_kin"] = np.unwrap(results["kite_yaw_kin"])
