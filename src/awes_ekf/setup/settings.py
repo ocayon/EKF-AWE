@@ -84,6 +84,7 @@ class ObservationData:
     bridle_angle_of_sideslip: bool = False
     kite_yaw_angle: bool = False
     kite_thrust_force: bool = False
+    raw_tether_force: bool = False
 
 
 class TuningParameters:

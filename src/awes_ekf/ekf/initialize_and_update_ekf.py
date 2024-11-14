@@ -1,8 +1,6 @@
 import numpy as np
-from awes_ekf.setup.tether import Tether
+from awes_ekf.utils import raw_force_to_tether_force
 from awes_ekf.ekf import ExtendedKalmanFilter, DynamicModel, ObservationModel
-from awes_ekf.setup.kite import Kite
-from awes_ekf.setup.kcu import KCU
 from awes_ekf.ekf.ekf_output import create_ekf_output
 from awes_ekf.postprocess.postprocessing import find_offset
 import time
@@ -147,7 +145,7 @@ def update_state_ekf_tether(ekf, tether, kite, kcu, ekf_input, simConfig):
 def propagate_state_EKF(ekf, ekf_input, simConfig, tether, kite, kcu):
     # Predict step
     ekf.x_k1_k = kite.propagate(ekf.x_k1_k1, ekf.u, ekf_input.timestep)
-
+    
     ## Update step
     ekf, ekf_ouput = update_state_ekf_tether(
         ekf, tether, kite, kcu, ekf_input, simConfig

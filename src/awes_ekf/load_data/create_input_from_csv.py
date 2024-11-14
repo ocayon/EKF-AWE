@@ -180,7 +180,12 @@ def create_input_from_csv(
                 init_wind_dir = np.deg2rad(360 - 90 - flight_data[column].iloc[1400])
                 break
 
-
+    try:
+        raw_tether_force = np.array(flight_data["sensor_tether_force"])
+    except KeyError:
+        if simConfig.obsData.raw_tether_force:
+            raise ValueError("No raw tether force data found, but required by the config file")
+        raw_tether_force = np.zeros(n_intervals)
 
     timestep = np.gradient(flight_data["time"].values)
 
@@ -211,6 +216,7 @@ def create_input_from_csv(
                 steering_input=steering_input[i],
                 kite_thrust_force=kite_thrust_force[i],
                 depower_input=depower_input[i],
+                raw_tether_force=raw_tether_force[i],
             )
         )
 

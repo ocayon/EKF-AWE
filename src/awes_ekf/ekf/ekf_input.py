@@ -12,6 +12,7 @@ class EKFInput:
     tether_force: float  # Ground tether force (N)
     tether_length: float  # Tether length (offsets are calculated automatically) (m)
     tether_reelout_speed: float  # Reelout speed (positive values reel out) (m/s)
+    raw_tether_force: float  # Raw tether force (N)
 
     # Optional attributes
     kite_apparent_windspeed: float = None  # Apparent windspeed (m/s)

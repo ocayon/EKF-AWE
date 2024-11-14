@@ -392,3 +392,10 @@ def find_time_delay(signal_1,signal_2):
     time_delay = (max_corr_index - (len(signal_1) - 1))
 
     return time_delay, cross_corr
+
+def raw_force_to_tether_force(raw_force, elevation, calibration_coeffs = [76.77, 290.25, 318.34]):
+    x1 = calibration_coeffs[0]
+    x2 = calibration_coeffs[1]
+    y = calibration_coeffs[2]
+    beta = 0.5*(elevation+np.pi*0.5)
+    return 0.5*(raw_force*x2)/(y*np.cos(beta)*np.sin(beta)+x1*np.cos(beta)**2)

@@ -3,8 +3,7 @@ import time as time
 import sys
 from datetime import datetime
 from pathlib import Path
-from dataclasses import dataclass
-import readline
+from awes_ekf.utils import raw_force_to_tether_force
 
 # Todo: this python path update is added because of the import from data.process_KP_data. We could move process_KP_data
 #  to the examples dir to avoid this.
@@ -174,6 +173,14 @@ class AnalyzeAweFromCsvLog:
             #     ekf_input.kite_velocity = np.array([np.nan, np.nan, np.nan])
             #     print("Acceleration is too high to 1get good GPS data")
             try:
+                if simConfig.obsData.raw_tether_force:
+                    if k>1000:
+                        elevation = ekf_input.tether_elevation_ground+ekf_ouput.tether_elevation_offset
+                    else:
+                        elevation = ekf_input.tether_elevation_ground
+                    ekf_input.tether_force = raw_force_to_tether_force(
+                        ekf_input.raw_tether_force, elevation
+                    )
                 ekf, ekf_ouput = propagate_state_EKF(
                     ekf, ekf_input, simConfig, tether, kite, kcu
                 )

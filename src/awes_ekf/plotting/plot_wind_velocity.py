@@ -97,6 +97,10 @@ def interpolate_lidar_data(flight_data, results):
         z_wind = []
         for height in lidar_heights:
             wind_speeds.append(flight_data[str(height)+"m_Wind_Speed_m_s"].iloc[index])
+            if str(height)+"m_Wind_Speed_max_m_s" not in flight_data.columns:
+                flight_data[str(height)+"m_Wind_Speed_max_m_s"] = flight_data[str(height)+"m_Wind_Speed_m_s"]
+                flight_data[str(height)+"m_Wind_Speed_min_m_s"] = flight_data[str(height)+"m_Wind_Speed_m_s"]
+               
             wind_speeds_max.append(flight_data[str(height)+"m_Wind_Speed_max_m_s"].iloc[index])
             wind_speeds_min.append(flight_data[str(height)+"m_Wind_Speed_min_m_s"].iloc[index])
             wind_directions.append(flight_data[str(height)+"m_Wind_Direction_deg"].iloc[index])
