@@ -64,21 +64,19 @@ def plot_slack_tether_force(results, flight_data,kcu = None):
     tether_force = flight_data['ground_tether_force']  # Replace with the appropriate tether force variable
 
 
-    fig, ax1 = plt.subplots(figsize=(12, 5))
+    fig, ax1 = plt.subplots(figsize=(9, 3))
 
     # Plotting Slack on the first axis
-    ax1.set_xlabel('Time [s]')
-    ax1.set_ylabel('Slack [m]', color=colors[0])
-    ax1 = plot_time_series(flight_data, slack, ax1, color=colors[0], ylabel='Sag [m]', plot_phase=True)
+    ax1 = plot_time_series(flight_data, slack, ax1, color=colors[0], ylabel='Sag (m)', plot_phase=True)
     ax1.tick_params(axis='y', labelcolor=colors[0])
 
     # Creating a second y-axis for Tether Force
     ax2 = ax1.twinx()
-    ax2.set_ylabel('Tether Force [N]', color=colors[1])
+    ax2.set_ylabel('Tether Force (N)', color=colors[1])
     ax2.plot(time, tether_force, color=colors[1], linestyle='--')
     ax2.tick_params(axis='y', labelcolor=colors[1])
     
-
+    ax1.set_xlabel('Time (s)')
     # Get the current handles and labels
     handles, labels = ax1.get_legend_handles_labels()
 
@@ -96,8 +94,19 @@ def plot_slack_tether_force(results, flight_data,kcu = None):
     #     frameon=True,
     #     bbox_to_anchor=(0.075, 1)  # Adjust the x-coordinate to move the legend to the right
     # )
-
+    from matplotlib.patches import Patch
+    # Create a new patch for the legend
+    reel_out_straight_patch = Patch(color=colors[5], alpha=0.2, label="Reel-out - Straight")
+    reel_out_turn_patch = Patch(color=colors[7], alpha=0.2, label="Reel-out - Turn")
+    reel_in_patch = Patch(color='white', alpha=1, label="Reel-in")
+    ax1.legend(
+        [reel_out_straight_patch, reel_out_turn_patch, reel_in_patch],
+        ["Reel-out - Straight", "Reel-out - Turn", "Reel-in"],
+        loc='upper left',
+        frameon=True,
+        bbox_to_anchor=(0.075, 1)  # Adjust the x-coordinate to move the legend to the right
+    )
     fig.tight_layout()  # Adjust layout to prevent overlap
 
     # Title and Grid
-    ax1.grid(True, linestyle='--', alpha=0.8)
+    ax2.grid(True, linestyle='--', alpha=0.8)

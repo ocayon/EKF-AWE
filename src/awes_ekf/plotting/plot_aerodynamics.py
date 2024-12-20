@@ -16,8 +16,8 @@ def plot_aerodynamics(results, flight_data, config_data):
     date = config_data["year"] + "-" + config_data["month"] + "-" + config_data["day"]
     plot_polars(results, flight_data, date=date, model=config_data["kite"]["model_name"])
 
-    if "kcu_actual_steering" in flight_data.columns:
-        plot_identify_turn_dynamics(results, flight_data, config_data)
+    # if "kcu_actual_steering" in flight_data.columns:
+    #     plot_identify_turn_dynamics(results, flight_data, config_data)
     plt.show()
 
 def plot_identify_turn_dynamics(results, flight_data, config_data):

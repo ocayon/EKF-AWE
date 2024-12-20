@@ -166,11 +166,9 @@ def plot_wind_speed(
 
     # Set labels and other properties
     axs[0].set_ylim([0, 20])
-    axs[0].set_ylabel("Wind speed (m/s)")
-    axs[0].set_xlabel("Time (s)")
-    axs[1].set_ylabel("Wind direction (deg)")
-    axs[1].set_xlabel("Time (s)")
-    axs[2].set_ylabel("Vertical Wind speed (m/s)")
+    axs[0].set_ylabel("Wind speed (m s$^{-1}$)")
+    axs[1].set_ylabel("Wind direction ($^\circ$)")
+    axs[2].set_ylabel("Vertical Wind speed (m s$^{-1}$)")
     axs[2].set_xlabel("Time (s)")
 
     sns.set(style="whitegrid")
@@ -754,7 +752,7 @@ def plot_time_series(
         y1, y2 = ax.get_ylim()
         try:
             # Mask and fill for "straight and powered" phase
-            mask = (abs(flight_data["us"]) < 0.4) & (
+            mask = (abs(flight_data["us"]) < 0.2) & (
                 flight_data["powered"] == "powered"
             )
             ax.fill_between(
@@ -768,7 +766,7 @@ def plot_time_series(
             )
 
             # Mask and fill for "turn and powered" phase
-            mask = (abs(flight_data["us"]) > 0.4) & (
+            mask = (abs(flight_data["us"]) > 0.2) & (
                 flight_data["powered"] == "powered"
             )
             ax.fill_between(
@@ -861,7 +859,7 @@ def plot_wind_profile(flight_data, results, savefig=False):
         plt.savefig("wind_profile.png", dpi=300)
 
 
-def plot_wind_profile_bins(flight_data, results, axs, step=20, savefig=False, color=None, label=None, lidar_data=False):
+def plot_wind_profile_bins(flight_data, results, axs, step=20, savefig=False, color=None, label=None, lidar_data=False, ylabel = None):
     # Extract data
     height = results["kite_position_z"]
     wvel = results["wind_speed_horizontal"]
@@ -897,16 +895,16 @@ def plot_wind_profile_bins(flight_data, results, axs, step=20, savefig=False, co
         wvel_means,
         bin_centers,
         xerr=wvel_stds,
-        fmt="o-",
+        fmt=".-",
         color=color,
         ecolor=hex_to_rgba(color, 0.5),
-        elinewidth=3,
+        elinewidth=1,
         capsize=0,
         label=label,
     )
 
-    axs[0].set_xlabel("Wind Speed ($\mathrm{m}/\mathrm{s}$)")
-    axs[0].set_ylabel("Height ($\mathrm{m}$)")
+    # axs[0].set_xlabel("Wind Speed ($\mathrm{m}/\mathrm{s}$)")
+    axs[0].set_ylabel(ylabel)
     axs[0].legend()
     axs[0].set_xlim([min(wvel_means) - 3, max(wvel_means) + 3])
 
@@ -915,10 +913,10 @@ def plot_wind_profile_bins(flight_data, results, axs, step=20, savefig=False, co
         wdir_means,
         bin_centers,
         xerr=wdir_stds,
-        fmt="o-",
+        fmt=".-",
         color=color,
         ecolor=hex_to_rgba(color, 0.5),
-        elinewidth=3,
+        elinewidth=1,
         capsize=0,
         label=label,
     )
@@ -983,8 +981,8 @@ def plot_wind_profile_bins(flight_data, results, axs, step=20, savefig=False, co
             capsize=0,
             label="Lidar",
         )
-    axs[1].set_xlabel("Wind Direction ($^\circ$)")
-    axs[1].set_ylabel("Height ($\mathrm{m}$)")
+    # axs[1].set_xlabel("Wind Direction ($^\circ$)")
+    axs[1].set_ylabel(ylabel)
     axs[1].legend()
     axs[1].set_xlim([min(wdir_means) - 15, max(wdir_means) + 15])
 
@@ -1166,7 +1164,7 @@ def plot_kite_reference_frame(results, flight_data, imus, frame_axis="xyz"):
     # plt.show()
 
 
-def plot_cl_curve(cl, cd, aoa, mask, axs, label=None, savefig=False, color=None):
+def plot_cl_curve(cl, cd, aoa, mask, axs, label=None, savefig=False, color=None, facecolor='none'):
     cl_wing = cl[mask]
     cd_wing = cd[mask]
     alpha = aoa[mask]
@@ -1195,23 +1193,23 @@ def plot_cl_curve(cl, cd, aoa, mask, axs, label=None, savefig=False, color=None)
     bin_centers = 0.5 * (bins[:-1] + bins[1:])
 
     # Plot cl_wing and shade the area for 95% confidence interval
-    axs[0].plot(bin_centers, cl_wing_means, "o-", markersize=8, linewidth=1.5, label=label, color=color)
+    axs[0].plot(bin_centers, cl_wing_means, "o-", markersize=8, linewidth=1.5, label=label, color=color, markerfacecolor=facecolor)
     axs[0].fill_between(
         bin_centers, cl_wing_means - cl_wing_cis, cl_wing_means + cl_wing_cis, alpha=0.2, color=color
     )
 
     axs[0].set_ylabel("$C_L$", fontsize=14)
-    axs[0].set_xlabel(r"$\alpha_{w,b}$ [$^\circ$]", fontsize=14)
+    axs[0].set_xlabel(r"$\alpha_{w,b}$ ($^\circ$)", fontsize=14)
     axs[0].grid(True)
 
     # Plot cd_wing and shade the area for 95% confidence interval
-    axs[1].plot(bin_centers, cd_wing_means, "o-", markersize=8, linewidth=1.5, label=label, color=color)
+    axs[1].plot(bin_centers, cd_wing_means, "o-", markersize=8, linewidth=1.5, label=label, color=color, markerfacecolor=facecolor)
     axs[1].fill_between(
         bin_centers, cd_wing_means - cd_wing_cis, cd_wing_means + cd_wing_cis, alpha=0.2, color=color
     )
 
     axs[1].set_ylabel("$C_{D}$", fontsize=14)
-    axs[1].set_xlabel(r"$\alpha_{w,b}$ [$^\circ$]", fontsize=14)
+    axs[1].set_xlabel(r"$\alpha_{w,b}$ ($^\circ$)", fontsize=14)
     axs[1].grid(True)
 
 
@@ -1241,7 +1239,7 @@ def plot_kinetic_energy_spectrum(results, flight_data, ax, savefig=False):
     # Log-log plot
     ax.loglog(pos_fft_freq, pos_energy_spectrum, label='Energy Spectrum', color = colors[1])
     ax.set_xlabel('Frequency (Hz)')
-    ax.set_ylabel('Power Spectral Density ($m^2/s^2$)')
+    ax.set_ylabel('Power Spectral Density (m$^2$ s$^{-2}$)')
 
     # Determine an appropriate subrange and calculate the slope
     # Adjust subrange_start and subrange_end based on your data
@@ -1264,6 +1262,8 @@ def plot_kinetic_energy_spectrum(results, flight_data, ax, savefig=False):
 def plot_turbulence_intensity(results,flight_data, height, ax, savefig=False):
     mask = (results['kite_position_z']>height-10)&(results['kite_position_z']<height+10)
     TI_160m = []
+    flight_data["time"] = flight_data["time"]-flight_data["time"].iloc[0]
+    time = []
     for i in range(len(results)):
         if i<600:
             std = np.std(results["wind_speed_horizontal"].iloc[0:i][mask])
@@ -1273,18 +1273,22 @@ def plot_turbulence_intensity(results,flight_data, height, ax, savefig=False):
             mean = np.mean(results["wind_speed_horizontal"].iloc[i-600:i][mask])
 
         TI_160m.append(std/mean)
+        
     #%%
-    TI_160m_lidar = flight_data[str(height)+'m_Wind_Speed_Dispersion_m_s'][mask]/flight_data[str(height)+'m_Wind_Speed_m_s'][mask]
-    ax.plot(TI_160m, color = colors[1])
-    ax.plot(TI_160m_lidar, color = colors[0])
+    TI_160m_lidar = flight_data[str(height)+'m_Wind_Speed_Dispersion_m_s']/flight_data[str(height)+'m_Wind_Speed_m_s']
+    ax.plot(flight_data["time"]/60,TI_160m, color = colors[1])
+    ax.plot(flight_data["time"]/60,TI_160m_lidar, color = colors[0])
     ax.legend(['EKF 0','Lidar'])
-    ax.set_xlabel('Time (s)')
+    ax.set_ylim([0, 0.3])
+    ax.set_xlim([0, flight_data["time"].iloc[-1]/60])
+    ax.set_xlabel('Time (min)')
     ax.set_ylabel('Turbulence intensity')
 
 def plot_turbulence_intensity_high_res(results,flight_data, height, ax, savefig=False):
     mask = (results['kite_position_z']>height-10)&(results['kite_position_z']<height+10)
     TI_160m = []
     TI_160m_lidar = []
+    flight_data["time"] = flight_data["time"]-flight_data["time"].iloc[0]
     for i in range(len(results)):
         if i<600:
             std = np.std(results["wind_speed_horizontal"].iloc[0:i][mask])
@@ -1300,10 +1304,12 @@ def plot_turbulence_intensity_high_res(results,flight_data, height, ax, savefig=
         TI_160m.append(std/mean)
         TI_160m_lidar.append(std_lidar/mean_lidar)
     #%%
-    ax.plot(TI_160m, color = colors[1])
-    ax.plot(TI_160m_lidar, color = colors[0])
+    ax.plot(flight_data["time"]/60,TI_160m, color = colors[1])
+    ax.plot(flight_data["time"]/60,TI_160m_lidar, color = colors[0])
     ax.legend(['EKF 0','Lidar'])
-    ax.set_xlabel('Time (s)')
+    ax.set_ylim([0, 0.3])
+    ax.set_xlim([0, flight_data["time"].iloc[-1]/60])
+    ax.set_xlabel('Time (min)')
     ax.set_ylabel('Turbulence intensity')
 
 
@@ -1356,8 +1362,8 @@ def plot_forces_dimensional(results,flight_data, kite,kcu):
     upper_error = np.array(max_values) - np.array(mean_values)
     errors = [lower_error, upper_error]
     # Plotting
-    plt.figure(figsize=(12, 5))
-    plt.errorbar(forces, mean_values,fmt='D', yerr=errors, capsize=5, elinewidth=2, markersize=8, color = colors[0])
+    plt.figure(figsize=(9, 3))
+    plt.errorbar(forces, mean_values,fmt='.', yerr=errors, capsize=5, elinewidth=2, markersize=8, color = colors[0])
     plt.xticks(rotation=45, ha='right')  # Rotate labels diagonally
     plt.ylabel('Magnitude (N)')
     plt.grid(axis='y', linestyle='--', alpha=0.5)

@@ -42,6 +42,7 @@ pu.plot_time_series(flight_data[mask], flight_data[mask]["kcu_actual_steering"],
 flight_data["kite_yaw_rate"] = yaw_rate
 from awes_ekf.utils import calculate_turn_rate_law
 yaw_rate, coeffs = calculate_turn_rate_law(results, flight_data, model = "simple", steering_offset=False)
+print("Coeffs: ", coeffs)
 yaw_rate_weight, coeffs_weight = calculate_turn_rate_law(results, flight_data, model = "simple_weight", steering_offset=True)
 
 
@@ -93,11 +94,11 @@ print("Mean error yaw rate weight: ", mean_error_weight)
 print("Std error yaw rate: ", np.std(error))
 print("Std error yaw rate weight: ", np.std(error_weight))
 
-fig, ax = plt.subplots(1, 1, figsize=(14, 6))
-pu.plot_time_series(flight_data[mask], results[mask]["norm_epsilon_norm"], ax, plot_phase=True, color = colors[0])
+fig, ax = plt.subplots(1, 1, figsize=(6, 4))
+pu.plot_time_series(flight_data[mask], results[mask]["nis"], ax, plot_phase=True, color = colors[0])
 ax.legend()
-ax.set_xlabel("Time [s]")
-ax.set_ylabel("Norm of Normalized Residuals")
+ax.set_xlabel("Time (s)")
+ax.set_ylabel("NIS")
 plt.tight_layout()
 
 from matplotlib.patches import Patch
@@ -124,7 +125,7 @@ plt.show()
 
 colors = get_color_list()
 # Plot position and velocity
-fig, axs = plt.subplots(2, 1, figsize=(6, 10))
+fig, axs = plt.subplots(2, 1, figsize=(5, 8))
 mean_wind_dir = np.mean(results[mask]["wind_direction"])
 azimuth, elevation = calculate_azimuth_elevation(res_min[mask_min]["kite_position_x"], res_min[mask_min]["kite_position_y"], res_min[mask_min]["kite_position_z"])
 axs[0].plot(np.rad2deg(azimuth%(2*np.pi)-mean_wind_dir), np.rad2deg(elevation), label="EKF 0", color = colors[0])
@@ -133,8 +134,10 @@ axs[0].plot(np.rad2deg(azimuth%(2*np.pi)-mean_wind_dir), np.rad2deg(elevation), 
 azimuth, elevation = calculate_azimuth_elevation(flight_data[mask]["kite_position_x"], flight_data[mask]["kite_position_y"], flight_data[mask]["kite_position_z"])
 axs[0].plot(np.rad2deg(azimuth%(2*np.pi)-mean_wind_dir), np.rad2deg(elevation), label="GPS", color = colors[2])
 axs[0].legend()
-axs[0].set_xlabel("Azimuth [deg]")
-axs[0].set_ylabel("Elevation [deg]")
+axs[0].set_xlabel(f"Azimuth ($^\circ$)")
+axs[0].set_ylabel(f"Elevation ($^\circ$)")
+axs[0].set_xlim([-60, 60])
+axs[0].set_ylim([20, 90])
 r = np.sqrt(res_min[mask_min]["kite_position_x"]**2 + res_min[mask_min]["kite_position_y"]**2+ res_min[mask_min]["kite_position_z"]**2)
 axs[1].plot(flight_data[mask]["time"], r, label="EKF 0 ", color = colors[0])
 r = np.sqrt(results[mask]["kite_position_x"]**2 + results[mask]["kite_position_y"]**2+ results[mask]["kite_position_z"]**2)
@@ -144,8 +147,9 @@ axs[1].plot(flight_data[mask]["time"], r, label="GPS+IMU", color = colors[2])
 axs[1].plot(flight_data[mask]["time"], flight_data[mask]["tether_length"]+15.55, label="Measured tether length", color = colors[3])
 # axs[1].plot(fd_min[mask_min]["time"], res_min[mask_min]["tether_length"]+15.55, label="Min. measurements", color = colors[4])
 axs[1].legend()
-axs[1].set_xlabel("Time [s]")
-axs[1].set_ylabel("Radial Distance/Tether Length [m]")
+axs[1].set_xlabel("Time (s)")
+axs[1].set_ylabel("Radial Distance/Tether Length (m)")
+axs[1].set_ylim([200, 360])
 plt.tight_layout()
 plt.savefig("./results/plots_paper/kite_trajectory_2023-11-27.pdf")
 plt.show()
@@ -156,11 +160,11 @@ res_va, fd_va = cut_data(res_va, fd_va, [cut, -cut])
 res_log, fd_log = cut_data(res_log, fd_log, [cut, -cut])
 res_min, fd_min = cut_data(res_min, fd_min, [cut, -cut])
 
-fig, ax = plt.subplots(1, 1, figsize=(10, 6))
+fig, ax = plt.subplots(1, 1, figsize=(12, 6))
 pu.plot_kinetic_energy_spectrum(res_va, fd_va, ax, savefig=False)
 plt.show()
 
-# fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+# fig, ax = plt.subplots(1, 1, figsize=(6, 4))
 # # pu.plot_turbulence_intensity(results, flight_data, 140, ax)
 # pu.plot_turbulence_intensity(res_min, fd_min, 140, ax)
 # plt.savefig("./results/plots_paper/turbulence_intensity_2023-11-27.pdf")
@@ -182,18 +186,26 @@ res_min_subsets = [res_min.iloc[i*chunk_size:(i+1)*chunk_size] for i in range(nu
 fd_min_subsets = [fd_min.iloc[i*chunk_size:(i+1)*chunk_size] for i in range(num_subsets)]
 
 # Create a figure with subplots for each subset
-fig, axs = plt.subplots(2, num_subsets, figsize=(16,6))  # Adjust the layout as needed
-
+fig, axs = plt.subplots(2, num_subsets, figsize=(10, 4), sharey=True, 
+                        )
+plt.subplots_adjust(left=0.05, right=0.95, wspace=0.2, hspace=0.4)
 # Flatten axs for easy iteration if using a 2D grid of subplots
+# Add x-labels in the center of each row
+fig.text(0.5, 0.5, 'Wind speed (m s$^{-1}$)', ha='center', va='center', fontsize=12)
+fig.text(0.5, 0.02, 'Wind direction ($^\circ$)', ha='center', va='center', fontsize=12)
 axs = axs.flatten()
 colors = get_color_list()
 # Loop through each subset and plot wind profiles
 for i in range(num_subsets):
     # Plot wind profile bins
+    if i == 0:
+        ylabel = "Height (m)"
+    else:
+        ylabel = None
     pu.plot_wind_profile_bins(fd_min_subsets[i], res_min_subsets[i], [axs[i], axs[i+num_subsets]], step=10, color=colors[1], label="EKF 0", lidar_data=False)
     pu.plot_wind_profile_bins(flight_data_subsets[i], results_subsets[i], [axs[i], axs[i+num_subsets]], step=10, color=colors[2], lidar_data=False, label="EKF 1")
     pu.plot_wind_profile_bins(fd_log_subsets[i], res_log_subsets[i], [axs[i], axs[i+num_subsets]], step=10, color=colors[4], label="EKF 2", lidar_data=False)
-    pu.plot_wind_profile_bins(fd_va_subsets[i], res_va_subsets[i], [axs[i], axs[i+num_subsets]], step=10, color=colors[3], label="EKF 3", lidar_data=True)
+    pu.plot_wind_profile_bins(fd_va_subsets[i], res_va_subsets[i], [axs[i], axs[i+num_subsets]], step=10, color=colors[3], label="EKF 3", lidar_data=True, ylabel=ylabel)
     
     
     
@@ -212,25 +224,26 @@ for i in range(num_subsets):
     # Print the subset and rounded time
     print(f"Subset {i+1}: {rounded_time}")
 
-axs[0].legend(loc="lower right", frameon=True)
+axs[0].legend(loc="lower right", bbox_to_anchor=(1, -0.4), frameon=True)
 
 # Adjust the layout and show the plot
-plt.tight_layout()
+# plt.tight_layout()
 # Save as a PDF file
 plt.savefig("./results/plots_paper/wind_profiles_2023-11-27.pdf")
 plt.show()
 
 t0 = 12600
 dt = 12000
+from awes_ekf.plotting.plot_wind_velocity import interpolate_lidar_data
 results, flight_data = cut_data(results, flight_data, [t0, t0+dt])
-flight_data = pu.interpolate_lidar_data(flight_data, results)
+flight_data = interpolate_lidar_data(flight_data, results)
 res_va, fd_va = cut_data(res_va, fd_va, [t0, t0+dt])
 res_log, fd_log = cut_data(res_log, fd_log, [t0, t0+dt])
 res_min, fd_min = cut_data(res_min, fd_min, [t0, t0+dt])
 
 
 
-fig, axs = plt.subplots(3, 1, figsize=(16, 6), sharex=True)
+fig, axs = plt.subplots(3, 1, figsize=(9,6), sharex=True)
 axs[0].plot(fd_min["time"], res_min["wind_speed_horizontal"], label="EKF 0", color = colors[1])
 axs[0].plot(flight_data["time"], results["wind_speed_horizontal"], label="EKF 1", color = colors[2])
 axs[0].plot(fd_log["time"], res_log["wind_speed_horizontal"], label="EKF 2", color = colors[4])
@@ -246,28 +259,28 @@ axs[0].fill_between(
 uf = flight_data["ground_wind_speed"]*kappa/np.log(10/z0)
 vel_ground = uf/kappa*np.log(results["kite_position_z"]/z0)
 axs[0].plot(flight_data["time"], vel_ground, label="Ground", color = colors[5])
-axs[0].set_ylabel("Wind speed [m/s]")
+axs[0].set_ylabel("Wind speed (m s$^{-1}$)")
 # axs[0].legend()
 
-axs[1].plot(fd_min["time"], res_min["wind_direction"]*180/np.pi, label="Min. measurements", color = colors[1])
-axs[1].plot(flight_data["time"], results["wind_direction"]*180/np.pi, label="Min. + $l_t$", color = colors[2])
-axs[1].plot(fd_log["time"], res_log["wind_direction"]*180/np.pi, label="Min. with Log profile", color = colors[4])
-axs[1].plot(fd_va["time"], res_va["wind_direction"]*180/np.pi, label="Min. + $v_a$", color = colors[3])
+axs[1].plot(fd_min["time"], res_min["wind_direction"]*180/np.pi, label="EKF 0", color = colors[1])
+axs[1].plot(flight_data["time"], results["wind_direction"]*180/np.pi, label="EKF 1", color = colors[2])
+axs[1].plot(fd_log["time"], res_log["wind_direction"]*180/np.pi, label="EKF 2", color = colors[4])
+axs[1].plot(fd_va["time"], res_va["wind_direction"]*180/np.pi, label="EKF 3", color = colors[3])
 axs[1].plot(flight_data["time"], 270-flight_data["interp_wind_direction"], label="Lidar", color = colors[0])
 
 axs[1].plot(flight_data["time"], flight_data["ground_wind_direction"], label="Ground", color = colors[5])
 axs[1].set_ylim([160, 280])
-axs[1].set_ylabel("Wind direction [deg]")
-
+axs[1].set_ylabel("Wind direction ($^\circ$)")
+axs[1].legend(frameon=True)
 
 axs[2].plot(fd_min["time"], res_min["wind_speed_vertical"], label="EKF 0", color = colors[1])
 axs[2].plot(flight_data["time"], results["wind_speed_vertical"], label="EKF 1", color = colors[2])
 axs[2].plot(fd_log["time"], res_log["wind_speed_vertical"], label="EKF 2", color = colors[4])
 axs[2].plot(fd_va["time"], res_va["wind_speed_vertical"], label="EKF 3", color = colors[3])
 axs[2].plot(flight_data["time"], flight_data["interp_z_wind"], label="Lidar",   color = colors[0])
-axs[2].set_ylabel("Vertical wind speed [m/s]")
-axs[2].set_xlabel("Time [s]")
-axs[2].legend(frameon=True)
+axs[2].set_ylabel("Vertical wind speed (m s$^{-1}$)")
+axs[2].set_xlabel("Time (s)")
+
 
 axs[0].set_xlim([flight_data["time"].iloc[0], flight_data["time"].iloc[-1]])
 time_of_day = pd.to_datetime(flight_data["time_of_day"]).dt.strftime("%H:%M")

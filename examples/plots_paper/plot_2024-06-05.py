@@ -52,25 +52,25 @@ flight_data_min, flight_data_tether, flight_data_vwz0, flight_data_log = dataset
 colors = get_color_list()
 
 ### Step 1: Initial Plots
-plt.figure()
-acc = np.sqrt(flight_data_min["kite_acceleration_x"]**2 + flight_data_min["kite_acceleration_y"]**2 + flight_data_min["kite_acceleration_z"]**2)
-plt.plot(flight_data_min["time"], flight_data_min["kite_acceleration_z"], label="Kite Acceleration Z")
-plt.plot(flight_data_min["time"], flight_data_min["kite_velocity_z"], label="Kite Velocity Z")
-plt.plot(flight_data_min["time"], flight_data_min["kite_position_z"], label="Kite Position Z")
-plt.xlabel("Time [s]")
-plt.legend()
-plt.show()
+# plt.figure()
+# acc = np.sqrt(flight_data_min["kite_acceleration_x"]**2 + flight_data_min["kite_acceleration_y"]**2 + flight_data_min["kite_acceleration_z"]**2)
+# plt.plot(flight_data_min["time"], flight_data_min["kite_acceleration_z"], label="Kite Acceleration Z")
+# plt.plot(flight_data_min["time"], flight_data_min["kite_velocity_z"], label="Kite Velocity Z")
+# plt.plot(flight_data_min["time"], flight_data_min["kite_position_z"], label="Kite Position Z")
+# plt.xlabel("Time [s]")
+# plt.legend()
+# plt.show()
 
-fig, ax = plt.subplots(1, 1, figsize=(10, 6))
-pu.plot_kinetic_energy_spectrum(results_min, flight_data_min, ax, savefig=False)
-plt.show()
+# fig, ax = plt.subplots(1, 1, figsize=(10, 6))
+# pu.plot_kinetic_energy_spectrum(results_min, flight_data_min, ax, savefig=False)
+# plt.show()
 
 ### Step 2: Turbulence Intensity Plot
-fig, ax = plt.subplots(1, 1, figsize=(7, 6))
-pu.plot_turbulence_intensity_high_res(results_min, flight_data_min, 120, ax, savefig=False)
-ax.set_ylim([0, 0.4])
-plt.savefig("./results/plots_paper/turbulence_intensity_2024-06-05.pdf")
-plt.show()
+# fig, ax = plt.subplots(1, 1, figsize=(6,4))
+# pu.plot_turbulence_intensity_high_res(results_min, flight_data_min, 120, ax, savefig=False)
+
+# plt.savefig("./results/plots_paper/turbulence_intensity_2024-06-05.pdf")
+# plt.show()
 
 ### Step 3: Chunking and Plotting Wind Profiles
 chunk_size = 3200  # Number of rows in each subset
@@ -92,16 +92,24 @@ subsets = {
 }
 
 # Create a figure with subplots for each subset
-fig, axs = plt.subplots(2, 6, figsize=(16, 6))  # Adjust the layout as needed
+# Create a figure with subplots for each subset
+fig, axs = plt.subplots(2, num_subsets, figsize=(10, 4), sharey=True, 
+                        )
+plt.subplots_adjust(left=0.05, right=0.95, wspace=0.2, hspace=0.4)
+fig.text(0.5, 0.49, 'Wind speed (m s$^{-1}$)', ha='center', va='center', fontsize=12)
+fig.text(0.5, 0.02, 'Wind direction ($^\circ$)', ha='center', va='center', fontsize=12)
 axs = axs.flatten()
-
 # Loop through each subset and plot wind profiles
 for i in range(num_subsets):
+    if i == 0:
+        ylabel = "Height (m)"
+    else:
+        ylabel = None
     # Plot wind profile bins for all datasets
     pu.plot_wind_profile_bins(subsets["flight_data_min"][i], subsets["results_min"][i], [axs[i], axs[i + 6]], step=10, color=colors[1], lidar_data=False, label="EKF 0")
     pu.plot_wind_profile_bins(subsets["flight_data_log"][i], subsets["results_log"][i], [axs[i], axs[i + 6]], step=10, color=colors[4], lidar_data=False, label="EKF 2")
     pu.plot_wind_profile_bins(subsets["flight_data_vwz0"][i], subsets["results_vwz0"][i], [axs[i], axs[i + 6]], step=10, color=colors[3], lidar_data=False, label="EKF 4")
-    pu.plot_wind_profile_bins(subsets["flight_data_tether"][i], subsets["results_tether"][i], [axs[i], axs[i + 6]], step=10, color=colors[2], lidar_data=True, label="EKF 5")
+    pu.plot_wind_profile_bins(subsets["flight_data_tether"][i], subsets["results_tether"][i], [axs[i], axs[i + 6]], step=10, color=colors[2], lidar_data=True, label="EKF 5", ylabel=ylabel)
     
     # Extract and round time to the nearest 5-minute interval
     original_time = subsets["flight_data_min"][i]["time_of_day"].iloc[0]
@@ -116,13 +124,13 @@ for i in range(num_subsets):
     print(f"Subset {i+1}: {rounded_time}")
 
 # Add legends and finalize layout
-axs[0].legend(loc="lower right", frameon=True)
-plt.tight_layout()
+axs[0].legend(loc="lower right", bbox_to_anchor=(1, -0.4), frameon=True)
+
 plt.savefig("./results/plots_paper/wind_profiles_2024-06-05.pdf")
 plt.show()
 
 ### Step 4: Plot Wind Speed Comparison
-fig, axs = plt.subplots(3, 1, figsize=(16, 6), sharex=True)
+fig, axs = plt.subplots(3, 1, figsize=(9,6), sharex=True)
 pu.plot_wind_speed(results_min, flight_data_min, axs, lidar_heights=[250,100,160], color=colors[1], label_ekf="EKF 0") 
 pu.plot_wind_speed(results_log, flight_data_log, axs, lidar_data=False, color=colors[4], label_ekf="EKF 2")
 pu.plot_wind_speed(results_vwz0, flight_data_vwz0, axs, lidar_data=False, color=colors[3], label_ekf="EKF 4")
@@ -141,7 +149,7 @@ if tick_indices[-1] != len(flight_data_min) - 1:
 
 axs[2].set_xticks(flight_data_min["time"].iloc[tick_indices])
 axs[2].set_xticklabels(time_of_day.iloc[tick_indices], rotation=45, ha="right")
-axs[2].set_xlabel("Time of day [hh:mm]")
+axs[2].set_xlabel("Time of day (hh:mm)")
 
 plt.tight_layout()
 plt.savefig("./results/plots_paper/wind_speed_2024-06-05.pdf")

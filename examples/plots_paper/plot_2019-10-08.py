@@ -4,7 +4,6 @@ import pandas as pd
 from awes_ekf.postprocess.postprocessing import remove_offsets_IMU_data_v3
 from awes_ekf.load_data.read_data import read_results
 from awes_ekf.plotting.plot_utils import plot_time_series, plot_kinetic_energy_spectrum, plot_forces_dimensional
-from awes_ekf.plotting.plot_kinematics import plot_kite_orientation
 from awes_ekf.plotting.plot_tether import plot_slack_tether_force
 from awes_ekf.plotting.plot_kinematics import calculate_azimuth_elevation
 from awes_ekf.plotting.color_palette import get_color_list, visualize_palette, set_plot_style, get_color
@@ -12,7 +11,114 @@ from awes_ekf.setup.settings import  SimulationConfig
 from awes_ekf.setup.kite import PointMassEKF
 from awes_ekf.utils import calculate_turn_rate_law, find_time_delay
 from awes_ekf.setup.kcu import KCU
+from scipy.stats import linregress
+def plot_kite_orientation(results, flight_data, config_data):
+    """
+    Plot the kite orientation from the results and the flight data.
+    The orientation is plotted as euler angles.
+    """
+    fig, axs = plt.subplots(3, 1, figsize=(5, 10), sharex=True)  # 3 rows, 1 column
+    colors = get_color_list()
 
+    for column in results.columns:
+        if "pitch" in column or "roll" in column:
+            results.loc[:, column] = np.unwrap((results[column]) % (2*np.pi))
+
+    for column in flight_data.columns:
+        if "pitch" in column or "roll" in column:
+            flight_data.loc[:, column] = np.unwrap((flight_data[column]) % (2*np.pi))
+    try:
+        kite_imus = config_data["kite"].get("sensor_ids", [])
+    except:
+        kite_imus = []
+    try:
+        kcu_imus = config_data["kcu"].get("sensor_ids", [])
+    except:
+        kcu_imus = []
+    # Plot roll
+    for imu in kite_imus:
+        plot_time_series(
+            flight_data,
+            np.degrees(flight_data["kite_roll_" + str(imu)])-360,
+            axs[0],
+            label="IMU Strut " + str(imu),
+            plot_phase=False,
+            color= colors[imu+1]
+        )
+    for imu in kcu_imus:
+        plot_time_series(
+            flight_data,
+            np.degrees(flight_data["kcu_roll_" + str(imu)])-360,
+            axs[0],
+            label="IMU KCU ",
+            plot_phase=False,
+            color= colors[imu+1]
+        )
+    plot_time_series(
+        flight_data, np.degrees(results["kite_roll"])-360, axs[0], label="EKF 1", plot_phase=False
+    )
+    axs[0].legend(loc = "lower center", frameon=True)
+    axs[0].set_ylabel('Roll Angle ($^\circ$)')
+
+    # Plot pitch
+    
+    for imu in kite_imus:
+        plot_time_series(
+            flight_data,
+            np.degrees(flight_data["kite_pitch_" + str(imu)]),
+            axs[1],
+            label="IMU Strut " + str(imu),
+            plot_phase=False,
+            color= colors[imu+1]
+        )
+    for imu in kcu_imus:
+        plot_time_series(
+            flight_data,
+            np.degrees(flight_data["kcu_pitch_" + str(imu)]),
+            axs[1],
+            label="IMU KCU",
+            plot_phase=False,
+            color= colors[imu+1]
+        )
+    plot_time_series(
+        flight_data, np.degrees(results["kite_pitch"]), axs[1], label="EKF 1", plot_phase=False
+    )
+    
+    axs[1].legend(loc = "lower center", frameon=True)
+    axs[1].set_ylabel('Pitch Angle ($^\circ$)')
+
+    # Plot yaw
+    
+    
+    for imu in kite_imus:
+        plot_time_series(
+            flight_data,
+            np.degrees(flight_data["kite_yaw_" + str(imu)]),
+            axs[2],
+            label="IMU Strut " + str(imu),
+            plot_phase=False,
+            color= colors[imu+1]
+        )
+    for imu in kcu_imus:
+        plot_time_series(
+            flight_data,
+            np.degrees(flight_data["kcu_yaw_" + str(imu)]),
+            axs[2],
+            label="IMU KCU",
+            plot_phase=False,
+            color= colors[imu+1]
+        )
+    plot_time_series(
+        flight_data, np.degrees(results["kite_yaw"]), axs[2], label=r"Aligned with $v_\mathrm{a}$", plot_phase=False
+    )
+    plot_time_series(flight_data, np.degrees(results["kite_yaw_kin"]), axs[2], label=r"Aligned with $v_\mathrm{k}$", plot_phase=False, color=colors[3])
+    axs[2].legend(loc = "lower center", frameon=True)
+    axs[2].set_ylabel('Yaw Angle ($^\circ$)')
+
+    # Common x-label for the bottom plot
+    axs[2].set_xlabel('Time (s)')
+
+    plt.tight_layout()  # Adjusts spacing between subplots to prevent overlap
 def cut_data(results, flight_data, range):
     results = results.iloc[range[0]:range[1]]
     flight_data = flight_data.iloc[range[0]:range[1]]
@@ -28,6 +134,11 @@ kite_model = "v3"
 
 results, flight_data,config_data = read_results(year, month, day, kite_model,addition='_lt')
 res_min, fd_min,config_data_min = read_results(year, month, day, kite_model,addition='_min')
+
+# upper_threshold = 0.08
+# lower_threshold = -0.06
+# mask_straight = (flight_data["us"] < upper_threshold) & (flight_data["us"] > lower_threshold) 
+# mask_turn = (flight_data["us"] > upper_threshold) | (flight_data["us"] < lower_threshold)
 
 print(config_data["simulation_parameters"]["measurements"])
 
@@ -52,14 +163,14 @@ ax.legend(
         frameon=True,
         bbox_to_anchor=(0.075, 1)  # Adjust the x-coordinate to move the legend to the right
     )
-ax.set_xlabel("Time [s]")
+ax.set_xlabel("Time (s)")
 ax.set_ylabel("Norm of Normalized Residuals")
 plt.tight_layout()
 plt.savefig("./results/plots_paper/norm_residuals_2019-10-08.pdf")
 plt.show()
 
 # Plot position and velocity
-fig, axs = plt.subplots(2, 1, figsize=(6, 10))
+fig, axs = plt.subplots(2, 1, figsize=(5, 8))
 mean_wind_dir = np.mean(results[mask]["wind_direction"])
 azimuth, elevation = calculate_azimuth_elevation(res_min[mask]["kite_position_x"], res_min[mask]["kite_position_y"], res_min[mask]["kite_position_z"])
 axs[0].plot(np.rad2deg(azimuth-mean_wind_dir), np.rad2deg(elevation), label="EKF 0", color = colors[0])
@@ -68,8 +179,10 @@ axs[0].plot(np.rad2deg(azimuth-mean_wind_dir), np.rad2deg(elevation), label="EKF
 azimuth, elevation = calculate_azimuth_elevation(flight_data[mask]["kite_position_x"], flight_data[mask]["kite_position_y"], flight_data[mask]["kite_position_z"])
 axs[0].plot(np.rad2deg(azimuth-mean_wind_dir), np.rad2deg(elevation), label="GPS", color = colors[2])
 axs[0].legend()
-axs[0].set_xlabel("Azimuth [deg]")
-axs[0].set_ylabel("Elevation [deg]")
+axs[0].set_xlabel(f"Azimuth ($^\circ$)")
+axs[0].set_ylabel(f"Elevation ($^\circ$)")
+axs[0].set_xlim([-60, 60])
+axs[0].set_ylim([20, 90])
 r = np.sqrt(res_min[mask]["kite_position_x"]**2 + res_min[mask]["kite_position_y"]**2+ res_min[mask]["kite_position_z"]**2)
 axs[1].plot(flight_data[mask]["time"], r, label="EKF 0 ", color = colors[0])
 r = np.sqrt(results[mask]["kite_position_x"]**2 + results[mask]["kite_position_y"]**2+ results[mask]["kite_position_z"]**2)
@@ -78,8 +191,9 @@ r = np.sqrt(flight_data[mask]["kite_position_x"]**2 + flight_data[mask]["kite_po
 axs[1].plot(flight_data[mask]["time"], r, label="GPS+IMU", color = colors[2])
 axs[1].plot(flight_data[mask]["time"], flight_data[mask]["tether_length"]+11.5, label="Measured tether length", color = colors[3])
 axs[1].legend()
-axs[1].set_xlabel("Time [s]")
-axs[1].set_ylabel("Radial Distance/Tether Length [m]")
+axs[1].set_xlabel("Time (s)")
+axs[1].set_ylabel("Radial Distance/Tether Length (m)")
+axs[1].set_ylim([200, 360])
 plt.tight_layout()
 plt.savefig("./results/plots_paper/kite_trajectory_2019-10-08.pdf")
 # plt.show()
@@ -96,6 +210,7 @@ plt.savefig("./results/plots_paper/awe_forces_2019-10-08.pdf")
 # plt.show()
 
 plot_slack_tether_force(results[mask], flight_data[mask], kcu)
+
 plt.tight_layout()
 plt.savefig("./results/plots_paper/slack_2019-10-08.pdf")
 # plt.show()
@@ -119,7 +234,7 @@ plt.figure()
 plot_time_series(flight_data[mask], results[mask]["kite_apparent_windspeed"], plt.gca(), label="Yaw kite", plot_phase=True)
 # plt.show()
 
-fig, ax = plt.subplots(1, 1, figsize=(12, 5))
+fig, ax = plt.subplots(1, 1, figsize=(9, 3))
 plot_time_series(
     flight_data[mask],
     np.rad2deg(results[mask]["kite_roll"] - results[mask]["tether_roll"]),
@@ -138,8 +253,8 @@ plot_time_series(
     color=colors[1],
 )
 ax.legend()
-ax.set_xlabel("Time [s]")
-ax.set_ylabel("Angle [deg]")
+ax.set_xlabel("Time (s)")
+ax.set_ylabel("Angle ($^\circ$)")
 plt.tight_layout()
 plt.savefig("./results/plots_paper/kite_tether_angles_2019-10-08.pdf")
 # plt.show()
@@ -156,18 +271,18 @@ aoa_imu = (results[mask]["wing_angle_of_attack_imu_0"]+results[mask]["wing_angle
 aoa_imu = np.convolve(aoa_imu, np.ones(10)/10, mode="same")
 azimuth = np.arctan2(results["kite_position_y"], results["kite_position_x"])
 # Plot aerodynamic coefficients
-fig, axs = plt.subplots(3, 1, figsize=(12, 8), sharex=True)
+fig, axs = plt.subplots(3, 1, figsize=(9, 6), sharex=True)
 plot_time_series(flight_data[mask], results[mask]["wing_lift_coefficient"], axs[0], ylabel="$C_L$", plot_phase=True, color=colors[0])
-axs[0].legend()
+# axs[0].legend()
 plot_time_series(flight_data[mask], results[mask]["wing_drag_coefficient"], axs[1],  label="$C_\mathrm{D}$", color=colors[0])
 plot_time_series(flight_data[mask], results[mask]["kcu_drag_coefficient"], axs[1],  label="$C_\mathrm{D,kcu}$", color=colors[1])
 plot_time_series(flight_data[mask], results[mask]["tether_drag_coefficient"], axs[1],  label="$C_\mathrm{D,t}$", plot_phase=True, color=colors[2], ylabel="$C_D$")
 axs[1].legend()
 plot_time_series(flight_data[mask], flight_data[mask]["bridle_angle_of_attack"], axs[2], color=colors[1])
 plot_time_series(flight_data[mask], aoa_imu, axs[2], color=colors[2])
-plot_time_series(flight_data[mask], results[mask]["wing_angle_of_attack_bridle"], axs[2],  ylabel=r"$\alpha$ [$^\circ$]", plot_phase=True, color=colors[0])
+plot_time_series(flight_data[mask], results[mask]["wing_angle_of_attack_bridle"], axs[2],  ylabel=r"$\alpha$ ($^\circ$)", plot_phase=True, color=colors[0])
 axs[2].legend([r"$\alpha_\mathrm{b}$ measured", r"$\alpha_\mathrm{w}$ from IMU", r"$\alpha_\mathrm{w}$ from bridle"], frameon=True)
-axs[2].set_xlabel("Time [s]")
+axs[2].set_xlabel("Time (s)")
 plt.tight_layout()
 plt.savefig("./results/plots_paper/aero_coefficients_2019-10-08.pdf")
 # plt.show()
@@ -177,14 +292,14 @@ mask_turn = (flight_data["turn_straight"]=="turn")&mask_polar
 mask_straight = (flight_data["turn_straight"]=="straight")&mask_polar
 # Plot curves 
 from awes_ekf.plotting.plot_utils import plot_cl_curve
-fig, axs = plt.subplots(1, 2, figsize=(14, 6), sharex=True)
+fig, axs = plt.subplots(1, 2, figsize=(9, 5), sharex=True)
 cl_roullier = np.loadtxt("./processed_data/previous_analysis/cl_roullier_mean.csv", delimiter=",")
 cd_roullier = np.loadtxt("./processed_data/previous_analysis/cd_roullier_mean.csv", delimiter=",")
 cl_rans = np.loadtxt("./processed_data/previous_analysis/RANS_CL_alpha_struts.csv", delimiter=",")
 cd_rans = np.loadtxt("./processed_data/previous_analysis/RANS_CD_alpha_struts.csv", delimiter=",")
 VSM_coeffs = pd.read_csv("./processed_data/previous_analysis/VSM_aero_coeffs_V3.csv")
 
-plot_cl_curve(np.sqrt((results["wing_lift_coefficient"]**2+results["wing_sideforce_coefficient"]**2)), results["wing_drag_coefficient"], results['wing_angle_of_attack_bridle'], mask_polar,axs, label = "Wing", color=colors[0])
+plot_cl_curve(np.sqrt((results["wing_lift_coefficient"]**2+results["wing_sideforce_coefficient"]**2)), results["wing_drag_coefficient"], results['wing_angle_of_attack_bridle'], mask_polar,axs, label = "Wing", color=colors[0], facecolor=colors[0])
 # plot_cl_curve(np.sqrt((results["wing_lift_coefficient"]**2+results["wing_sideforce_coefficient"]**2)), results["wing_drag_coefficient"], results['wing_angle_of_attack_bridle'], mask_turn,axs, label = "Wing Turn", color=colors[2])
 # plot_cl_curve(np.sqrt((results["wing_lift_coefficient"]**2+results["wing_sideforce_coefficient"]**2)), results["wing_drag_coefficient"], results['wing_angle_of_attack_bridle'], mask_straight,axs, label = "Wing Straight", color=colors[3])
 plot_cl_curve(np.sqrt((results["wing_lift_coefficient"]**2+results["wing_sideforce_coefficient"]**2)), results["wing_drag_coefficient"]+results["kcu_drag_coefficient"]+results["tether_drag_coefficient"], results['wing_angle_of_attack_bridle'], mask_polar,axs, label = "Wing+KCU+tether", color=colors[1])
@@ -204,7 +319,7 @@ axs[0].axvline(x = mean_aoa_pow, color = colors[6],linestyle = '--', label = 'Me
 axs[0].axvline(x = mean_aoa_dep, color = colors[7],linestyle = '--', label = 'Mean reel-in angle of attack')
 axs[1].axvline(x = mean_aoa_pow, color = colors[6],linestyle = '--', label = 'Mean reel-out angle of attack')
 axs[1].axvline(x = mean_aoa_dep, color = colors[7],linestyle = '--', label = 'Mean reel-in angle of attack')
-axs[0].legend(loc = "lower right")
+axs[0].legend(loc = "lower right", frameon=True)
 plt.tight_layout()
 plt.savefig("./results/plots_paper/polars_2019-10-08.pdf")
 # plt.show()
@@ -218,7 +333,7 @@ results, flight_data = cut_data(results, flight_data, [18000, len(results)-18000
 ts = config_data["simulation_parameters"]["timestep"]
 flight_data["kite_yaw_rate"] = flight_data["kite_yaw_rate_1"]
 flight_data["kcu_actual_steering"] = flight_data["kcu_actual_steering"]
-signal_delay, corr = find_time_delay(flight_data["kite_yaw_rate"], -flight_data["kcu_actual_steering"])
+signal_delay, corr = find_time_delay(flight_data["kite_yaw_rate"]/results["kite_apparent_windspeed"], -flight_data["kcu_actual_steering"])
 time_delay = signal_delay*ts
 print("Time delay turn rate: ", time_delay)
 signal_delay, corr = find_time_delay(results["wing_sideforce_coefficient"], -flight_data["kcu_actual_steering"])
@@ -334,7 +449,7 @@ print("Std error yaw rate weight: ", np.std(error_weight))
 
 fit_sideforce = slope*flight_data[mask]["kcu_actual_steering_delay"] / 100+intercept
 # Plot sideforce
-fig, axs = plt.subplots(3, 1, figsize=(12, 8), sharex=True)
+fig, axs = plt.subplots(3, 1, figsize=(9, 6), sharex=True)
 plot_time_series(flight_data[mask], results[mask]["wing_sideforce_coefficient"], axs[0], ylabel="$C_{S}$", plot_phase=False, color=colors[0], label = "EKF 0")
 slope, intercept, r_value, p_value, std_err = linregress(flight_data["kcu_actual_steering"] / 100, results["wing_sideforce_coefficient"])
 axs[0].plot(flight_data[mask]["time"], slope*flight_data[mask]["kcu_actual_steering"] / 100+intercept, label="Linear Fit", color=colors[1], linestyle="--")
@@ -346,12 +461,12 @@ axs[1].plot(flight_data[mask]["time"], np.degrees(flight_data["kite_yaw_rate"][m
 axs[1].plot(flight_data[mask]["time"], np.degrees(yaw_rate[mask]), label='Identified Yaw Rate', color=colors[1], linestyle='--')
 axs[1].plot(flight_data[mask]["time"], np.degrees(yaw_rate_weight[mask]), label='Offset-Corrected Yaw Rate', color=colors[2], linestyle='-.')
 axs[1].legend(frameon = True)
-axs[1].set_ylabel("Yaw Rate [deg/s]")
+axs[1].set_ylabel("$\dot{\psi}$ ($^\circ$ s$^{-1}$)")
 # Third subplot: Steering Input
 plot_time_series(flight_data[mask], -flight_data[mask]["kcu_actual_steering"]/100, axs[2], ylabel="$u_s$", plot_phase=False, color=colors[0], label="Actual steering")
 plot_time_series(flight_data[mask], -flight_data[mask]["kcu_set_steering"]/100, axs[2], ylabel="$u_s$", plot_phase=False, color=colors[1], label="Set steering")
 axs[2].legend(frameon = True)
-axs[2].set_xlabel("Time [s]")
+axs[2].set_xlabel("Time (s)")
 axs[2].set_ylim([-0.4,0.4])
 plt.tight_layout()
 plt.savefig("./results/plots_paper/turn_timeseries_2019-10-08.pdf")

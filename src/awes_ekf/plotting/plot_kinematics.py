@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from awes_ekf.plotting.color_palette import set_plot_style_no_latex
+from awes_ekf.plotting.color_palette import set_plot_style_no_latex, get_color_list
 from awes_ekf.plotting.plot_utils import plot_time_series
 
 def calculate_azimuth_elevation(x, y, z):
@@ -65,8 +65,8 @@ def plot_kite_orientation(results, flight_data, config_data):
     Plot the kite orientation from the results and the flight data.
     The orientation is plotted as euler angles.
     """
-    fig, axs = plt.subplots(3, 1, figsize=(6, 10), sharex=True)  # 3 rows, 1 column
-
+    fig, axs = plt.subplots(3, 1, figsize=(5, 10), sharex=True)  # 3 rows, 1 column
+    colors = get_color_list()
     for column in results.columns:
         if "pitch" in column or "roll" in column or "yaw" in column:
             results.loc[:, column] = np.unwrap((results[column]) % (2*np.pi))
@@ -74,7 +74,13 @@ def plot_kite_orientation(results, flight_data, config_data):
     for column in flight_data.columns:
         if "pitch" in column or "roll" in column or "yaw" in column:
             flight_data.loc[:, column] = np.unwrap((flight_data[column]) % (2*np.pi))
+    # for column in results.columns:
+    #     if "pitch" in column or "roll" in column:
+    #         results.loc[:, column] = np.unwrap((results[column]) % (2*np.pi))
 
+    # for column in flight_data.columns:
+    #     if "pitch" in column or "roll" in column:
+    #         flight_data.loc[:, column] = np.unwrap((flight_data[column]) % (2*np.pi))
     try:
         kite_imus = config_data["kite"].get("sensor_ids", [])
     except:
@@ -89,22 +95,24 @@ def plot_kite_orientation(results, flight_data, config_data):
             flight_data,
             np.degrees(flight_data["kite_roll_" + str(imu)]),
             axs[0],
-            label="IMU Srut " + str(imu),
-            plot_phase=False
+            label="IMU Strut " + str(imu),
+            plot_phase=False,
+            color= colors[imu+1]
         )
     for imu in kcu_imus:
         plot_time_series(
             flight_data,
-            np.degrees(flight_data["kcu_roll_" + str(imu)]),
+            np.degrees(flight_data["kcu_roll_" + str(imu)])-360,
             axs[0],
             label="IMU KCU ",
-            plot_phase=False
+            plot_phase=False,
+            color= colors[imu+1]
         )
     plot_time_series(
-        flight_data, np.degrees(results["kite_roll"]), axs[0], label="EKF 1", plot_phase=False
+        flight_data, np.degrees(results["kite_roll"])-360, axs[0], label="EKF 1", plot_phase=False
     )
     axs[0].legend(loc = "lower center", frameon=True)
-    axs[0].set_ylabel('Roll Angle [$^\circ$]')
+    axs[0].set_ylabel('Roll Angle ($^\circ$)')
 
     # Plot pitch
     
@@ -113,23 +121,25 @@ def plot_kite_orientation(results, flight_data, config_data):
             flight_data,
             np.degrees(flight_data["kite_pitch_" + str(imu)]),
             axs[1],
-            label="IMU Srut " + str(imu),
-            plot_phase=False
+            label="IMU Strut " + str(imu),
+            plot_phase=False,
+            color= colors[imu+1]
         )
     for imu in kcu_imus:
         plot_time_series(
             flight_data,
             np.degrees(flight_data["kcu_pitch_" + str(imu)]),
             axs[1],
-            label="KCU " + str(imu),
-            plot_phase=False
+            label="IMU KCU",
+            plot_phase=False,
+            color= colors[imu+1]
         )
     plot_time_series(
         flight_data, np.degrees(results["kite_pitch"]), axs[1], label="EKF 1", plot_phase=False
     )
     
     axs[1].legend(loc = "lower center", frameon=True)
-    axs[1].set_ylabel('Pitch Angle [$^\circ$]')
+    axs[1].set_ylabel('Pitch Angle ($^\circ$)')
 
     # Plot yaw
     
@@ -139,25 +149,27 @@ def plot_kite_orientation(results, flight_data, config_data):
             flight_data,
             np.degrees(flight_data["kite_yaw_" + str(imu)]),
             axs[2],
-            label="IMU Srut " + str(imu),
-            plot_phase=False
+            label="IMU Strut " + str(imu),
+            plot_phase=False,
+            color= colors[imu+1]
         )
     for imu in kcu_imus:
         plot_time_series(
             flight_data,
             np.degrees(flight_data["kcu_yaw_" + str(imu)]),
             axs[2],
-            label="KCU " + str(imu),
-            plot_phase=False
+            label="IMU KCU",
+            plot_phase=False,
+            color= colors[imu+1]
         )
     plot_time_series(
         flight_data, np.degrees(results["kite_yaw"]), axs[2], label=r"Aligned with $v_\mathrm{a}$", plot_phase=False
     )
-    plot_time_series(flight_data, np.degrees(results["kite_yaw_kin"]), axs[2], label=r"Aligned with $v_\mathrm{k}$", plot_phase=False)
+    plot_time_series(flight_data, np.degrees(results["kite_yaw_kin"]), axs[2], label=r"Aligned with $v_\mathrm{k}$", plot_phase=False, color=colors[3])
     axs[2].legend(loc = "lower center", frameon=True)
-    axs[2].set_ylabel('Yaw Angle [$^\circ$]')
+    axs[2].set_ylabel('Yaw Angle ($^\circ$)')
 
     # Common x-label for the bottom plot
-    axs[2].set_xlabel('Time')
+    axs[2].set_xlabel('Time (s)')
 
     plt.tight_layout()  # Adjusts spacing between subplots to prevent overlap

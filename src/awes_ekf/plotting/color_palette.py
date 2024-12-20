@@ -1,5 +1,4 @@
 # color_palette.py
-
 import matplotlib.pyplot as plt
 
 PALETTE = {

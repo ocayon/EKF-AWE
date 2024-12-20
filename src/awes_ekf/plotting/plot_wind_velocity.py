@@ -77,7 +77,7 @@ def interpolate_lidar_data(flight_data, results):
     lidar_heights = []
 
     for column in flight_data.columns:
-        if "Wind_Speed_m_s" in column:
+        if "m_Wind_Speed_m_s" in column:
             height = "".join(filter(str.isdigit, column))
             lidar_heights.append(int(height))
     # Sort the lidar heights
