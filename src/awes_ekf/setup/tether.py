@@ -216,12 +216,6 @@ class Tether:
                 if last_element:
                     faj = 0.5*drag_bridles +0.5*lift_bridles
 
-                elif self.n_elements == 1:
-                    faj = 0.5 * drag_j + 0.5 * lift_j
-                    dp_kcu= .5*rho*ca.norm_2(vajp)*vajp*kcu.cdp*kcu.Ap  # Adding kcu drag perpendicular to kcu
-                    dt_kcu= .5*rho*ca.norm_2(vajn)*vajn*kcu.cdt*kcu.At  # Adding kcu drag parallel to kcu
-                    faj += dp_kcu + dt_kcu + 0.5*drag_bridles + 0.5*lift_bridles+0.5*drag_j+0.5*lift_j
-
                 elif kcu_element:
                     drag_bridles = 0.5*rho*kcu.total_length_bridle_lines*kcu.diameter_bridle_lines*vaj_sq*cd_t # Bridle lines drag
                     drag_bridles = drag_bridles * dir_D
