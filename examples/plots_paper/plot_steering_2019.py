@@ -10,7 +10,7 @@ from awes_ekf.plotting.plot_kinematics import calculate_azimuth_elevation
 from awes_ekf.plotting.color_palette import get_color_list, visualize_palette, set_plot_style, get_color
 from awes_ekf.setup.settings import  SimulationConfig
 from awes_ekf.setup.kite import PointMassEKF
-from awes_ekf.utils import calculate_turn_rate_law, find_time_delay
+from awes_ekf.utils import calculate_turn_rate_law, calculate_steering_law
 from awes_ekf.setup.kcu import KCU
 from scipy.stats import linregress
 
@@ -103,7 +103,8 @@ y_line_right = slope_right * x_line_right + intercept_right
 x_line_left = np.linspace(x_full[mask_left].min(), x_full[mask_left].max(), 100)
 y_line_left = slope_left * x_line_left + intercept_left
 
-
+est_cs, coeff_cs = calculate_steering_law(downsampled_results, downsampled_data)
+print("Coefficients: ", coeff_cs)
 # Plot data points and regression lines
 plt.figure(figsize=(5,4))
 
@@ -112,7 +113,7 @@ plt.scatter(-downsampled_data["kcu_actual_steering"] / 100, downsampled_results[
 plt.scatter(x_full[mask_straight], y_full[mask_straight], alpha=0.4, label="Straight (Corrected)", color=colors[1], marker='.')
 plt.scatter(x_full[mask_left], y_full[mask_left], alpha=0.4, label="Left Turn (Corrected)", color=colors[2], marker='.')
 plt.scatter(x_full[mask_right], y_full[mask_right], alpha=0.4, label="Right Turn (Corrected)", color=colors[3], marker='.')
-
+plt.scatter(-downsampled_data["kcu_actual_steering_delay"] / 100, est_cs, alpha=0.2, label="Delay Corrected", color='black', marker='.')
 
 
 # Plot regression lines for each region
@@ -132,6 +133,7 @@ plt.savefig("./results/plots_paper/sideforce_three_regions.pdf")
 yaw_rate, coeffs = calculate_turn_rate_law(results, flight_data, model = "simple", steering_offset=False)
 yaw_rate_weight, coeffs_weight = calculate_turn_rate_law(results, flight_data, model = "simple", steering_offset=True)
 
+print("Coefficients: ", coeffs)
 # Calculate mean errors
 error = abs(np.degrees(yaw_rate) - np.degrees(flight_data["kite_yaw_rate"]))
 error_weight = abs(np.degrees(yaw_rate_weight) - np.degrees(flight_data["kite_yaw_rate"]))
@@ -288,6 +290,22 @@ axs[0].plot(
     label="Linear Fit (Steering)", 
     color=colors[2], 
     linestyle=":"
+)
+
+c0 = np.ones_like(flight_data.loc[mask, "kcu_actual_steering_delay"])
+c1 = flight_data.loc[mask, "kcu_actual_steering_delay"]/100
+c2 = (flight_data.loc[mask, "kcu_actual_steering_delay"]/100)**2*np.sign(flight_data.loc[mask, "kcu_actual_steering_delay"])
+c3 = flight_data.loc[mask,"kite_yaw_rate"]/flight_data.loc[mask,"kite_apparent_windspeed"]*np.sign(flight_data.loc[mask, "kcu_actual_steering_delay"])
+
+A = np.vstack([c0, c1, c2, c3]).T
+est_cs = A@coeff_cs
+print("Coefficients: ", coeff_cs) 
+axs[0].plot(
+    flight_data.loc[mask, "time"], 
+    est_cs, 
+    label="Delay Corrected", 
+    color=colors[3], 
+    linestyle="-"
 )
 
 # Finalize the plot

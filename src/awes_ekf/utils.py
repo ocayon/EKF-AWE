@@ -338,6 +338,23 @@ def calculate_weighted_least_squares(y, A, W=None):
         x_hat = np.linalg.inv(A.T @ W @ A) @ A.T @ W @ y
     return x_hat
 
+def calculate_steering_law(results, flight_data):
+    us = flight_data["kcu_actual_steering_delay"]/100
+    va = results["kite_apparent_windspeed"]
+    yaw_rate = flight_data["kite_yaw_rate"]
+    sideforce_coeff = results["wing_sideforce_coefficient"]
+    c0 = np.ones(len(us))
+    c1 = us
+    c2 = us**2*np.sign(us)
+    c3 = yaw_rate/va*np.sign(us)
+
+    A = np.vstack([c0,c1,c2,c3]).T
+    W = np.eye(len(us))
+
+    coeffs = calculate_weighted_least_squares(sideforce_coeff, A, W)
+    sideforce_coeff = A@coeffs
+    return sideforce_coeff, coeffs
+
 def calculate_turn_rate_law(results, flight_data, model = 'simple', steering_offset = False, mass=15, area=19.75, span=10, coeffs = None):
     from scipy.sparse import eye
 
