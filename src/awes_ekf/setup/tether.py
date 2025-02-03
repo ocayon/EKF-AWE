@@ -102,10 +102,10 @@ class Tether:
             at = (
                 ca.dot(a_kite, v_kite / ca.norm_2(v_kite)) * v_kite / ca.norm_2(v_kite)
             )  # Tangential acceleration
-            omega_kite = ca.cross(a_kite-at, v_kite) / (
+            omega_kite = -ca.cross(a_kite-at, v_kite) / (
                 ca.norm_2(v_kite) ** 2
             )  # Angular velocity of the kite
-            ICR = ca.cross(v_kite, omega_kite) / (
+            ICR = -ca.cross(v_kite, omega_kite) / (
                 ca.norm_2(omega_kite) ** 2
             )  # Instantaneous center of rotation
             alpha = (
@@ -372,6 +372,7 @@ class Tether:
                 "tether_length", args, [stretched_tether_length]
             ),
             "positions": ca.Function("positions", args, [positions]),
+            
         }
 
         return res
