@@ -18,6 +18,26 @@ def plot_aerodynamics(results, flight_data, config_data):
 
     # if "kcu_actual_steering" in flight_data.columns:
     #     plot_identify_turn_dynamics(results, flight_data, config_data)
+
+    CL_mean_powered = results["wing_lift_coefficient"][flight_data["powered"] == "powered"].mean()
+    CD_mean_powered = results["wing_drag_coefficient"][flight_data["powered"] == "powered"].mean()  
+    print(f"Mean CL powered: {CL_mean_powered:.2f}")
+    print(f"Mean CD powered: {CD_mean_powered:.2f}")
+    print(f"Mean CL/CD powered: {CL_mean_powered/CD_mean_powered:.2f}")
+
+    std_CL_powered = results["wing_lift_coefficient"][flight_data["powered"] == "powered"].std()
+    std_CD_powered = results["wing_drag_coefficient"][flight_data["powered"] == "powered"].std()
+    print(f"Std CL powered: {std_CL_powered:.2f}")
+    print(f"Std CD powered: {std_CD_powered:.2f}")
+
+
+    CL_mean_depowered = results["wing_lift_coefficient"][flight_data["powered"] == "depowered"].mean()
+    CD_mean_depowered = results["wing_drag_coefficient"][flight_data["powered"] == "depowered"].mean()
+    print(f"Mean CL depowered: {CL_mean_depowered:.2f}")
+    print(f"Mean CD depowered: {CD_mean_depowered:.2f}")
+    print(f"Mean CL/CD depowered: {CL_mean_depowered/CD_mean_depowered:.2f}")
+
+
     plt.show()
 
 def plot_identify_turn_dynamics(results, flight_data, config_data):

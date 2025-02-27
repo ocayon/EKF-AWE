@@ -117,6 +117,19 @@ def plot_kite_orientation(results, flight_data, config_data):
 
     # Common x-label for the bottom plot
     axs[2].set_xlabel('Time (s)')
+    error_pitch = abs(np.degrees(results["kite_pitch"])-np.degrees(flight_data["kite_pitch_0"]))
+    error_pitch = error_pitch[flight_data["powered"]=="powered"]
+    error_roll = abs(np.degrees(results["kite_roll"])-np.degrees(flight_data["kite_roll_0"]))
+    error_yaw = abs(np.degrees(np.unwrap(results["kite_yaw"]))-np.degrees(np.unwrap(flight_data["kite_yaw_0"])))
+    error_yaw_kin = abs(np.degrees(np.unwrap(results["kite_yaw_kin"]))-np.degrees(np.unwrap(flight_data["kite_yaw_0"])))
+    mean_error_pitch = np.mean(error_pitch)
+    mean_error_roll = np.mean(error_roll)
+    mean_error_yaw = np.mean(error_yaw)
+    mean_error_yaw_kin = np.mean(error_yaw_kin)
+    print("Mean error pitch: ", mean_error_pitch)
+    print("Mean error roll: ", mean_error_roll)
+    print("Mean error yaw: ", mean_error_yaw)
+    print("Mean error yaw kin: ", mean_error_yaw_kin)
 
     plt.tight_layout()  # Adjusts spacing between subplots to prevent overlap
 def cut_data(results, flight_data, range):
@@ -132,8 +145,29 @@ month = "10"
 day = "08"
 kite_model = "v3"
 
-results, flight_data,config_data = read_results(year, month, day, kite_model,addition='_lt')
+results, flight_data,config_data = read_results(year, month, day, kite_model,addition='_va')
 res_min, fd_min,config_data_min = read_results(year, month, day, kite_model,addition='_min')
+
+# In min use only indices in the range of the results
+res_min = res_min.iloc[0:len(results)]
+fd_min = fd_min.iloc[0:len(results)]
+
+plt.figure()
+mask = (flight_data["powered"] == "powered")&(flight_data["cycle"].isin([64, 65]))
+kite_speed = np.sqrt(results["kite_velocity_x"]**2 + results["kite_velocity_y"]**2 + results["kite_velocity_z"]**2)
+apparent_speed = results["kite_apparent_windspeed"]
+plot_time_series(flight_data[mask], kite_speed[mask], plt.gca(), plot_phase=True, label='Kite speed')
+plt.plot(flight_data["time"][mask], flight_data["tether_reelout_speed"][mask], label='Reel-out speed')
+# plt.plot(flight_data["time"][mask], kite_speed[mask], label='Kite speed')
+plt.plot(flight_data["time"][mask], apparent_speed[mask], label='Apparent wind speed')
+
+np.mean(kite_speed[mask])
+np.mean(apparent_speed[mask])
+print("Mean kite speed: ", np.mean(kite_speed[mask]))
+print("Mean apparent wind speed: ", np.mean(apparent_speed[mask]))
+plt.legend()
+plt.show()
+
 
 # upper_threshold = 0.08
 # lower_threshold = -0.06
@@ -146,6 +180,7 @@ for imu in config_data["kite"]["sensor_ids"]:
     flight_data = remove_offsets_IMU_data_v3(results, flight_data, sensor=imu)
 
 mask = flight_data["cycle"].isin([64, 65])
+# mask_min = fd_min["cycle"].isin([64, 65])
 
 colors = get_color_list()
 
@@ -224,6 +259,8 @@ results["kite_yaw_kin"] = results["kite_yaw_kin"]%(2*np.pi)
 plot_kite_orientation(results[mask], flight_data[mask], config_data)
 plt.tight_layout()
 plt.savefig("./results/plots_paper/kite_orientation_2019-10-08.pdf")
+
+
 # plt.show()
 signal_delay, corr = find_time_delay(flight_data["kite_yaw_0"], results["kite_yaw_kin"])
 time_delay = signal_delay*0.1
@@ -330,7 +367,7 @@ results, flight_data = cut_data(results, flight_data, [18000, len(results)-18000
 
 
 # Turn rate law
-ts = config_data["simulation_parameters"]["timestep"]
+ts = flight_data["time"][1]-flight_data["time"][0]
 flight_data["kite_yaw_rate"] = flight_data["kite_yaw_rate_1"]
 flight_data["kcu_actual_steering"] = flight_data["kcu_actual_steering"]
 signal_delay, corr = find_time_delay(flight_data["kite_yaw_rate"]/results["kite_apparent_windspeed"], -flight_data["kcu_actual_steering"])

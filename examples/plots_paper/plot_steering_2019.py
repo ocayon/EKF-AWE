@@ -27,8 +27,8 @@ month = "10"
 day = "08"
 kite_model = "v3"
 
-results, flight_data,config_data = read_results(year, month, day, kite_model,addition='_lt')
-res_min, fd_min,config_data_min = read_results(year, month, day, kite_model,addition='_min')
+results, flight_data,config_data = read_results(year, month, day, kite_model,addition='_min')
+res_min, fd_min,config_data_min = read_results(year, month, day, kite_model,addition='_lt')
 
 print(config_data["simulation_parameters"]["measurements"])
 
@@ -104,7 +104,7 @@ x_line_left = np.linspace(x_full[mask_left].min(), x_full[mask_left].max(), 100)
 y_line_left = slope_left * x_line_left + intercept_left
 
 est_cs, coeff_cs = calculate_steering_law(downsampled_results, downsampled_data)
-print("Coefficients: ", coeff_cs)
+print("Coefficients steering: ", coeff_cs)
 # Plot data points and regression lines
 plt.figure(figsize=(5,4))
 

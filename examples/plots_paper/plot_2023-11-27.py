@@ -27,6 +27,33 @@ res_va, fd_va, _ = read_results(year, month, day, kite_model,addition='_va')
 res_log, fd_log, _ = read_results(year, month, day, kite_model,addition='_log')
 res_min, fd_min, config = read_results(year, month, day, kite_model,addition='_min')
 
+
+sideslip = flight_data["bridle_sideslip_angle"]
+
+
+
+mask_ss = (np.abs(sideslip)<20)&(flight_data["tether_reelout_speed"]>0.1)
+sideslip = sideslip[mask_ss]
+mean_sideslip = np.mean(sideslip)
+sideslip = sideslip - mean_sideslip
+mean_sideslip = np.mean(sideslip)
+std_sideslip = np.std(sideslip)
+print("Mean sideslip: ", mean_sideslip)
+print("Std sideslip: ", std_sideslip)
+
+mask =( flight_data["turn_straight"] == "turn")&(flight_data["kite_azimuth"]>0)
+mean_right_turn = np.mean(sideslip[mask])
+print("Mean right turn: ", mean_right_turn)
+mask =( flight_data["turn_straight"] == "turn")&(flight_data["kite_azimuth"]<0)
+mean_left_turn = np.mean(sideslip[mask])
+print("Mean left turn: ", mean_left_turn)
+
+
+
+raise ValueError
+
+
+
 #%% Plot orientation
 from awes_ekf.postprocess.postprocessing import remove_offsets_IMU_data
 from awes_ekf.plotting.plot_kinematics import plot_kite_orientation
