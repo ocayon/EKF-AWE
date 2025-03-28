@@ -17,7 +17,7 @@ simulation_parameters:
     kite_velocity: true                   # Kite velocity measurement
     kite_acceleration: true                   # Kite acceleration measurement
     tether_force: true               # Tether force measurement
-    tether_length: true              # Tether length measurement
+    tether_length: false              # Tether length measurement
     tether_elevation: false           # Tether elevation angle measurement
     tether_azimuth: false             # Tether azimuth angle measurement
     kcu_position: false                    # KCU position measurement

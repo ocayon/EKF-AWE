@@ -117,8 +117,8 @@ def create_ekf_output(x, u, ekf_input, tether, kite, simConfig):
     # Tether force and geometry
     tension_ground = u[input_index_map["ground_tether_force"]]
     tether_length = x[state_index_map["tether_length"]]
-    elevation_0 = x[state_index_map["elevation_first_tether_element"]]
-    azimuth_0 = x[state_index_map["azimuth_first_tether_element"]]
+    elevation_0 = x[state_index_map["elevation_0"]]
+    azimuth_0 = x[state_index_map["azimuth_0"]]
     args = (elevation_0, azimuth_0, tether_length, tension_ground, r_kite, v_kite, vw)
 
     # Add optional accelerations if observed

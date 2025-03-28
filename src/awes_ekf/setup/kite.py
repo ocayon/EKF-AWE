@@ -68,9 +68,13 @@ class PointMassEKF(Kite):
         self.x = self.get_state()
         self.x0 = self.create_previous_state_vector()
         
+        
         super().__init__(**kwargs)
 
+    
+
     def get_state(self):
+        # Concatenate state variables into the state vector
         self.x = ca.vertcat(
             self.r,
             self.v,
@@ -82,16 +86,34 @@ class PointMassEKF(Kite):
             self.elevation_0,
             self.azimuth_0,
         )
+
+        # Maintain a list of state variable names
+        self.state_names = (
+            [f"r_{i}" for i in range(3)] +
+            [f"v_{i}" for i in range(3)] +
+            [f"vw_{i}" for i in range(self.vw_state.size1())] +
+            ["CL", "CD", "CS", "tether_length", "elevation_0", "azimuth_0"]
+        )
+
+        # Handle optional variables based on configuration
         if self.simConfig.model_yaw:
             self.x = ca.vertcat(self.x, self.yaw, self.k_yaw_rate)
+            self.state_names.extend(["yaw", "k_yaw_rate"])
+
         if self.simConfig.obsData.tether_length:
             self.x = ca.vertcat(self.x, self.tether_length_offset)
+            self.state_names.append("tether_length_offset")
+
         if self.simConfig.obsData.tether_elevation:
             self.x = ca.vertcat(self.x, self.tether_elevation_offset)
+            self.state_names.append("tether_elevation_offset")
+
         if self.simConfig.obsData.tether_azimuth:
             self.x = ca.vertcat(self.x, self.tether_azimuth_offset)
+            self.state_names.append("tether_azimuth_offset")
 
         return self.x
+
 
     def get_wind_velocity(self):
         if self.simConfig.log_profile is True:
@@ -105,23 +127,37 @@ class PointMassEKF(Kite):
             self.vw_state = self.vw
 
     def get_input(self):
+        # Initialize the input vector and input names list
         input = ca.vertcat(self.reelout_speed, self.Ftg)
+        self.input_names = ["reelout_speed", "ground_tether_force"]
+
+        # Optional inputs based on configuration
         if self.simConfig.obsData.kite_acceleration:
             self.a_kite = ca.SX.sym("a_kite", 3)  # Kite acceleration
             input = ca.vertcat(input, self.a_kite)
+            self.input_names.extend([f"a_kite_{i}" for i in range(3)])
+
         if self.simConfig.obsData.kcu_acceleration:
             self.a_kcu = ca.SX.sym("a_kcu", 3)  # KCU acceleration
             input = ca.vertcat(input, self.a_kcu)
+            self.input_names.extend([f"a_kcu_{i}" for i in range(3)])
+
         if self.simConfig.obsData.kcu_velocity:
             self.v_kcu = ca.SX.sym("v_kcu", 3)  # KCU velocity
             input = ca.vertcat(input, self.v_kcu)
+            self.input_names.extend([f"v_kcu_{i}" for i in range(3)])
+
         if self.simConfig.obsData.kite_thrust_force:
             self.thrust = ca.SX.sym("thrust", 3)  # Thrust force
             input = ca.vertcat(input, self.thrust)
+            self.input_names.extend([f"thrust_{i}" for i in range(3)])
+
         if self.simConfig.model_yaw:
             input = ca.vertcat(input, self.us)
+            self.input_names.append("us")
 
         return input
+
 
     def get_fx(self, tether):
 
@@ -211,40 +247,91 @@ class PointMassEKF(Kite):
         return ca.Function(
             "calc_Fx", [self.x, self.u, self.x0], [self.get_fx_jac(kite, tether, kcu)]
         )
+    def create_integrator(self,ts):
+        """
+        Creates an integrator as a CasADi function with parameters self.x, self.u, x, and ts.
+        """
+        x_param = ca.SX.sym('x_param', self.x.size1())  # Symbolic input for x parameter
+        ts_sym = ca.SX.sym('ts')  # Symbolic input for time step
+        u_param = ca.SX.sym('u_param', self.u.size1())  # Symbolic input for u parameter
 
-    def propagate(self, x, u, ts):
+        # Define ODE system with x_param as a parameter
+        fx = self.calc_fx(self.x, self.u, x_param)
+        dae = {"x": self.x, "p": ca.vertcat(self.u,x_param), "ode": fx}
 
-        fx = self.calc_fx(self.x, self.u, x)
+        # Create the integrator with a symbolic time step
+        self.integrator = ca.integrator("intg", "cvodes", dae, 0,ts)
 
-        # Define ODE system
-        dae = {"x": self.x, "p": self.u, "ode": fx}  # Define ODE system
-        integrator = ca.integrator("intg", "cvodes", dae, 0, ts)  # Define integrator
+        # # Convert the integrator into a CasADi function with all parameters
+        # self.integrator_fn = ca.Function(
+        #     "integrator_fn",
+        #     [x_param, u_param],
+        #     [)["xf"]],
+        #     [ "x_param", "u_param","ts"],
+        #     ["x_next"]
+        # )
 
-        return np.array(integrator(x0=x, p=u)["xf"].T)
+    def propagate(self, x_param,u_param, ts):
+        """
+        Uses the pre-built CasADi function to integrate the ODE.
+        
+        Parameters:
+        - x: State variable for the ODE.
+        - u: Control input.
+        - x_param: Initial state of the system.
+        - ts: Time step for integration.
+
+        Returns:
+        - Integrated state after the time step.
+        """
+        # Only three digits after the decimal point
+        ts = round(ts, 3)
+        if not hasattr(self, 'integrator'):
+            self.create_integrator(ts)
+            self.ts = ts
+
+        if ts != self.ts:
+            print(ts, self.ts)
+            print("Recreating integrator")
+            self.ts = ts
+            self.create_integrator(ts)  
+
+        result = self.integrator(x0=x_param, p=ca.vertcat(u_param, x_param))["xf"]
+
+        return np.asarray(result).reshape(-1)
+    # def propagate(self, x, u, ts):
+
+    #     # Define ODE system
+    #     dae = {"x": self.x, "p": self.u, "ode": self.calc_fx(self.x, self.u, x)}  # Define ODE system
+        
+    #     self.integrator = ca.integrator("intg", "cvodes", dae, 0,ts)
+
+    #     return np.array(self.integrator(x0=x, p=u)["xf"].T)
     
     def create_previous_state_vector(self):
-        # Extract the names of the symbolic variables
-        names = [str(self.x[i]) for i in range(self.x.size1())]
-        # Create new symbolic variables with names ending in _0
-        x0_elements = [ca.SX.sym(f"{name}_0") for name in names]
+        # Generate previous state names by appending '_0' to current state names
+        self.previous_state_names = [f"{name}_0" for name in self.state_names]
+        print(self.previous_state_names)
+
+        # Create symbolic variables with these names
+        x0_elements = [ca.SX.sym(name) for name in self.previous_state_names]
+
+        # Concatenate into a symbolic vector
         x0 = ca.vertcat(*x0_elements)
         return x0
+
     @property
     def state_index_map(self):
-        # Split the CasADi matrix into individual symbolic variables
-        state_variables = ca.vertsplit(self.x)
+
 
         # Create a dictionary to map variable names to their indices
-        variable_index_map = {var.name(): i for i, var in enumerate(state_variables)}
+        variable_index_map = {name: i for i, name in enumerate(self.state_names)}
         return variable_index_map
     
     @property
     def input_index_map(self):
         # Split the CasADi matrix into individual symbolic variables
-        input_variables = ca.vertsplit(self.u)
-
-        # Create a dictionary to map variable names to their indices
-        variable_index_map = {var.name(): i for i, var in enumerate(input_variables)}
+        variable_index_map = {name: i for i, name in enumerate(self.input_names)}
         return variable_index_map
 
 class PointMass(Kite):
@@ -266,11 +353,12 @@ class PointMass(Kite):
         self.u = self.get_input()
         self.x = self.get_state()
         self.x0 = ca.SX.sym("x0", self.x.shape[0])  # Initial state vector
+        self.calc_fx = self.get_fx_fun()
 
         super().__init__(**kwargs)
 
     def get_state(self):
-        self.x = ca.vertcat(
+        self.x = ca.horzcat(
             self.r,
             self.v,
             self.yaw,
@@ -322,14 +410,16 @@ class PointMass(Kite):
 
         x = np.hstack((kite_input.kite_position, kite_input.kite_velocity, np.array([kite_input.kite_yaw]))).reshape(-1)
         u = np.hstack((kite_input.wind_velocity, np.array([kite_input.us]), np.array([kite_input.up]), kite_input.tether_force)).reshape(-1)
-        calc_fx = self.get_fx_fun()
+        
 
         # Define ODE system
-        dae = {"x": self.x, "p": self.u, "ode": calc_fx(self.x,self.u)}  # Define ODE system
+        dae = {"x": self.x, "p": self.u, "ode": self.calc_fx(self.x,self.u)}  # Define ODE system
 
-        integrator = ca.integrator("intg", "cvodes", dae, 0, ts)  # Define integrator
 
-        return np.array(integrator(x0=x, p=u)["xf"].T)
+
+        self.integrator = ca.integrator("intg", "cvodes", dae, 0,ts)
+
+        return np.array(self.integrator(x0=x, p=u)["xf"].T)
     
     def calculate_CL(self, up, us):
         #TODO: Implement CL calculation

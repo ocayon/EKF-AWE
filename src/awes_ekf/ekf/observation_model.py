@@ -19,17 +19,18 @@ class ObservationModel:
         previous_state_variables = ca.vertsplit(self.x0)
         input_variables = ca.vertsplit(self.u)
         # Create a dictionary to map variable names to their symbolic variables
-        state_map = {var.name(): var for var in state_variables}
-        input_map = {var.name(): var for var in input_variables}
-        previous_state_map = {var.name(): var for var in previous_state_variables}
+        state_map = {name: var for var,name in zip(state_variables, kite.state_names)}
+        input_map = {name: var for var,name in zip(input_variables, kite.input_names)}
+        previous_state_map = {name: var for var,name in zip(previous_state_variables, kite.previous_state_names)}
 
-        elevation_0 = state_map["elevation_first_tether_element"]
-        azimuth_0 = state_map["azimuth_first_tether_element"]
+        elevation_0 = state_map["elevation_0"]
+        azimuth_0 = state_map["azimuth_0"]
         tether_length = state_map["tether_length"]
-        r_kite = np.array([previous_state_map[f"r_{i}_0"] for i in range(3)])
-        v_kite = np.array([previous_state_map[f"v_{i}_0"] for i in range(3)])
+        r_kite = ca.vertcat(*[previous_state_map[f"r_{i}_0"] for i in range(3)])
+        v_kite = ca.vertcat(*[previous_state_map[f"v_{i}_0"] for i in range(3)])
         tension_ground = input_map["ground_tether_force"]
 
+        # Handle wind velocity based on configuration
         if self.simConfig.log_profile:
             vw = calculate_log_wind_velocity(
                 previous_state_map["uf_0"],
@@ -38,9 +39,10 @@ class ObservationModel:
                 previous_state_map["r_2_0"],
             )
         else:
-            vw = np.array([previous_state_map[f"vw_{i}_0"] for i in range(3)])
+            vw = ca.vertcat(*[previous_state_map[f"vw_{i}_0"] for i in range(3)])
 
-        args = (
+        # Prepare arguments as a list of MX objects
+        args = [
             elevation_0,
             azimuth_0,
             tether_length,
@@ -48,17 +50,22 @@ class ObservationModel:
             r_kite,
             v_kite,
             vw,
-        )
-        if self.simConfig.obsData.kite_acceleration:
-            a_kite = np.array([input_map[f"a_kite_{i}"] for i in range(3)])
-            args += (a_kite,)
-        if self.simConfig.obsData.kcu_acceleration:
-            a_kcu = np.array([input_map[f"a_kcu_{i}"] for i in range(3)])
-            args += (a_kcu,)
-        if self.simConfig.obsData.kcu_velocity:
-            v_kcu = np.array([input_map[f"v_kcu_{i}"] for i in range(3)])
-            args += (v_kcu,)
+        ]
 
+        # Add optional arguments based on the simulation configuration
+        if self.simConfig.obsData.kite_acceleration:
+            a_kite = ca.vertcat(*[input_map[f"a_kite_{i}"] for i in range(3)])
+            args.append(a_kite)
+
+        if self.simConfig.obsData.kcu_acceleration:
+            a_kcu = ca.vertcat(*[input_map[f"a_kcu_{i}"] for i in range(3)])
+            args.append(a_kcu)
+
+        if self.simConfig.obsData.kcu_velocity:
+            v_kcu = ca.vertcat(*[input_map[f"v_kcu_{i}"] for i in range(3)])
+            args.append(v_kcu)
+
+        # Call the CasADi function with a list of MX arguments
         r_tether_model = tether.kite_position(*args)
 
         index_map = kite.state_index_map
