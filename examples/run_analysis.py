@@ -50,14 +50,16 @@ class AnalyzeAweFromCsvLog:
 
     def __init__(self, config_data: dict,
                  date: datetime,
-                 log_directory: Path):
+                 log_directory: Path,
+                 addition: str = ""):
         
         self.config_data = config_data
         self.update_configuration_for_execution(date.strftime("%Y-%m-%d"))
-
         self.log_directory = log_directory
+        self.addition = addition
 
         self.run()
+
 
     def update_configuration_for_execution(self, date: str) -> None:
         self.config_data['year'], self.config_data['month'], self.config_data['day'] = date.split('-')
@@ -229,7 +231,8 @@ class AnalyzeAweFromCsvLog:
             self.config_data,
         )
         # %% Store results
-        save_results(ekf_output_df, flight_data, kite_model, year, month, day, self.config_data, addition="")
+        save_results(ekf_output_df, flight_data, kite_model, year, month, day, self.config_data, addition=self.addition)
+
 
     def run(self):
 
@@ -283,9 +286,12 @@ def main() -> None:
     print(f"Date: {date_str}, Time: {time_str}")
     print(f"Log directory: {log_dir}")
     
+
+    addition = input("Enter an identifier (e.g. '_paper', '_test', '') to append to the output folder: ").strip()
     AnalyzeAweFromCsvLog(config_data=config_data,
                          date=date,
-                         log_directory=log_dir)
+                         log_directory=log_dir,
+                         addition=addition)
 
 
 if __name__ == "__main__":
