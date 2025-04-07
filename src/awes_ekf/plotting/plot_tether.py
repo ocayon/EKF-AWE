@@ -102,9 +102,9 @@ def plot_slack_tether_force(results, flight_data,kcu = None):
     ax1.legend(
         [reel_out_straight_patch, reel_out_turn_patch, reel_in_patch],
         ["Reel-out - Straight", "Reel-out - Turn", "Reel-in"],
-        loc='upper left',
+        loc='best',
         frameon=True,
-        bbox_to_anchor=(0.075, 1)  # Adjust the x-coordinate to move the legend to the right
+        # bbox_to_anchor=(0.075, 1)  # Adjust the x-coordinate to move the legend to the right
     )
     fig.tight_layout()  # Adjust layout to prevent overlap
 

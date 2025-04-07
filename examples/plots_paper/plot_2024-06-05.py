@@ -5,6 +5,7 @@ from awes_ekf.setup.settings import load_config
 from awes_ekf.load_data.read_data import read_results
 import awes_ekf.plotting.plot_utils as pu
 from awes_ekf.plotting.color_palette import get_color_list, set_plot_style
+from awes_ekf.plotting.plot_kinematics import calculate_azimuth_elevation
 
 # Set plot style
 set_plot_style()
@@ -20,6 +21,11 @@ results_min, flight_data_min, _ = read_results(year, month, day, kite_model, add
 results_tether, flight_data_tether, _ = read_results(year, month, day, kite_model, addition='_tether')
 results_vwz0, flight_data_vwz0, _ = read_results(year, month, day, kite_model, addition='_vwz0')
 results_log, flight_data_log, _ = read_results(year, month, day, kite_model, addition='_log')
+
+azimuth, elevation = calculate_azimuth_elevation(results_min["kite_position_x"], results_min["kite_position_y"], results_min["kite_position_z"])
+plt.plot(azimuth, label="Kite Position Z")
+plt.show()
+
 
 # Apply necessary adjustments (for wind direction correction, indexing, etc.)
 def adjust_results(results):
@@ -37,6 +43,18 @@ results_min["cycle"] = flight_data_min["cycle"]
 results_tether["cycle"] = flight_data_tether["cycle"]
 results_vwz0["cycle"] = flight_data_vwz0["cycle"]
 results_log["cycle"] = flight_data_log["cycle"]
+
+heights = [70,200]
+error_wind = pu.calculate_error_10_minute(flight_data_vwz0, results_vwz0, heights=heights)
+error_wind = pu.calculate_error_10_minute(flight_data_min, results_min, heights=heights)
+error_wind = pu.calculate_error_10_minute(flight_data_tether, results_tether, heights=heights)
+error_wind = pu.calculate_error_10_minute(flight_data_log, results_log, heights=heights)
+
+
+flight_data_tether["time"] = flight_data_tether["unix_time"] - flight_data_tether["unix_time"].iloc[0]
+flight_data_min["time"] = flight_data_min["unix_time"] - flight_data_min["unix_time"].iloc[0]
+flight_data_vwz0["time"] = flight_data_vwz0["unix_time"] - flight_data_vwz0["unix_time"].iloc[0]
+flight_data_log["time"] = flight_data_log["unix_time"] - flight_data_log["unix_time"].iloc[0]
 
 # Cut data to reduce unwanted initial and ending data
 cut = 6000
@@ -60,6 +78,48 @@ colors = get_color_list()
 # plt.xlabel("Time [s]")
 # plt.legend()
 # plt.show()
+# print(flight_data_tether.columns)
+
+# Calculate mean error from flight_data position and results position
+error = np.sqrt((flight_data_tether["kite_position_x"] - results_tether["kite_position_x"])**2 + (flight_data_tether["kite_position_y"] - results_tether["kite_position_y"])**2 + (flight_data_tether["kite_position_z"] - results_tether["kite_position_z"])**2)
+print(np.mean(error))
+
+for col in flight_data_tether.columns:
+    if "time" in col:
+        print(col)
+print(flight_data_tether["cycle"].iloc[-1])
+mask = flight_data_tether["cycle"].isin([28])
+mask_min = flight_data_min["cycle"].isin([28])
+# Plot position and velocity
+fig, axs = plt.subplots(2, 1, figsize=(5, 8))
+mean_wind_dir = np.mean(results_tether[mask]["wind_direction"])
+azimuth, elevation = calculate_azimuth_elevation(results_min[mask_min]["kite_position_x"], results_min[mask_min]["kite_position_y"], results_min[mask_min]["kite_position_z"])
+axs[0].plot(np.rad2deg(azimuth-mean_wind_dir), np.rad2deg(elevation), label="EKF 0", color = colors[0])
+azimuth, elevation = calculate_azimuth_elevation(results_tether[mask]["kite_position_x"], results_tether[mask]["kite_position_y"], results_tether[mask]["kite_position_z"])
+axs[0].plot(np.rad2deg(azimuth-mean_wind_dir), np.rad2deg(elevation), label="EKF 5", color = colors[1])
+azimuth, elevation = calculate_azimuth_elevation(flight_data_tether[mask]["kite_position_x"], flight_data_tether[mask]["kite_position_y"], flight_data_tether[mask]["kite_position_z"])
+axs[0].plot(np.rad2deg(azimuth-mean_wind_dir), np.rad2deg(elevation), label="GPS", color = colors[2])
+axs[0].legend()
+axs[0].set_xlabel(f"Azimuth ($^\circ$)")
+axs[0].set_ylabel(f"Elevation ($^\circ$)")
+axs[0].set_xlim([-100, 60])
+axs[0].set_ylim([10, 90])
+# plt.show()
+r = np.sqrt(results_min[mask_min]["kite_position_x"]**2 + results_min[mask_min]["kite_position_y"]**2+ results_min[mask_min]["kite_position_z"]**2)
+axs[1].plot(flight_data_tether[mask]["unix_time"], r, label="EKF 0 ", color = colors[0])
+r = np.sqrt(results_tether[mask]["kite_position_x"]**2 + results_tether[mask]["kite_position_y"]**2+ results_tether[mask]["kite_position_z"]**2)
+axs[1].plot(flight_data_tether[mask]["unix_time"], r, label="EKF 5", color = colors[1])
+r = np.sqrt(flight_data_tether[mask]["kite_position_x"]**2 + flight_data_tether[mask]["kite_position_y"]**2+ flight_data_tether[mask]["kite_position_z"]**2)
+axs[1].plot(flight_data_tether[mask]["unix_time"], r, label="GPS+IMU", color = colors[2])
+axs[1].plot(flight_data_tether[mask]["unix_time"], flight_data_tether[mask]["tether_length"]+15.55, label="Measured tether length", color = colors[3])
+# axs[1].plot(fd_min[mask_min]["time"], results_min[mask_min]["tether_length"]+15.55, label="Min. measurements", color = colors[4])
+axs[1].legend()
+axs[1].set_xlabel("Time (s)")
+axs[1].set_ylabel("Radial Distance/Tether Length (m)")
+axs[1].set_ylim([200, 360])
+plt.tight_layout()
+plt.savefig("./results/plots_paper/kite_trajectory_2023-11-27.pdf")
+plt.show()
 
 # fig, ax = plt.subplots(1, 1, figsize=(10, 6))
 # pu.plot_kinetic_energy_spectrum(results_min, flight_data_min, ax, savefig=False)
@@ -124,7 +184,8 @@ for i in range(num_subsets):
     print(f"Subset {i+1}: {rounded_time}")
 
 # Add legends and finalize layout
-axs[0].legend(loc="lower right", bbox_to_anchor=(1, -0.4), frameon=True)
+axs[0].legend(loc="upper center", bbox_to_anchor=(3.5, 1.5), ncol=5, frameon=False)
+plt.subplots_adjust(top=0.85)  # Increase this value to push down the plot
 
 plt.savefig("./results/plots_paper/wind_profiles_2024-06-05.pdf")
 plt.show()
@@ -138,7 +199,10 @@ pu.plot_wind_speed(results_tether, flight_data_tether, axs, lidar_data=False, co
 
 
 
-axs[1].legend(loc="right", frameon=True)
+# Add legend from axs[0] and position it above the entire figure
+handles, labels = axs[0].get_legend_handles_labels()
+fig.legend(handles, labels, loc="upper center", bbox_to_anchor=(0.5, 1), ncol=4, frameon=False)
+
 axs[1].set_ylim([-60, 20])
 axs[2].set_ylim([-5, 5])
 axs[0].set_xlim([flight_data_min["time"].iloc[0], flight_data_min["time"].iloc[-1]])
@@ -151,6 +215,7 @@ axs[2].set_xticks(flight_data_min["time"].iloc[tick_indices])
 axs[2].set_xticklabels(time_of_day.iloc[tick_indices], rotation=45, ha="right")
 axs[2].set_xlabel("Time of day (hh:mm)")
 
-plt.tight_layout()
+# Adjust layout to make space for top legend
+plt.tight_layout(rect=[0, 0, 1, 0.95])
 plt.savefig("./results/plots_paper/wind_speed_2024-06-05.pdf")
 plt.show()

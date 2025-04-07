@@ -1193,7 +1193,7 @@ def plot_cl_curve(cl, cd, aoa, mask, axs, label=None, savefig=False, color=None,
     bin_centers = 0.5 * (bins[:-1] + bins[1:])
 
     # Plot cl_wing and shade the area for 95% confidence interval
-    axs[0].plot(bin_centers, cl_wing_means, "o-", markersize=8, linewidth=1.5, label=label, color=color, markerfacecolor=facecolor)
+    axs[0].plot(bin_centers, cl_wing_means, "o-", markersize=5, linewidth=1.5, label=label, color=color, markerfacecolor=facecolor)
     axs[0].fill_between(
         bin_centers, cl_wing_means - cl_wing_cis, cl_wing_means + cl_wing_cis, alpha=0.2, color=color
     )
@@ -1203,7 +1203,7 @@ def plot_cl_curve(cl, cd, aoa, mask, axs, label=None, savefig=False, color=None,
     axs[0].grid(True)
 
     # Plot cd_wing and shade the area for 95% confidence interval
-    axs[1].plot(bin_centers, cd_wing_means, "o-", markersize=8, linewidth=1.5, label=label, color=color, markerfacecolor=facecolor)
+    axs[1].plot(bin_centers, cd_wing_means, "o-", markersize=5, linewidth=1.5, label=label, color=color, markerfacecolor=facecolor)
     axs[1].fill_between(
         bin_centers, cd_wing_means - cd_wing_cis, cd_wing_means + cd_wing_cis, alpha=0.2, color=color
     )
@@ -1316,7 +1316,7 @@ def plot_turbulence_intensity_high_res(results,flight_data, height, ax, savefig=
 def plot_forces_dimensional(results,flight_data, kite,kcu):
 
     # Sample data for different forces
-    forces = ['Tether force', 'Wing lift', 'Wing sideforce', 'Wing drag',  'Tether drag', 'KCU drag','KCU Inertia', 'Wing Inertia', 'KCU weight', 'Wing weight']
+    forces = ['Tether force', 'Wing lift', 'Wing sideforce', 'Wing drag',  'Tether drag', 'KCU drag','KCU Inertial Force', 'Wing Inertial Force', 'KCU weight', 'Wing weight']
     lift_force = 1.225*results['wing_lift_coefficient']*kite.area*results['kite_apparent_windspeed']**2/2
     side_force = abs(results['wing_sideforce_coefficient']*kite.area*results['kite_apparent_windspeed']**2/2)
     drag_force = results['wing_drag_coefficient']*kite.area*results['kite_apparent_windspeed']**2/2
@@ -1535,3 +1535,122 @@ def plot_ekf_performance(results, flight_data, config_data):
     
     plt.tight_layout()
     plt.show()
+
+
+import pandas as pd
+import numpy as np
+def angular_difference_deg(a, b):
+    """Returns the smallest angle difference between two angles in degrees"""
+    diff = np.abs(a - b) % 360
+    return np.minimum(diff, 360 - diff)
+
+
+def calculate_error_10_minute(
+    flight_data, results,
+    lidar_heights=None, height_bin_width=10,
+    error_type='rmse', heights = [100,200]
+):
+    # Time conversion and setup
+    flight_data['time'] = pd.to_timedelta(flight_data['time'], unit='s')
+    results['time'] = pd.to_timedelta(results['time'], unit='s')
+    flight_data.set_index('time', inplace=True)
+    results.set_index('time', inplace=True)
+
+    results['time_10min'] = results.index.floor('10min')
+
+    # Auto-detect Lidar heights
+    if lidar_heights is None:
+        lidar_heights = [
+            int("".join(filter(str.isdigit, col)))
+            for col in flight_data.columns if "Wind_Direction_deg" in col
+        ]
+
+    print("Evaluating heights:", lidar_heights)
+    error_list = []
+
+    for h in lidar_heights:
+        # --- WIND SPEED ---
+        speed_col = f"{h}m_Wind_Speed_m_s"
+        if speed_col in flight_data.columns:
+            lidar_speed = flight_data[speed_col].resample("10min").mean()
+        else:
+            print(f"Speed column {speed_col} not found. Skipping height {h}.")
+            continue
+
+        # --- WIND DIRECTION ---
+        dir_col = f"{h}m_Wind_Direction_deg"
+        if dir_col in flight_data.columns:
+            lidar_dir = flight_data[dir_col].resample("10min").mean()
+        else:
+            print(f"Direction column {dir_col} not found. Skipping height {h}.")
+            continue
+
+        # Filter results by height bin
+        height_mask = (
+            (results['kite_position_z'] >= h - height_bin_width) &
+            (results['kite_position_z'] <= h + height_bin_width)
+        )
+        # reeling_mask = flight_data["tether_reelout_speed"] <0
+        res_subset = results[height_mask]
+
+
+        # Resample results
+        res_speed = res_subset.groupby('time_10min')['wind_speed_horizontal'].mean()
+        res_dir = res_subset.groupby('time_10min')['wind_direction'].mean()
+
+        # Align both wind speed and direction
+        aligned_speed = pd.concat([lidar_speed, res_speed], axis=1, keys=['lidar', 'model']).dropna()
+        aligned_dir = pd.concat([lidar_dir, res_dir], axis=1, keys=['lidar', 'model']).dropna()
+
+        # Calculate errors
+        if aligned_speed.empty or aligned_dir.empty:
+            print(f"No aligned data at height {h}. Skipping...")
+            continue
+
+        # Wind speed error
+        speed_diff = aligned_speed['lidar'] - aligned_speed['model']
+        speed_error = (
+            np.sqrt(np.mean(speed_diff**2)) if error_type == 'rmse'
+            else np.mean(np.abs(speed_diff))
+        )
+
+        # Wind direction error (correct units)
+        lidar_deg = 270 - aligned_dir['lidar']  # Convert to same reference
+        model_deg = np.degrees(aligned_dir['model'])  # Convert from rad to deg
+        dir_diff = angular_difference_deg(lidar_deg, model_deg)
+        dir_error = (
+            np.sqrt(np.mean(dir_diff**2)) if error_type == 'rmse'
+            else np.mean(dir_diff)
+        )
+
+        error_list.append({
+            'height': h,
+            'wind_speed_error': speed_error,
+            'wind_direction_error': dir_error,
+            'speed_bias': -np.mean(speed_diff),
+            'direction_bias': -np.mean(dir_diff),
+        })
+
+    error_pd = pd.DataFrame(error_list)
+    mask = (error_pd['height'] > heights[0]) & (error_pd['height'] < heights[1])
+    error_ro = error_pd[mask]
+    print("Reeling out kite:")
+    print(f"Mean 10-min wind speed error:     {error_ro['wind_speed_error'].mean():.2f}")
+    print(f"Mean 10-min wind direction error: {error_ro['wind_direction_error'].mean():.2f}")
+    print(f"Mean 10-min wind speed bias:     {error_ro['speed_bias'].mean():.2f}")
+    print(f"Mean 10-min wind direction bias: {error_ro['direction_bias'].mean():.2f}")
+
+    mask = error_pd['height'] > heights[1]
+    error_ri = error_pd[mask]
+    print("Reeling in kite:")
+    print(f"Mean 10-min wind speed error:     {error_ri['wind_speed_error'].mean():.2f}")
+    print(f"Mean 10-min wind direction error: {error_ri['wind_direction_error'].mean():.2f}")
+    print(f"Mean 10-min wind speed bias:     {error_ri['speed_bias'].mean():.2f}")
+    print(f"Mean 10-min wind direction bias: {error_ri['direction_bias'].mean():.2f}")
+
+    # plt.figure()
+    # plt.plot(results["kite_position_z"])
+    # plt.show()
+
+    return error_pd
+

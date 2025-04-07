@@ -88,10 +88,11 @@ class PointMassEKF(Kite):
         )
 
         # Maintain a list of state variable names
+        symbols_vw = ca.symvar(self.vw_state)
         self.state_names = (
             [f"r_{i}" for i in range(3)] +
             [f"v_{i}" for i in range(3)] +
-            [f"vw_{i}" for i in range(self.vw_state.size1())] +
+            [s.name() for s in symbols_vw] +
             ["CL", "CD", "CS", "tether_length", "elevation_0", "azimuth_0"]
         )
 

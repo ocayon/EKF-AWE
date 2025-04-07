@@ -65,7 +65,7 @@ def plot_kite_orientation(results, flight_data, config_data):
     Plot the kite orientation from the results and the flight data.
     The orientation is plotted as euler angles.
     """
-    fig, axs = plt.subplots(3, 1, figsize=(5, 10), sharex=True)  # 3 rows, 1 column
+    fig, axs = plt.subplots(3, 1, figsize=(5, 6), sharex=True)  # 3 rows, 1 column
     colors = get_color_list()
     for column in results.columns:
         if "pitch" in column or "roll" in column or "yaw" in column:

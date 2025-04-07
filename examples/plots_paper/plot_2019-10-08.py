@@ -17,7 +17,7 @@ def plot_kite_orientation(results, flight_data, config_data):
     Plot the kite orientation from the results and the flight data.
     The orientation is plotted as euler angles.
     """
-    fig, axs = plt.subplots(3, 1, figsize=(5, 10), sharex=True)  # 3 rows, 1 column
+    fig, axs = plt.subplots(3, 1, figsize=(5, 6), sharex=True)  # 3 rows, 1 column
     colors = get_color_list()
 
     for column in results.columns:
@@ -146,27 +146,55 @@ day = "08"
 kite_model = "v3"
 
 results, flight_data,config_data = read_results(year, month, day, kite_model,addition='_va')
-res_min, fd_min,config_data_min = read_results(year, month, day, kite_model,addition='_min')
+res_min, fd_min,config_data_min = read_results(year, month, day, kite_model,addition='_lt')
+
+
 
 # In min use only indices in the range of the results
 res_min = res_min.iloc[0:len(results)]
 fd_min = fd_min.iloc[0:len(results)]
 
-plt.figure()
-mask = (flight_data["powered"] == "powered")&(flight_data["cycle"].isin([64, 65]))
-kite_speed = np.sqrt(results["kite_velocity_x"]**2 + results["kite_velocity_y"]**2 + results["kite_velocity_z"]**2)
-apparent_speed = results["kite_apparent_windspeed"]
-plot_time_series(flight_data[mask], kite_speed[mask], plt.gca(), plot_phase=True, label='Kite speed')
-plt.plot(flight_data["time"][mask], flight_data["tether_reelout_speed"][mask], label='Reel-out speed')
-# plt.plot(flight_data["time"][mask], kite_speed[mask], label='Kite speed')
-plt.plot(flight_data["time"][mask], apparent_speed[mask], label='Apparent wind speed')
 
-np.mean(kite_speed[mask])
-np.mean(apparent_speed[mask])
-print("Mean kite speed: ", np.mean(kite_speed[mask]))
-print("Mean apparent wind speed: ", np.mean(apparent_speed[mask]))
-plt.legend()
+mask = (flight_data["cycle"].isin([64, 65]))
+mask_min = (fd_min["cycle"].isin([64, 65]))
+
+va_offset_identified = 0.855
+colors = get_color_list()
+kite_speed = np.sqrt(results["kite_velocity_x"]**2 + results["kite_velocity_y"]**2 + results["kite_velocity_z"]**2)
+kite_speed_min = np.sqrt(res_min["kite_velocity_x"]**2 + res_min["kite_velocity_y"]**2 + res_min["kite_velocity_z"]**2)
+measured_speed = np.sqrt(flight_data["kite_velocity_x"]**2 + flight_data["kite_velocity_y"]**2 + flight_data["kite_velocity_z"]**2)
+apparent_speed = results["kite_apparent_windspeed"]
+
+fig, ax = plt.subplots(figsize=(9, 3))
+plot_time_series(flight_data[mask], kite_speed[mask], ax, plot_phase=True, label='Kite speed (EKF 3)', color=colors[2])
+ax.plot(flight_data["time"][mask], apparent_speed[mask], '--', label='Apparent wind speed (EKF 3)', color=colors[2])
+# Kite speed estimates (solid lines)
+ax.plot(flight_data["time"][mask], kite_speed_min[mask], label='Kite speed (EKF 4)', color=colors[1])
+ax.plot(flight_data["time"][mask], res_min["kite_apparent_windspeed"][mask], '--', label='Apparent wind speed (EKF 4)', color=colors[1])
+ax.plot(flight_data["time"][mask], measured_speed[mask], label='Kite speed (GPS)', color=colors[0])
+
+# Apparent wind estimates (dashed lines)
+
+
+ax.plot(flight_data["time"][mask], flight_data["kite_apparent_windspeed"][mask] + va_offset_identified, '--', label='Apparent wind speed (Pitot)', color=colors[0])
+
+ax.set_xlabel("Time ($\mathrm{s}$)")
+ax.set_ylabel("Speed ($\mathrm{m s}^{-1}$)")
+plt.legend(
+    frameon=False,                  # No border around the legend
+    loc='lower center',
+    bbox_to_anchor=(0.5, 1.05),
+    ncol=3,
+    borderaxespad=0.0,
+    columnspacing=1.5,
+    handletextpad=0.5
+)
+plt.tight_layout()  # Prevents legend from being cut off
+plt.savefig("./results/plots_paper/speed_2019-10-08.pdf")
 plt.show()
+
+
+
 
 
 # upper_threshold = 0.08
@@ -205,31 +233,33 @@ plt.savefig("./results/plots_paper/norm_residuals_2019-10-08.pdf")
 plt.show()
 
 # Plot position and velocity
-fig, axs = plt.subplots(2, 1, figsize=(5, 8))
+fig, axs = plt.subplots(2, 1, figsize=(5, 6))
 mean_wind_dir = np.mean(results[mask]["wind_direction"])
 azimuth, elevation = calculate_azimuth_elevation(res_min[mask]["kite_position_x"], res_min[mask]["kite_position_y"], res_min[mask]["kite_position_z"])
-axs[0].plot(np.rad2deg(azimuth-mean_wind_dir), np.rad2deg(elevation), label="EKF 0", color = colors[0])
+axs[0].plot(np.rad2deg(azimuth-mean_wind_dir), np.rad2deg(elevation), label="EKF 0", color = colors[0], linestyle="-")
 azimuth, elevation = calculate_azimuth_elevation(results[mask]["kite_position_x"], results[mask]["kite_position_y"], results[mask]["kite_position_z"])
-axs[0].plot(np.rad2deg(azimuth-mean_wind_dir), np.rad2deg(elevation), label="EKF 1", color = colors[1])
+axs[0].plot(np.rad2deg(azimuth-mean_wind_dir), np.rad2deg(elevation), label="EKF 1", color = colors[1], linestyle="-.")
 azimuth, elevation = calculate_azimuth_elevation(flight_data[mask]["kite_position_x"], flight_data[mask]["kite_position_y"], flight_data[mask]["kite_position_z"])
-axs[0].plot(np.rad2deg(azimuth-mean_wind_dir), np.rad2deg(elevation), label="GPS", color = colors[2])
-axs[0].legend()
+axs[0].plot(np.rad2deg(azimuth-mean_wind_dir), np.rad2deg(elevation), label="GPS", color = colors[2], linestyle="--")
+# axs[0].legend()
 axs[0].set_xlabel(f"Azimuth ($^\circ$)")
 axs[0].set_ylabel(f"Elevation ($^\circ$)")
 axs[0].set_xlim([-60, 60])
 axs[0].set_ylim([20, 90])
 r = np.sqrt(res_min[mask]["kite_position_x"]**2 + res_min[mask]["kite_position_y"]**2+ res_min[mask]["kite_position_z"]**2)
-axs[1].plot(flight_data[mask]["time"], r, label="EKF 0 ", color = colors[0])
+axs[1].plot(flight_data[mask]["time"], r, label="EKF 0 ", color = colors[0], linestyle="-")
 r = np.sqrt(results[mask]["kite_position_x"]**2 + results[mask]["kite_position_y"]**2+ results[mask]["kite_position_z"]**2)
-axs[1].plot(flight_data[mask]["time"], r, label="EKF 1", color = colors[1],linewidth=1)
+axs[1].plot(flight_data[mask]["time"], r, label="EKF 1", color = colors[1],linewidth=1, linestyle="-.")
 r = np.sqrt(flight_data[mask]["kite_position_x"]**2 + flight_data[mask]["kite_position_y"]**2+ flight_data[mask]["kite_position_z"]**2)
-axs[1].plot(flight_data[mask]["time"], r, label="GPS+IMU", color = colors[2])
-axs[1].plot(flight_data[mask]["time"], flight_data[mask]["tether_length"]+11.5, label="Measured tether length", color = colors[3])
-axs[1].legend()
+axs[1].plot(flight_data[mask]["time"], r, label="GPS+IMU", color = colors[2], linestyle="--")
+axs[1].plot(flight_data[mask]["time"], flight_data[mask]["tether_length"]+11.5, label="Measured tether length", color = colors[3], linestyle=":")
+handles, labels = axs[1].get_legend_handles_labels()
+fig.legend(handles, labels, loc='upper center', ncol=2, bbox_to_anchor=(0.5, 1.0), bbox_transform=fig.transFigure)
+plt.tight_layout(rect=[0, 0, 1, 0.94])
 axs[1].set_xlabel("Time (s)")
 axs[1].set_ylabel("Radial Distance/Tether Length (m)")
 axs[1].set_ylim([200, 360])
-plt.tight_layout()
+# plt.tight_layout()
 plt.savefig("./results/plots_paper/kite_trajectory_2019-10-08.pdf")
 # plt.show()
 
@@ -289,7 +319,7 @@ plot_time_series(
     plot_phase=False,
     color=colors[1],
 )
-ax.legend()
+ax.legend(frameon=True)
 ax.set_xlabel("Time (s)")
 ax.set_ylabel("Angle ($^\circ$)")
 plt.tight_layout()
@@ -302,6 +332,11 @@ plt.tight_layout()
 plt.savefig("./results/plots_paper/kinetic_energy_spectrum_2019-10-08.pdf")
 
 
+mask_ro = (flight_data["powered"]=="depowered")& flight_data["cycle"].isin(np.arange(20,70))
+mean_aoa = np.mean(results[mask_ro]["wing_angle_of_attack_bridle"])
+sd_aoa = np.std(results[mask_ro]["wing_angle_of_attack_bridle"])
+print("Mean AOA: ", mean_aoa)
+print("SD AOA: ", sd_aoa)
 
 flight_data["bridle_angle_of_attack"] = np.convolve(flight_data["bridle_angle_of_attack"], np.ones(10)/10, mode="same")
 aoa_imu = (results[mask]["wing_angle_of_attack_imu_0"]+results[mask]["wing_angle_of_attack_imu_1"])/2
@@ -313,12 +348,24 @@ plot_time_series(flight_data[mask], results[mask]["wing_lift_coefficient"], axs[
 # axs[0].legend()
 plot_time_series(flight_data[mask], results[mask]["wing_drag_coefficient"], axs[1],  label="$C_\mathrm{D}$", color=colors[0])
 plot_time_series(flight_data[mask], results[mask]["kcu_drag_coefficient"], axs[1],  label="$C_\mathrm{D,kcu}$", color=colors[1])
-plot_time_series(flight_data[mask], results[mask]["tether_drag_coefficient"], axs[1],  label="$C_\mathrm{D,t}$", plot_phase=True, color=colors[2], ylabel="$C_D$")
-axs[1].legend()
+plot_time_series(flight_data[mask], results[mask]["tether_drag_coefficient"], axs[1],  label="$C_\mathrm{D,t}$", color=colors[2], ylabel="$C_D$")
+plot_time_series(flight_data[mask], results[mask]["bridles_drag_coefficient"], axs[1],  label="$C_\mathrm{D,b}$", plot_phase=True, color=colors[3])
+axs[1].legend(
+    loc='lower center',
+    bbox_to_anchor=(0.5, 1.05),
+    ncol=4,
+    frameon=False
+)
 plot_time_series(flight_data[mask], flight_data[mask]["bridle_angle_of_attack"], axs[2], color=colors[1])
 plot_time_series(flight_data[mask], aoa_imu, axs[2], color=colors[2])
 plot_time_series(flight_data[mask], results[mask]["wing_angle_of_attack_bridle"], axs[2],  ylabel=r"$\alpha$ ($^\circ$)", plot_phase=True, color=colors[0])
-axs[2].legend([r"$\alpha_\mathrm{b}$ measured", r"$\alpha_\mathrm{w}$ from IMU", r"$\alpha_\mathrm{w}$ from bridle"], frameon=True)
+axs[2].legend(
+    [r"$\alpha_\mathrm{b}$ measured", r"$\alpha_\mathrm{w}$ from IMU", r"$\alpha_\mathrm{w}$ from bridle"],
+    loc='lower center',
+    bbox_to_anchor=(0.5, 1.05),
+    ncol=3,
+    frameon=False
+)
 axs[2].set_xlabel("Time (s)")
 plt.tight_layout()
 plt.savefig("./results/plots_paper/aero_coefficients_2019-10-08.pdf")
@@ -329,7 +376,7 @@ mask_turn = (flight_data["turn_straight"]=="turn")&mask_polar
 mask_straight = (flight_data["turn_straight"]=="straight")&mask_polar
 # Plot curves 
 from awes_ekf.plotting.plot_utils import plot_cl_curve
-fig, axs = plt.subplots(1, 2, figsize=(9, 5), sharex=True)
+fig, axs = plt.subplots(1, 2, figsize=(8, 4), sharex=True)
 cl_roullier = np.loadtxt("./processed_data/previous_analysis/cl_roullier_mean.csv", delimiter=",")
 cd_roullier = np.loadtxt("./processed_data/previous_analysis/cd_roullier_mean.csv", delimiter=",")
 cl_rans = np.loadtxt("./processed_data/previous_analysis/RANS_CL_alpha_struts.csv", delimiter=",")
@@ -339,11 +386,11 @@ VSM_coeffs = pd.read_csv("./processed_data/previous_analysis/VSM_aero_coeffs_V3.
 plot_cl_curve(np.sqrt((results["wing_lift_coefficient"]**2+results["wing_sideforce_coefficient"]**2)), results["wing_drag_coefficient"], results['wing_angle_of_attack_bridle'], mask_polar,axs, label = "Wing", color=colors[0], facecolor=colors[0])
 # plot_cl_curve(np.sqrt((results["wing_lift_coefficient"]**2+results["wing_sideforce_coefficient"]**2)), results["wing_drag_coefficient"], results['wing_angle_of_attack_bridle'], mask_turn,axs, label = "Wing Turn", color=colors[2])
 # plot_cl_curve(np.sqrt((results["wing_lift_coefficient"]**2+results["wing_sideforce_coefficient"]**2)), results["wing_drag_coefficient"], results['wing_angle_of_attack_bridle'], mask_straight,axs, label = "Wing Straight", color=colors[3])
-plot_cl_curve(np.sqrt((results["wing_lift_coefficient"]**2+results["wing_sideforce_coefficient"]**2)), results["wing_drag_coefficient"]+results["kcu_drag_coefficient"]+results["tether_drag_coefficient"], results['wing_angle_of_attack_bridle'], mask_polar,axs, label = "Wing+KCU+tether", color=colors[1])
-axs[0].plot(cl_roullier[:,0], cl_roullier[:,1], label="Exp. Roullier", linewidth=1.5, color = colors[2])
-axs[1].plot(cd_roullier[:,0], cd_roullier[:,1], label="Exp. Roullier", linewidth=1.5,color = colors[2])
-axs[0].plot(cl_rans[:,0], cl_rans[:,1], label="RANS",linewidth=1.5, color = colors[3])
-axs[1].plot(cd_rans[:,0], cd_rans[:,1], label="RANS", linewidth=1.5,color = colors[3])
+plot_cl_curve(np.sqrt((results["wing_lift_coefficient"]**2+results["wing_sideforce_coefficient"]**2)), results["wing_drag_coefficient"]+results["kcu_drag_coefficient"]+results["tether_drag_coefficient"]+results["bridles_drag_coefficient"], results['wing_angle_of_attack_bridle'], mask_polar,axs, label = "System", color=colors[1])
+axs[0].plot(cl_roullier[:,0], cl_roullier[:,1], label="Roullier (2020)", linewidth=1.5, color = colors[2])
+axs[1].plot(cd_roullier[:,0], cd_roullier[:,1], label="Roullier (2020)", linewidth=1.5,color = colors[2])
+axs[0].plot(cl_rans[:,0], cl_rans[:,1], label="Viré (2022)",linewidth=1.5, color = colors[3])
+axs[1].plot(cd_rans[:,0], cd_rans[:,1], label="Viré (2022)", linewidth=1.5,color = colors[3])
 axs[0].plot(VSM_coeffs["alpha"], VSM_coeffs["cl_powered"], label="VSM - Powered",linewidth=1.5, color = colors[5])
 axs[0].plot(VSM_coeffs["alpha"], VSM_coeffs["cl_depowered"], label="VSM - Depowered",linewidth=1.5, color = colors[5], linestyle = '--')
 axs[0].plot(VSM_coeffs["alpha"], VSM_coeffs["cl_powered_max_steering"], label="VSM - Powered Turn",linewidth=1.5, color = colors[5], linestyle = '-.')
@@ -356,8 +403,19 @@ axs[0].axvline(x = mean_aoa_pow, color = colors[6],linestyle = '--', label = 'Me
 axs[0].axvline(x = mean_aoa_dep, color = colors[7],linestyle = '--', label = 'Mean reel-in angle of attack')
 axs[1].axvline(x = mean_aoa_pow, color = colors[6],linestyle = '--', label = 'Mean reel-out angle of attack')
 axs[1].axvline(x = mean_aoa_dep, color = colors[7],linestyle = '--', label = 'Mean reel-in angle of attack')
-axs[0].legend(loc = "lower right", frameon=True)
-plt.tight_layout()
+# Get legend handles and labels from one of the subplots
+handles, labels = axs[0].get_legend_handles_labels()
+
+# Create a global legend at the top
+fig.legend(
+    handles, labels,
+    loc='upper center',
+    ncol=3,
+    bbox_to_anchor=(0.5, 1),
+    frameon=False
+)
+
+plt.tight_layout(rect=[0, 0, 1, 0.85])  # Leave space for the legend above
 plt.savefig("./results/plots_paper/polars_2019-10-08.pdf")
 # plt.show()
 
