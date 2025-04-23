@@ -362,7 +362,7 @@ def calculate_turn_rate_law(results, flight_data, model = 'simple', steering_off
     va = results["kite_apparent_windspeed"]
     v = np.sqrt(results["kite_velocity_x"]**2 + results["kite_velocity_y"]**2 + results["kite_velocity_z"]**2)
     yaw = flight_data["kite_yaw_0"]
-    beta = results["kite_elevation"]
+    
     yaw_rate = flight_data["kite_yaw_rate"]
     radius = results["radius_turn"]
 
@@ -372,6 +372,7 @@ def calculate_turn_rate_law(results, flight_data, model = 'simple', steering_off
         W = eye(len(us))
     elif model == 'simple_weight':
         c1 = us*va
+        beta = results["kite_elevation"]
         c2 = np.sin(yaw)*np.cos(beta)/va
         A = np.vstack([c1,c2]).T
         W = eye(len(us))

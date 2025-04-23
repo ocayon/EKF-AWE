@@ -1,0 +1,31 @@
+cff-version: 1.2.0
+message: "If you use this work, please cite it as below."
+title: "Kite as a Sensor: Wind and State Estimation in Tethered Flying Systems"
+authors:
+  - family-names: Cayon
+    given-names: Oriol
+  - family-names: Watson
+    given-names: Simon
+  - family-names: Schmehl
+    given-names: Roland
+date-released: 2025-01-01
+doi: 10.5194/wes-2024-182
+url: https://doi.org/10.5194/wes-2024-182
+version: "preprint"
+type: article
+repository-code: https://github.com/ocayon/EKF-AWE
+preferred-citation:
+  type: article
+  authors:
+    - family-names: Cayon
+      given-names: Oriol
+    - family-names: Watson
+      given-names: Simon
+    - family-names: Schmehl
+      given-names: Roland
+  title: "Kite as a Sensor: Wind and State Estimation in Tethered Flying Systems"
+  journal: "Wind Energy Science Discussions"
+  year: 2025
+  doi: 10.5194/wes-2024-182
+  url: https://doi.org/10.5194/wes-2024-182
+  note: "in review"
