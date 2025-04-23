@@ -13,7 +13,7 @@ doi: 10.5194/wes-2024-182
 url: https://doi.org/10.5194/wes-2024-182
 version: "preprint"
 type: article
-repository-code: https://github.com/YOUR-USERNAME/YOUR-REPOSITORY
+repository-code: https://github.com/ocayon/EKF-AWE
 preferred-citation:
   type: article
   authors:
