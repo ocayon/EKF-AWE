@@ -98,7 +98,8 @@ class ExtendedKalmanFilter:
         valid_indices = [i for i in range(len(self.z)) if i not in none_indices]
 
         # Create a reduced version of z without None values
-        z_valid = self.z[valid_indices]
+        self.z_valid = self.z[valid_indices]
+
 
         if self.doIEKF == True:
 
@@ -119,29 +120,29 @@ class ExtendedKalmanFilter:
 
                 # Construct the Jacobian Hx for valid observations only
                 Hx_full = np.array(self.calc_Hx(eta1, self.u, eta1))  # Full Hx
-                Hx = Hx_full[valid_indices, :]  # Reduced Hx (remove rows)
+                self.Hx = Hx_full[valid_indices, :]  # Reduced Hx (remove rows)
 
                 # Observation and observation error predictions (valid observations only)
                 z_k1_k_full = np.array(self.calc_hx(eta1, self.u, eta1)).reshape(-1)
-                z_k1_k = z_k1_k_full[valid_indices]  # Only valid predictions
+                self.z_k1_k = z_k1_k_full[valid_indices]  # Only valid predictions
                 R_full = self.R  # Save the full R matrix
-                R = self.R[np.ix_(valid_indices, valid_indices)]  # Remove rows/cols
+                self.R = self.R[np.ix_(valid_indices, valid_indices)]  # Remove rows/cols
 
-                P_zz = (
-                    Hx @ self.P_k1_k @ Hx.T + R
+                self.P_zz = (
+                    self.Hx @ self.P_k1_k @ self.Hx.T + self.R
                 )  # Covariance matrix of observation error (for valid z)
                 std_z = np.sqrt(
-                    np.diag(P_zz)
+                    np.diag(self.P_zz)
                 )  # Standard deviation of observation error (for valid z)
 
                 # Gain (K)
-                K = self.P_k1_k @ Hx.T @ np.linalg.inv(P_zz)
+                self.K = self.P_k1_k @ self.Hx.T @ np.linalg.inv(self.P_zz)
 
                 # New observation for valid z values
-                eta2 = self.x_k1_k + K @ (
-                    z_valid
-                    - z_k1_k
-                    - np.array((Hx @ (self.x_k1_k - eta1).T)).reshape(-1)
+                eta2 = self.x_k1_k + self.K @ (
+                    self.z_valid
+                    - self.z_k1_k
+                    - np.array((self.Hx @ (self.x_k1_k - eta1).T)).reshape(-1)
                 )
                 eta2 = np.array(eta2).reshape(-1)
                 err = np.linalg.norm(eta2 - eta1) / np.linalg.norm(eta1)
@@ -151,13 +152,13 @@ class ExtendedKalmanFilter:
 
         else:
             # Non-iterative case
-            self.Hx_full = np.array(self.calc_Hx(self.x_k1_k, self.u, self.x_k1_k))  # Full Hx
-            self.Hx = self.Hx_full[valid_indices, :]  # Reduced Hx
+            Hx_full = np.array(self.calc_Hx(self.x_k1_k, self.u, self.x_k1_k))  # Full Hx
+            self.Hx = Hx_full[valid_indices, :]  # Reduced Hx
 
             # Observation and observation error predictions (valid observations only)
-            self.z_k1_k_full = np.array(self.calc_hx(self.x_k1_k, self.u, self.x_k1_k)).reshape(-1)
-            self.z_k1_k = self.z_k1_k_full[valid_indices]  # Only valid predictions
-            self.R_full = self.R  # Save the full R matrix
+            z_k1_k_full = np.array(self.calc_hx(self.x_k1_k, self.u, self.x_k1_k)).reshape(-1)
+            self.z_k1_k = z_k1_k_full[valid_indices]  # Only valid predictions
+            R_full = self.R  # Save the full R matrix
             self.R = self.R[np.ix_(valid_indices, valid_indices)]  # Remove rows/cols
 
             self.P_zz = (
@@ -173,12 +174,12 @@ class ExtendedKalmanFilter:
                 self.x_k1_k + self.K @ (self.z_valid - self.z_k1_k)
             ).reshape(-1)
 
-        self.P_k1_k1 = (np.eye(self.n) - K @ Hx) @ self.P_k1_k
+        self.P_k1_k1 = (np.eye(self.n) - self.K @ self.Hx) @ self.P_k1_k
         self.std_x_cor = np.sqrt(
             np.diag(self.P_k1_k1)
         )  # Standard deviation of state estimation error (for validation)
         
-        self.debug_info = self._output_debug_info(z_valid, z_k1_k, P_zz)
+        self.debug_info = self._output_debug_info(self.z_valid, self.z_k1_k, self.P_zz)
 
         # Restore full R and Hx for the next update
         self.R = R_full
