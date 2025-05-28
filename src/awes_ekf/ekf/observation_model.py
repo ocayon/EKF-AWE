@@ -100,9 +100,9 @@ class ObservationModel:
         if self.simConfig.obsData.tether_length:
             h = ca.vertcat(h, self.x[index_map["tether_length"]]-self.x[index_map["tether_length_offset"]])
         if self.simConfig.obsData.tether_elevation:
-            h = ca.vertcat(h, self.x[index_map["elevation_first_tether_element"]]-self.x[index_map["tether_elevation_offset"]])
+            h = ca.vertcat(h, self.x[index_map["elevation_0"]]-self.x[index_map["tether_elevation_offset"]])
         if self.simConfig.obsData.tether_azimuth:
-            h = ca.vertcat(h, self.x[index_map["azimuth_first_tether_element"]] - self.x[index_map["tether_azimuth_offset"]])
+            h = ca.vertcat(h, self.x[index_map["azimuth_0"]] - self.x[index_map["tether_azimuth_offset"]])
         if self.simConfig.enforce_vertical_wind_to_0:
             h = ca.vertcat(h, self.x[index_map["vw_2"]])
         if self.simConfig.obsData.kite_apparent_windspeed:

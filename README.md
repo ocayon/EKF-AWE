@@ -177,6 +177,6 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 ### Copyright
 Technische Universiteit Delft hereby disclaims all copyright interest in the code "EKF-AWE" written by the Author(s).
 
-Copyright &copy; 2024 Oriol Cayon 
-
 Prof. Dr. H.G.C. (Henri) Werij, Dean of Faculty of Aerospace Engineering
+
+Copyright &copy; 2024 Oriol Cayon 

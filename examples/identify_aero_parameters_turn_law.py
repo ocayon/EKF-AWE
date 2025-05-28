@@ -2,22 +2,34 @@ import numpy as np
 import matplotlib.pyplot as plt
 from awes_ekf.setup.settings import load_config
 from awes_ekf.load_data.read_data import read_results
-from awes_ekf.utils import calculate_weighted_least_squares
+from awes_ekf.utils import calculate_weighted_least_squares, calculate_turn_rate_law
 
 # Example usage
 plt.close("all")
-config_file_name = "v3_config.yaml"
-config = load_config()
+# config = load_config()
 
 # Load results and flight data and plot kite reference frame
 cut = 80000
 results, flight_data,_ = read_results(
-    str(config["year"]),
-    str(config["month"]),
-    str(config["day"]),
-    config["kite"]["model_name"],
-    addition="_lt",
+    "2023",
+    "11",
+    "27",
+    "v9",
+    addition="_va",
 )
+
+
+if "kite_yaw_rate" not in flight_data.columns:
+    flight_data["kite_yaw_rate"] = np.convolve(np.gradient(flight_data["kite_yaw_0"], flight_data["time"]), np.ones(20) / 20, mode="same")
+
+plt.plot(flight_data["time"], results["wing_lift_coefficient"], label="CL")
+plt.xlabel("Time [s]")
+plt.ylabel("CL")
+plt.show()
+
+yaw_rate, coeffs = calculate_turn_rate_law(results, flight_data, model = "simple", steering_offset=False)
+
+print(f"Coefficients: {coeffs}")
 
 def construct_A_matrix(dependencies, **kwargs):
     """
@@ -73,9 +85,9 @@ dependencies = [
     "alpha**2",             # a_2 * alpha^2
     "up",                   # a_3 * up
     "us",                   # a_4 * us
-    "alpha * us",           # a_5 * alpha * us
-    "alpha * up",           # a_6 * alpha * up
-    "up * us"               # a_7 * up * us
+    # "alpha * us",           # a_5 * alpha * us
+    # "alpha * up",           # a_6 * alpha * up
+    # "up * us"               # a_7 * up * us
 ]
 
 # Mask and input data (as per example)
@@ -86,7 +98,7 @@ us = abs(np.array(flight_data["us"]))[mask]
 data = results[mask]["wing_lift_coefficient"]  # or wing_drag_coefficient or other target data
 
 # Call the function to fit the model and evaluate
-results = fit_and_evaluate_model(
+fit = fit_and_evaluate_model(
     data,
     dependencies,
     alpha=alpha,
@@ -97,9 +109,13 @@ results = fit_and_evaluate_model(
 # Plot results (optional)
 plt.figure()
 plt.plot(flight_data["time"][mask], data, label="Measured Data", color="black", alpha=0.5)
-plt.plot(flight_data["time"][mask], results["data_est"], label="Model Estimation")
+plt.plot(flight_data["time"][mask], fit["data_est"], label="Model Estimation")
 plt.xlabel("Time [s]")
 plt.ylabel("Coefficient")
 plt.legend()
 plt.grid(True)
 plt.show()
+
+
+
+
