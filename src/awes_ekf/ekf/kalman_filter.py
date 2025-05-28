@@ -138,7 +138,7 @@ class ExtendedKalmanFilter:
                 K = self.P_k1_k @ Hx.T @ np.linalg.inv(P_zz)
 
                 # New observation for valid z values
-                eta2 = self.x_k1_k + self.K @ (
+                eta2 = self.x_k1_k + K @ (
                         z_valid
                         - z_k1_k
                         - np.array((Hx @ (self.x_k1_k - eta1).T)).reshape(-1)
