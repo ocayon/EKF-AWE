@@ -7,7 +7,7 @@ import os
 rho = 1.225  # Air density [kg/m^3]
 kappa = 0.4  # Von Karman constant [-]
 g = 9.81  # Gravity acceleration [m/s^2]
-z0 = 0.1  # Surface roughness [m]
+z0 = 0.01  # Surface roughness [m]
 
 
 # Load the configuration file

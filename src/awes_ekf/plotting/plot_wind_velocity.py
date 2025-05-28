@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 from awes_ekf.plotting.color_palette import get_color_list
+from awes_ekf.utils import calculate_uf_from_wind_velocity
 
 colors = get_color_list()
 
@@ -66,7 +67,11 @@ def plot_wind_timeseries(results, flight_data):
     axs[0].legend(frameon=True)
     axs[1].legend(frameon=True)
     axs[2].legend(frameon=True)
+    
 
+    uf = calculate_uf_from_wind_velocity(
+        results["wind_speed_horizontal"],results["kite_position_z"])
+    print("Mean friction velocity [m/s]:", np.mean(uf))
     # Adjust layout
     plt.tight_layout()
 

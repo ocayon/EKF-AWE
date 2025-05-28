@@ -120,6 +120,14 @@ def create_input_from_csv(
         steering_input = np.zeros(n_intervals)
 
     try:
+        kite_course = np.array(
+            flight_data["kite_course"]
+        )
+    except KeyError:
+        if simConfig.obsData.kite_course:
+            raise ValueError("No kite course data found, but required by the config file")
+        kite_course = np.zeros(n_intervals)
+    try:
         bridle_angle_of_attack = np.array(flight_data["bridle_angle_of_attack"])
     except KeyError:
         if simConfig.obsData.bridle_angle_of_attack:
@@ -211,6 +219,7 @@ def create_input_from_csv(
                 steering_input=steering_input[i],
                 kite_thrust_force=kite_thrust_force[i],
                 depower_input=depower_input[i],
+                kite_course=kite_course[i],
             )
         )
 

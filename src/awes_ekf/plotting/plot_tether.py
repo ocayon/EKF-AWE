@@ -13,8 +13,50 @@ def plot_tether(results, flight_data, config_data):
 
     plot_slack_tether_force(results, flight_data)
 
+    plot_tether_force_frequency(flight_data, results)
+
+    plt.figure()
+    plt.plot(np.gradient(flight_data["tether_reelout_speed"], flight_data["time"]), label="Tether Reel-out Speed", color=colors[2])
+    plt.plot(np.gradient(flight_data["kcu_actual_depower"]/max(flight_data["kcu_actual_depower"]), flight_data["time"]), label="Tether Reel-in Speed", color=colors[3])
+
+    plt.figure()
+    plt.plot(flight_data["time"], flight_data["kcu_actual_depower"], label="Ground Tether Force", color=colors[4])
     plt.show()
 
+
+def plot_tether_force_frequency(flight_data, results):
+    """
+    Plots tether force in frequency domain.
+    """
+    #Convert to frequency domain
+    # Compute dt from regularly sampled data (e.g., mean of diffs)
+    # Time step estimation (assuming regular sampling)
+    dt = np.mean(np.diff(flight_data["time"]))
+
+    # Get signal and apply a Hanning window to reduce spectral leakage
+    tether_force = flight_data["ground_tether_force"]
+    window = np.hanning(len(tether_force))
+    tether_force_windowed = tether_force * window
+
+    # Compute FFT and frequency vector
+    tether_force_freq = np.fft.fft(tether_force_windowed)
+    freq = np.fft.fftfreq(len(tether_force), dt)
+
+    # Normalize by number of points
+    tether_force_magnitude = 2.0 / len(tether_force) * np.abs(tether_force_freq)
+    
+    # Mask for positive frequencies
+    mask = freq > 0
+
+    # Plotting
+    fig, ax = plt.subplots(figsize=(12, 5))
+    ax.plot(freq[mask], tether_force_magnitude[mask], label="Tether Force Spectrum", color=colors[0])
+    ax.set_xlabel("Frequency [Hz]")
+    ax.set_ylabel("Amplitude")
+    ax.set_xlim([0, 0.5 / dt])  # Nyquist limit
+    ax.set_ylim(bottom=0)
+    ax.legend()
+    ax.grid(True)
 
 def plot_kite_tether_angles(flight_data, results, plot_phase_roll=True, plot_phase_pitch=False):
     """

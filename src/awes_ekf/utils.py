@@ -53,6 +53,13 @@ def calculate_log_wind_velocity(uf, wdir, wvel_z, z):
     vw = np.array([wvel * np.cos(wdir), wvel * np.sin(wdir), wvel_z])
     return vw
 
+def calculate_uf_from_wind_velocity(wvel, z):
+    """
+    Calculate the friction velocity (uf) from the wind velocity (vw) and height (z).
+
+    """
+    uf = wvel*kappa/np.log(z/z0)
+    return uf
 
 
 def project_onto_plane(

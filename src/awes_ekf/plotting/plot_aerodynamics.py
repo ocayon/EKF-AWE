@@ -23,6 +23,11 @@ def plot_aerodynamics(results, flight_data, config_data):
     CD_mean_powered = results["wing_drag_coefficient"][flight_data["powered"] == "powered"].mean()  
     print(f"Mean CL powered: {CL_mean_powered:.2f}")
     print(f"Mean CD powered: {CD_mean_powered:.2f}")
+    # for col in results.columns:
+    #     if "drag_coefficient" in col:
+    #         print(f"Mean {col} powered: {results[col][flight_data['powered'] == 'powered'].mean():.2f}")
+    # CD_mean_powered_sys = np.mean(results["wing_drag_coefficient"][flight_data["powered"] == "powered"] + results["kcu_drag_coefficient"][flight_data["powered"] == "powered"]+ results["bridle_drag_coefficient"][flight_data["powered"] == "powered"])
+    # print(f"Mean CD powered system: {CD_mean_powered_sys:.2f}")
     print(f"Mean CL/CD powered: {CL_mean_powered/CD_mean_powered:.2f}")
 
     std_CL_powered = results["wing_lift_coefficient"][flight_data["powered"] == "powered"].std()

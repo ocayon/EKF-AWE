@@ -24,6 +24,7 @@ class EKFInput:
     steering_input: float = None  # Steering input (don't use, define units later) (from -1 to 1)
     kite_thrust_force: np.ndarray = field(default_factory=lambda: np.zeros(3))  # Thrust force (fly-gen kites value) (N)
     depower_input: float = None  # Depower input (Units are irrelevant, as constant is automatically calculated) (from 0 to 1)
+    kite_course: float = None # Kite course angle (angle between kite velocity and ENU x-axis) (rad)
 
     def __post_init__(self):
         # Ensure all array attributes have a length of 3

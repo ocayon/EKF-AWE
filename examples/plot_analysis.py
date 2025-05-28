@@ -3,7 +3,7 @@ from pathlib import Path
 import pandas as pd
 
 # Assume imported plotting functions for each category
-from awes_ekf.plotting import plot_aerodynamics, plot_kinematics, plot_tether, plot_wind_velocity, plot_ekf_performance, personalized_plot
+from awes_ekf.plotting import plot_aerodynamics, plot_kinematics, plot_tether, plot_wind_velocity, plot_ekf_performance, personalized_plot, plot_system_performance
 
 def select_plot_category():
     # Provide user with category options
@@ -13,8 +13,9 @@ def select_plot_category():
         "2": ("Kinematics", plot_kinematics),
         "3": ("Tether", plot_tether),
         "4": ("Wind Velocity", plot_wind_velocity),
-        "5": ("Personalized", personalized_plot), 
-        "6": ("EKF performance", plot_ekf_performance)
+        "5": ("System Performance", plot_system_performance),
+        "6": ("Personalized", personalized_plot), 
+        "7": ("EKF performance", plot_ekf_performance)
     }
     for key, (label, _) in categories.items():
         print(f"{key}: {label}")
