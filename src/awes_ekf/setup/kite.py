@@ -60,6 +60,10 @@ class PointMassEKF(Kite):
         self.yaw = ca.SX.sym("yaw")  # Bias angle of attack
         self.us = ca.SX.sym("us")  # Steering input
         self.k_yaw_rate = ca.SX.sym("k_yaw_rate")  # Yaw rate constant
+        self.k_cl_up = ca.SX.sym("k_cl_up") # Effect of depower rate on CL
+        self.k_cd_up = ca.SX.sym("k_cd_up") # Effect of depower rate on CL
+        self.depower_input = ca.SX.sym("depower_input") 
+        self.delta_up = ca.SX.sym("delta_up") # Change in depower setting
 
         self.get_wind_velocity()
         self.va = self.vw - self.v
@@ -112,6 +116,12 @@ class PointMassEKF(Kite):
         if self.simConfig.obsData.tether_azimuth:
             self.x = ca.vertcat(self.x, self.tether_azimuth_offset)
             self.state_names.append("tether_azimuth_offset")
+            
+        if self.simConfig.obsData.dynamic_depower:
+            self.x = ca.vertcat(self.x, self.k_cl_up)
+            self.state_names.append("k_cl_up")
+            self.x = ca.vertcat(self.x, self.k_cd_up)
+            self.state_names.append("k_cd_up")
 
         return self.x
 
@@ -156,6 +166,12 @@ class PointMassEKF(Kite):
         if self.simConfig.model_yaw:
             input = ca.vertcat(input, self.us)
             self.input_names.append("us")
+
+        if self.simConfig.obsData.dynamic_depower:
+            input = ca.vertcat(input, self.depower_input)
+            self.input_names.append("depower_input")
+            input = ca.vertcat(input, self.delta_up)
+            self.input_names.append("delta_up")
 
         return input
 
@@ -222,7 +238,17 @@ class PointMassEKF(Kite):
         v_kite_tan_vert = ca.dot(v_kite, vert_norm)
         elevation_rate = v_kite_tan_vert / r_norm
         azimuth_rate = v_kite_tan_horz / (r_norm * ca.cos(elevation_0))
-        
+
+        if self.simConfig.obsData.dynamic_depower:
+            k_cl_up = self.k_cl_up
+            k_cd_up = self.k_cd_up
+            delta_up = self.delta_up
+            
+            CLdot = k_cl_up*delta_up
+            CDdot = k_cd_up*delta_up
+        else:
+            CLdot = 0
+            CDdot = 0
 
         fx = ca.vertcat(rp, vp, 0, 0, 0, 0, 0, 0, self.reelout_speed, elevation_rate, azimuth_rate)
         if self.simConfig.model_yaw:
@@ -233,6 +259,9 @@ class PointMassEKF(Kite):
         if self.simConfig.obsData.tether_elevation:
             fx = ca.vertcat(fx, 0)
         if self.simConfig.obsData.tether_azimuth:
+            fx = ca.vertcat(fx, 0)
+        if self.simConfig.obsData.dynamic_depower:
+            fx = ca.vertcat(fx, 0)
             fx = ca.vertcat(fx, 0)
 
         return fx
