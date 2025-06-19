@@ -84,6 +84,7 @@ class ObservationData:
     bridle_angle_of_sideslip: bool = False
     kite_yaw_angle: bool = False
     kite_thrust_force: bool = False
+    dynamic_depower: bool = True
 
 
 class TuningParameters:
@@ -108,6 +109,8 @@ class TuningParameters:
                 "tether_length",
                 "tether_elevation",
                 "tether_azimuth",
+                "k_cl_up",
+                "k_cd_up"
             ]
         else:
             indices = [
@@ -126,6 +129,8 @@ class TuningParameters:
                 "tether_length",
                 "tether_elevation",
                 "tether_azimuth",
+                "k_cl_up",
+                "k_cd_up"
             ]
 
         self.stdv_dynamic_model = np.array([float(self.dict_model_stdv[key]) for key in indices])
