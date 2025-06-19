@@ -108,6 +108,8 @@ class TuningParameters:
                 "tether_length",
                 "tether_elevation",
                 "tether_azimuth",
+                "k_cl_up",
+                "k_cd_up"
             ]
         else:
             indices = [
@@ -126,6 +128,8 @@ class TuningParameters:
                 "tether_length",
                 "tether_elevation",
                 "tether_azimuth",
+                "k_cl_up",
+                "k_cd_up"
             ]
 
         self.stdv_dynamic_model = np.array([float(self.dict_model_stdv[key]) for key in indices])
