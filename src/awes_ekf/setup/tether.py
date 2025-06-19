@@ -3,7 +3,7 @@ from awes_ekf.setup.settings import g, rho, z0
 from scipy.optimize import least_squares
 from awes_ekf.utils import project_onto_plane, calculate_angle_2vec
 import casadi as ca
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 tether_materials = {
     "Dyneema-SK78": {
@@ -102,7 +102,7 @@ class Tether:
             at = (
                 ca.dot(a_kite, v_kite / ca.norm_2(v_kite)) * v_kite / ca.norm_2(v_kite)
             )  # Tangential acceleration
-            omega_kite = -ca.cross(a_kite-at, v_kite) / (
+            omega_kite = -ca.cross(a_kite - at, v_kite) / (
                 ca.norm_2(v_kite) ** 2
             )  # Angular velocity of the kite
             ICR = -ca.cross(v_kite, omega_kite) / (
@@ -184,21 +184,26 @@ class Tether:
                 )
 
             # Determine flow at point mass j.
-            vaj = vwj -vj  # Apparent wind velocity
+            vaj = vwj - vj  # Apparent wind velocity
 
             vajp = ca.dot(vaj, ej) * ej  # Parallel to tether element
             # TODO: check whether to use vajn
             vajn = vaj - vajp  # Perpendicular to tether element
 
-            vaj_sq = ca.norm_2(vaj)**2
+            vaj_sq = ca.norm_2(vaj) ** 2
 
             # Determina angle between  va and tether
             theta = calculate_angle_2vec(vaj, ej)
-            cd_t = self.cd * ca.sin(theta) ** 3 + np.pi*self.cf*ca.cos(theta)**3
-            cl_t = self.cd * ca.sin(theta) ** 2 * ca.cos(theta)-np.pi*self.cf*ca.sin(theta)*ca.cos(theta)**2
-            dir_D = vaj / ca.norm_2(vaj) # Drag direction
-            dir_L = -(ej - ca.dot(ej, dir_D) * dir_D) # Lift direction
-            dynamic_pressure_area = 0.5 * rho * ca.norm_2(vaj) ** 2 * l_unstrained * self.diameter
+            cd_t = self.cd * ca.sin(theta) ** 3 + np.pi * self.cf * ca.cos(theta) ** 3
+            cl_t = (
+                self.cd * ca.sin(theta) ** 2 * ca.cos(theta)
+                - np.pi * self.cf * ca.sin(theta) * ca.cos(theta) ** 2
+            )
+            dir_D = vaj / ca.norm_2(vaj)  # Drag direction
+            dir_L = -(ej - ca.dot(ej, dir_D) * dir_D)  # Lift direction
+            dynamic_pressure_area = (
+                0.5 * rho * ca.norm_2(vaj) ** 2 * l_unstrained * self.diameter
+            )
 
             # Calculate lift and drag using the common factor
             lift_j = dynamic_pressure_area * cl_t * dir_L
@@ -214,26 +219,53 @@ class Tether:
                     faj = 0.5 * drag_j + 0.5 * lift_j
             else:
                 if last_element:
-                    faj = 0.5*drag_bridles +0.5*lift_bridles
+                    faj = 0.5 * drag_bridles + 0.5 * lift_bridles
 
                 elif kcu_element:
-                    drag_bridles = 0.5*rho*kcu.total_length_bridle_lines*kcu.diameter_bridle_lines*vaj_sq*cd_t # Bridle lines drag
+                    drag_bridles = (
+                        0.5
+                        * rho
+                        * kcu.total_length_bridle_lines
+                        * kcu.diameter_bridle_lines
+                        * vaj_sq
+                        * cd_t
+                    )  # Bridle lines drag
                     drag_bridles = drag_bridles * dir_D
-                    lift_bridles = 0.5*rho*kcu.total_length_bridle_lines*kcu.diameter_bridle_lines*vaj_sq*cl_t # Bridle lines lift
+                    lift_bridles = (
+                        0.5
+                        * rho
+                        * kcu.total_length_bridle_lines
+                        * kcu.diameter_bridle_lines
+                        * vaj_sq
+                        * cl_t
+                    )  # Bridle lines lift
                     lift_bridles = lift_bridles * dir_L
-                    
-                    dp_kcu= .5*rho*ca.norm_2(vajp)*vajp*kcu.cdp*kcu.Ap  # Adding kcu drag perpendicular to kcu
-                    dt_kcu= .5*rho*ca.norm_2(vajn)*vajn*kcu.cdt*kcu.At  # Adding kcu drag parallel to kcu
-                    th = -0.5*rho*vaj_sq*ca.pi*0.2**2*0.4       # Add thrust of a wind turbine if present
+
+                    dp_kcu = (
+                        0.5 * rho * ca.norm_2(vajp) * vajp * kcu.cdp * kcu.Ap
+                    )  # Adding kcu drag perpendicular to kcu
+                    dt_kcu = (
+                        0.5 * rho * ca.norm_2(vajn) * vajn * kcu.cdt * kcu.At
+                    )  # Adding kcu drag parallel to kcu
+                    th = (
+                        -0.5 * rho * vaj_sq * ca.pi * 0.2**2 * 0.4
+                    )  # Add thrust of a wind turbine if present
                     # D_turbine = 0.5*rho*ca.norm_2(vaj)**2*ca.pi*0.2**2*1
-                    D_kcu = ca.norm_2(dp_kcu+dt_kcu)
-                    faj = dp_kcu+dt_kcu+0.5*drag_bridles+0.5*lift_bridles+0.5*drag_j+0.5*lift_j
-                    
+                    D_kcu = ca.norm_2(dp_kcu + dt_kcu)
+                    faj = (
+                        dp_kcu
+                        + dt_kcu
+                        + 0.5 * drag_bridles
+                        + 0.5 * lift_bridles
+                        + 0.5 * drag_j
+                        + 0.5 * lift_j
+                    )
+
                 else:
-                    faj = lift_j  + drag_j 
+                    faj = lift_j + drag_j
 
                     drag_tether += ca.norm_2(drag_j)
-  
+
             if kcu is None:
                 if last_element:
                     point_mass = m_s / 2 + kite.mass
@@ -331,7 +363,9 @@ class Tether:
         # Parasitic drag of tether and KCU
         if kcu is not None:
             cd_kcu = D_kcu / (0.5 * rho * ca.norm_2(vaj) ** 2 * kite.area)
-            cd_bridles = ca.norm_2(drag_bridles) / (0.5 * rho * ca.norm_2(vaj) ** 2 * kite.area)
+            cd_bridles = ca.norm_2(drag_bridles) / (
+                0.5 * rho * ca.norm_2(vaj) ** 2 * kite.area
+            )
         else:
             cd_kcu = 0
             cd_bridles = 0
@@ -372,7 +406,6 @@ class Tether:
                 "tether_length", args, [stretched_tether_length]
             ),
             "positions": ca.Function("positions", args, [positions]),
-            
         }
 
         return res
@@ -445,7 +478,7 @@ class TetherInput:
     tether_length: float
     tether_elevation: float
     tether_azimuth: float
-    wind_velocity: np.ndarray = np.array([1e-3, 1e-3, 0])
+    wind_velocity: np.ndarray = field(default_factory=lambda: np.zeros(3))
     kite_acceleration: np.ndarray = None
     kcu_acceleration: np.ndarray = None
     kcu_velocity: np.ndarray = None

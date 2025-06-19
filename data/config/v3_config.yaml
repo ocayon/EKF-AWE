@@ -23,10 +23,11 @@ simulation_parameters:
     kcu_position: false                    # KCU position measurement
     kcu_velocity: false                    # KCU velocity measurement
     kcu_acceleration: false                    # KCU acceleration measurement
-    kite_apparent_windspeed: false         # Apparent wind speed measurement
+    kite_apparent_windspeed: true         # Apparent wind speed measurement
     bridle_angle_of_attack: false            # Angle of attack measurement
     bridle_angle_of_sideslip: false             # Sideslip angle measurement
     kite_yaw_angle: false                  # Yaw angle measurement
+    dynamic_depower: true                # Dynamic depower optionality
 
 kite:
   model_name: 'v3'                # Kite model

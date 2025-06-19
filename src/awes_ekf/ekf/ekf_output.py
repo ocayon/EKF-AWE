@@ -25,8 +25,12 @@ class EKFOutput:
     kite_velocity_z: float = None  # Kite velocity in ENU coordinates (m/s)
     kite_roll: float = None  # Bridle element roll angle in radians, NED frame (rad)
     kite_pitch: float = None  # Bridle element pitch angle in radians, NED frame (rad)
-    kite_yaw: float = None  # Bridle element yaw angle in radians, NED frame (rad) (towards the kite apparent velocity direction)
-    kite_yaw_kin: float = None  # Bridle element yaw angle in radians, NED frame (rad) (towards the kite velocity direction)
+    kite_yaw: float = (
+        None  # Bridle element yaw angle in radians, NED frame (rad) (towards the kite apparent velocity direction)
+    )
+    kite_yaw_kin: float = (
+        None  # Bridle element yaw angle in radians, NED frame (rad) (towards the kite velocity direction)
+    )
     kite_elevation: float = None  # Elevation angle of the kite (rad)
     kite_thrust_force: float = None  # Thrust force applied to the kite (N)
 
@@ -50,17 +54,19 @@ class EKFOutput:
     tether_azimuth_offset: float = None  # Tether azimuth measurement offset (rad)
     tether_force_kite: float = None  # Tether force at the bridle point (N)
     tether_roll: float = None  # Roll of the first tether element below KCU (rad)
-    tether_pitch: float = (
-        None  # Pitch of the first tether element below KCU (rad)
+    tether_pitch: float = None  # Pitch of the first tether element below KCU (rad)
+    tether_yaw: float = (
+        None  # Yaw of the first tether element below KCU (rad) (Velocity direction)
     )
-    tether_yaw: float = None  # Yaw of the first tether element below KCU (rad) (Velocity direction)
 
     # Aerodynamic parameters
     kite_apparent_windspeed: float = None  # Apparent wind speed at the kite (m/s)
     kite_angle_of_attack: float = (
         None  # Angle of attack of the bridle tether element (rad)
     )
-    kite_sideslip_angle: float = None  # Sideslip angle in degrees (rad) (Angle between velocity and apparent velocity)
+    kite_sideslip_angle: float = (
+        None  # Sideslip angle in degrees (rad) (Angle between velocity and apparent velocity)
+    )
     wing_lift_coefficient: float = None  # Lift coefficient of the wing (-)
     wing_drag_coefficient: float = None  # Drag coefficient of the wing (-)
     wing_sideforce_coefficient: float = None  # Side force coefficient of the wing (-)
@@ -86,7 +92,11 @@ class EKFOutput:
     # Performance metrics
     normalized_innovation_squared: float = None  # Normalized innovation squared
     mahalanobis_distance: float = None  # Mahalanobis distance
-    normalized_residual_norm: float = None  # Norm of the normalized residuals by the stdv (0 is best fit) (more than 1 is bad)
+    normalized_residual_norm: float = (
+        None  # Norm of the normalized residuals by the stdv (0 is best fit) (more than 1 is bad)
+    )
+    k_cl_up: float = None  # Power input coefficient with cl
+    k_cd_up: float = None  # Power input coefficient with cd
 
 
 def create_ekf_output(x, u, ekf_input, tether, kite, simConfig):
@@ -98,6 +108,9 @@ def create_ekf_output(x, u, ekf_input, tether, kite, simConfig):
     # Store kite position and velocity from state vector
     r_kite = np.array([x[state_index_map[f"r_{i}"]] for i in range(3)])
     v_kite = np.array([x[state_index_map[f"v_{i}"]] for i in range(3)])
+
+    k_cl_up = float(x[state_index_map.get("k_cl_up", 0)])
+    k_cd_up = float(x[state_index_map.get("k_cd_up", 0)])
 
     # Calculate wind velocity based on configuration
     if simConfig.log_profile:
@@ -192,10 +205,12 @@ def create_ekf_output(x, u, ekf_input, tether, kite, simConfig):
         tether_pitch=euler_angles1[1],
         tether_yaw=euler_angles1[2],
         tether_length_offset=x[state_index_map.get("tether_length_offset", 0)],
-        tether_elevation_offset = x[state_index_map.get("tether_elevation_offset", 0)],
-        tether_azimuth_offset = x[state_index_map.get("tether_azimuth_offset", 0)],
+        tether_elevation_offset=x[state_index_map.get("tether_elevation_offset", 0)],
+        tether_azimuth_offset=x[state_index_map.get("tether_azimuth_offset", 0)],
         tether_force_kite=tether_force_kite,
         kite_apparent_windspeed=kite_apparent_windspeed,
+        k_cl_up=k_cl_up,
+        k_cd_up=k_cd_up,
     )
 
     # Optional yaw modeling
