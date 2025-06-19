@@ -411,6 +411,8 @@ class Tether:
             length = np.linalg.norm(r_kite)
 
             self.opt_guess = [elevation, azimuth, length]
+            if not np.all(np.isfinite(self.opt_guess)):
+                self.opt_guess = [0, 0, 0]
 
         args = (tension_ground, r_kite, v_kite, vw)
 
@@ -420,20 +422,26 @@ class Tether:
             args += (a_kcu,)
         if self.obsData.kcu_velocity:
             args += (v_kcu,)
-
-        opt_res = least_squares(
-            self.objective_function,
-            self.opt_guess,
-            args=args,
-            verbose=0,
-            xtol=1e-5,
-            ftol=1e-5,
-        )
-        self.opt_guess = opt_res.x
-        tetherInput.tether_length = opt_res.x[2]
-        tetherInput.tether_elevation = opt_res.x[0]
-        tetherInput.tether_azimuth = opt_res.x[1]
-
+        try:
+            opt_res = least_squares(
+                self.objective_function,
+                self.opt_guess,
+                args=args,
+                verbose=0,
+                xtol=1e-5,
+                ftol=1e-5,
+            )
+            
+            self.opt_guess = opt_res.x
+            tetherInput.tether_length = opt_res.x[2]
+            tetherInput.tether_elevation = opt_res.x[0]
+            tetherInput.tether_azimuth = opt_res.x[1]
+        except:
+            self.opt_guess = self.opt_guess
+            tetherInput.tether_length = 1
+            tetherInput.tether_elevation = 1
+            tetherInput.tether_azimuth = 1
+            
         return tetherInput
 
 
