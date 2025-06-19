@@ -199,6 +199,7 @@ def create_input_from_csv(
         raise ValueError("Initial wind velocity is NaN")
 
     ekf_input_list = []
+    delta_up = np.gradient(depower_input, timestep)
     for i in range(len(flight_data)):
         ekf_input_list.append(
             EKFInput(
@@ -220,6 +221,7 @@ def create_input_from_csv(
                 kite_thrust_force=kite_thrust_force[i],
                 depower_input=depower_input[i],
                 kite_course=kite_course[i],
+                delta_up=delta_up[i]
             )
         )
 
@@ -237,7 +239,7 @@ def find_initial_state_vector(tether, ekf_input, simConfig, wind_velocity=np.arr
         tether_elevation=ekf_input.tether_elevation_ground,
         tether_azimuth=ekf_input.tether_azimuth_ground,
         tether_length=ekf_input.tether_length,
-        wind_velocity=wind_velocity,
+        wind_velocity=wind_velocity
     )
 
     tether_input = tether.solve_tether_shape(tether_input)
@@ -282,5 +284,8 @@ def find_initial_state_vector(tether, ekf_input, simConfig, wind_velocity=np.arr
         x0 = np.append(x0, 0)  # Initial tether elevation offset
     if simConfig.obsData.tether_azimuth:
         x0 = np.append(x0, 0)
+    if simConfig.obsData.dynamic_depower:
+        x0 = np.append(x0, -0.6)
+        x0 = np.append(x0, -0.06)
 
     return x0
