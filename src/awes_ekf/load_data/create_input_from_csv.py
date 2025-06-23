@@ -212,7 +212,8 @@ def create_input_from_csv(
     uf = init_wind_vel * kappa / np.log(10 / z0)
     wvel0 = uf / kappa * np.log(kite_position[0][2] / z0)
     if np.isnan(wvel0):
-        raise ValueError("Initial wind velocity is NaN")
+        wvel0 = 5  # Default value if initial wind velocity is NaN
+        # raise ValueError("Initial wind velocity is NaN")
 
     ekf_input_list = []
     import matplotlib.pyplot as plt

@@ -4,8 +4,10 @@ caca_turn.py
 Scipy_implementation.py
 cd_kcu.py
 data/flight_logs/v9/
+data/flight_logs/v11/
 data/flight_logs/kitekraft/
 data/config/v9_config.yaml
+data/config/v11_config.yaml
 data/config/kft_config.yaml
 data/data_preprocessors/process_KFT_data.py
 data/data_preprocessors/process_KP_data.py
