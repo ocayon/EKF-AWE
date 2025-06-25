@@ -1,4 +1,4 @@
-# Extended Kalman Filter for Airborne Wind Energy Systems (AWES)
+# Extended (Iterated) Kalman Filter for Airborne Wind Energy Systems (AWES)
 
 This repository provides tools to process flight data and apply an Extended Kalman Filter (EKF) to estimate the dynamic state of a kite system in Airborne Wind Energy Systems (AWES). The EKF processes essential flight data inputs and generates accurate estimates of the kite's state, helping researchers and engineers model and analyze kite-based wind energy systems effectively.
 
