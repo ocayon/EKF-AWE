@@ -5,10 +5,11 @@ from awes_ekf.plotting.plot_utils import plot_time_series
 
 colors = get_color_list()
 
+
 def plot_tether(results, flight_data, config_data):
 
     set_plot_style_no_latex()
-   
+
     plot_kite_tether_angles(flight_data, results)
 
     plot_slack_tether_force(results, flight_data)
@@ -16,11 +17,27 @@ def plot_tether(results, flight_data, config_data):
     plot_tether_force_frequency(flight_data, results)
 
     plt.figure()
-    plt.plot(np.gradient(flight_data["tether_reelout_speed"], flight_data["time"]), label="Tether Reel-out Speed", color=colors[2])
-    plt.plot(np.gradient(flight_data["kcu_actual_depower"]/max(flight_data["kcu_actual_depower"]), flight_data["time"]), label="Tether Reel-in Speed", color=colors[3])
+    plt.plot(
+        np.gradient(flight_data["tether_reelout_speed"], flight_data["time"]),
+        label="Tether Reel-out Speed",
+        color=colors[2],
+    )
+    plt.plot(
+        np.gradient(
+            flight_data["kcu_actual_depower"] / max(flight_data["kcu_actual_depower"]),
+            flight_data["time"],
+        ),
+        label="Tether Reel-in Speed",
+        color=colors[3],
+    )
 
     plt.figure()
-    plt.plot(flight_data["time"], flight_data["kcu_actual_depower"], label="Ground Tether Force", color=colors[4])
+    plt.plot(
+        flight_data["time"],
+        np.gradient(flight_data["tether_reelout_speed"], flight_data["time"]),
+        label="Ground Tether Force",
+        color=colors[4],
+    )
     plt.show()
 
 
@@ -28,7 +45,7 @@ def plot_tether_force_frequency(flight_data, results):
     """
     Plots tether force in frequency domain.
     """
-    #Convert to frequency domain
+    # Convert to frequency domain
     # Compute dt from regularly sampled data (e.g., mean of diffs)
     # Time step estimation (assuming regular sampling)
     dt = np.mean(np.diff(flight_data["time"]))
@@ -44,13 +61,18 @@ def plot_tether_force_frequency(flight_data, results):
 
     # Normalize by number of points
     tether_force_magnitude = 2.0 / len(tether_force) * np.abs(tether_force_freq)
-    
+
     # Mask for positive frequencies
     mask = freq > 0
 
     # Plotting
     fig, ax = plt.subplots(figsize=(12, 5))
-    ax.plot(freq[mask], tether_force_magnitude[mask], label="Tether Force Spectrum", color=colors[0])
+    ax.plot(
+        freq[mask],
+        tether_force_magnitude[mask],
+        label="Tether Force Spectrum",
+        color=colors[0],
+    )
     ax.set_xlabel("Frequency [Hz]")
     ax.set_ylabel("Amplitude")
     ax.set_xlim([0, 0.5 / dt])  # Nyquist limit
@@ -58,10 +80,13 @@ def plot_tether_force_frequency(flight_data, results):
     ax.legend()
     ax.grid(True)
 
-def plot_kite_tether_angles(flight_data, results, plot_phase_roll=True, plot_phase_pitch=False):
+
+def plot_kite_tether_angles(
+    flight_data, results, plot_phase_roll=True, plot_phase_pitch=False
+):
     """
     Plots the roll and pitch angles between kite and tether over time.
-    
+
     Parameters:
         flight_data (DataFrame): Data frame containing flight data, including time.
         results (DataFrame): Data frame with results, including kite and tether roll and pitch angles.
@@ -96,29 +121,33 @@ def plot_kite_tether_angles(flight_data, results, plot_phase_roll=True, plot_pha
     ax.set_ylabel("Angle [deg]")
     plt.tight_layout()
 
-def plot_slack_tether_force(results, flight_data,kcu = None):
-    
+
+def plot_slack_tether_force(results, flight_data, kcu=None):
+
     # Assuming 'slack' is in the 'results' DataFrame and 'tether_force' is in 'flight_data'
-    time = flight_data['time']  # Replace with the appropriate time variable
+    time = flight_data["time"]  # Replace with the appropriate time variable
     # r = np.sqrt(results["kite_position_x"]**2 + results["kite_position_y"]**2 + results["kite_position_z"]**2)
     # slack = flight_data['tether_length']+kcu.distance_kcu_kite-r
-    slack = results['slack']  # Replace with the appropriate slack variable
-    tether_force = flight_data['ground_tether_force']  # Replace with the appropriate tether force variable
-
+    slack = results["slack"]  # Replace with the appropriate slack variable
+    tether_force = flight_data[
+        "ground_tether_force"
+    ]  # Replace with the appropriate tether force variable
 
     fig, ax1 = plt.subplots(figsize=(9, 3))
 
     # Plotting Slack on the first axis
-    ax1 = plot_time_series(flight_data, slack, ax1, color=colors[0], ylabel='Sag (m)', plot_phase=True)
-    ax1.tick_params(axis='y', labelcolor=colors[0])
+    ax1 = plot_time_series(
+        flight_data, slack, ax1, color=colors[0], ylabel="Sag (m)", plot_phase=True
+    )
+    ax1.tick_params(axis="y", labelcolor=colors[0])
 
     # Creating a second y-axis for Tether Force
     ax2 = ax1.twinx()
-    ax2.set_ylabel('Tether Force (N)', color=colors[1])
-    ax2.plot(time, tether_force, color=colors[1], linestyle='--')
-    ax2.tick_params(axis='y', labelcolor=colors[1])
-    
-    ax1.set_xlabel('Time (s)')
+    ax2.set_ylabel("Tether Force (N)", color=colors[1])
+    ax2.plot(time, tether_force, color=colors[1], linestyle="--")
+    ax2.tick_params(axis="y", labelcolor=colors[1])
+
+    ax1.set_xlabel("Time (s)")
     # Get the current handles and labels
     handles, labels = ax1.get_legend_handles_labels()
 
@@ -137,18 +166,21 @@ def plot_slack_tether_force(results, flight_data,kcu = None):
     #     bbox_to_anchor=(0.075, 1)  # Adjust the x-coordinate to move the legend to the right
     # )
     from matplotlib.patches import Patch
+
     # Create a new patch for the legend
-    reel_out_straight_patch = Patch(color=colors[5], alpha=0.2, label="Reel-out - Straight")
+    reel_out_straight_patch = Patch(
+        color=colors[5], alpha=0.2, label="Reel-out - Straight"
+    )
     reel_out_turn_patch = Patch(color=colors[7], alpha=0.2, label="Reel-out - Turn")
-    reel_in_patch = Patch(color='white', alpha=1, label="Reel-in")
+    reel_in_patch = Patch(color="white", alpha=1, label="Reel-in")
     ax1.legend(
         [reel_out_straight_patch, reel_out_turn_patch, reel_in_patch],
         ["Reel-out - Straight", "Reel-out - Turn", "Reel-in"],
-        loc='best',
+        loc="best",
         frameon=True,
         # bbox_to_anchor=(0.075, 1)  # Adjust the x-coordinate to move the legend to the right
     )
     fig.tight_layout()  # Adjust layout to prevent overlap
 
     # Title and Grid
-    ax2.grid(True, linestyle='--', alpha=0.8)
+    ax2.grid(True, linestyle="--", alpha=0.8)

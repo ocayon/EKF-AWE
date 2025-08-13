@@ -2,7 +2,9 @@ import numpy as np
 from awes_ekf.utils import calculate_reference_frame_euler, calculate_airflow_angles
 
 
-def calculate_offset_pitch_depower_turn(flight_data, results, sensor_index=0, prefix="kite"):
+def calculate_offset_pitch_depower_turn(
+    flight_data, results, sensor_index=0, prefix="kite"
+):
     """
     Calculate the offset pitch for the depower phase on EKF mean pitch during depower.
 
@@ -18,12 +20,11 @@ def calculate_offset_pitch_depower_turn(flight_data, results, sensor_index=0, pr
     mask_turn = abs(flight_data["us"]) > 0.8
     mask_dep = flight_data["up"] > 0.6
     pitch_IMU = np.array(flight_data[f"{prefix}_pitch_{sensor_index}"])
-    
+
     if prefix == "kcu":
         prefix = "tether"
 
     pitch_EKF = np.array(results[f"{prefix}_pitch"])
-    
 
     offset_dep = np.mean(pitch_EKF[mask_dep] - pitch_IMU[mask_dep])
     offset_turn = np.mean(pitch_EKF[mask_turn] - pitch_IMU[mask_turn])
@@ -114,13 +115,12 @@ def remove_offsets_IMU_data(results, flight_data, sensor=0, prefix="kite"):
     flight_data[yaw_column] = unwrapped_angles
     unwrapped_angles = np.unwrap(results[f"{prefix_results}_yaw"])
     results[f"{prefix_results}_yaw"] = unwrapped_angles
-    yaw_offset = find_offset(
-        results[f"{prefix_results}_yaw"], flight_data[yaw_column]
-    )
+    yaw_offset = find_offset(results[f"{prefix_results}_yaw"], flight_data[yaw_column])
     flight_data[yaw_column] = flight_data[yaw_column] + yaw_offset
     print("Yaw offset: ", np.rad2deg(yaw_offset))
-    
+
     return flight_data
+
 
 def remove_offsets_IMU_data_v3(results, flight_data, sensor=0, prefix="kite"):
     """Remove offsets of IMU euler angles based on EKF results"""
@@ -153,9 +153,9 @@ def remove_offsets_IMU_data_v3(results, flight_data, sensor=0, prefix="kite"):
     mask = (flight_data["powered"] == "powered") & (abs(flight_data["us"]) < 0.3)
     yaw_column = f"{prefix}_yaw_{sensor}"
     unwrapped_angles = np.unwrap(flight_data[yaw_column])
-    flight_data[yaw_column] = flight_data[yaw_column]%(2*np.pi)
+    flight_data[yaw_column] = flight_data[yaw_column] % (2 * np.pi)
     unwrapped_angles = np.unwrap(results[f"{prefix_results}_yaw"])
-    results[f"{prefix_results}_yaw"] = results[f"{prefix_results}_yaw"]%(2*np.pi)
+    results[f"{prefix_results}_yaw"] = results[f"{prefix_results}_yaw"] % (2 * np.pi)
     yaw_offset = find_offset(
         results[mask][f"{prefix_results}_yaw"], flight_data[mask][yaw_column]
     )
@@ -205,17 +205,23 @@ def postprocess_results(
     results["wind_direction"] = results["wind_direction"] % (2 * np.pi)
 
     kite_sensors = config_data["kite"].get("sensor_ids", [])
-    
+
     if kcu:
         kcu_sensors = config_data["kcu"].get("sensor_ids", [])
     else:
         kcu_sensors = []
 
-    flight_data["tether_length"] = flight_data["tether_length"] + results["tether_length_offset"]
+    flight_data["tether_length"] = (
+        flight_data["tether_length"] + results["tether_length_offset"]
+    )
     for imu in kite_sensors:
-        flight_data = remove_offsets_IMU_data(results, flight_data, sensor=imu, prefix="kite")
+        flight_data = remove_offsets_IMU_data(
+            results, flight_data, sensor=imu, prefix="kite"
+        )
     for imu in kcu_sensors:
-        flight_data = remove_offsets_IMU_data(results, flight_data, sensor=imu, prefix="kcu")
+        flight_data = remove_offsets_IMU_data(
+            results, flight_data, sensor=imu, prefix="kcu"
+        )
 
     # Calculate apparent speed based on EKF results
     wvel = results["wind_speed_horizontal"]
@@ -274,15 +280,12 @@ def postprocess_results(
         results["wing_angle_of_attack_imu_" + str(imu)] = np.zeros(len(results))
         results["wing_sideslip_angle_imu_" + str(imu)] = np.zeros(len(results))
 
-    
     for imu in kite_sensors:
         offset_dep, offset_turn = calculate_offset_pitch_depower_turn(
             flight_data, results, sensor_index=imu, prefix="kite"
         )
 
-        results["offset_depower_imu_" + str(imu)] = (
-            offset_dep * flight_data["up"]
-        ) 
+        results["offset_depower_imu_" + str(imu)] = offset_dep * flight_data["up"]
     for imu in kcu_sensors:
         offset_dep, offset_turn = calculate_offset_pitch_depower_turn(
             flight_data, results, sensor_index=imu, prefix="kcu"
@@ -291,7 +294,6 @@ def postprocess_results(
         results["offset_depower_imu_" + str(imu)] = (
             offset_dep * flight_data["up"]
         )  # + offset_turn * flight_data["us"]
-            
 
     flight_data["cycle"] = np.zeros(len(flight_data))
     cycle_count = 0
@@ -327,8 +329,12 @@ def postprocess_results(
             )
             # Calculate wind velocity based on KCU orientation and wind speed and direction
             airflow_angles = calculate_airflow_angles(dcm, va_kite[i])
-            results.loc[i, "wing_angle_of_attack_imu_" + str(imu)] = airflow_angles[0]  # Angle of attack
-            results.loc[i, "wing_sideslip_angle_imu_" + str(imu)] = airflow_angles[1]  # Sideslip angle
+            results.loc[i, "wing_angle_of_attack_imu_" + str(imu)] = airflow_angles[
+                0
+            ]  # Angle of attack
+            results.loc[i, "wing_sideslip_angle_imu_" + str(imu)] = airflow_angles[
+                1
+            ]  # Sideslip angle
 
         if len(kite_sensors) == 0:
             dcm = calculate_reference_frame_euler(
@@ -338,10 +344,10 @@ def postprocess_results(
                 eulerFrame="NED",
                 outputFrame="ENU",
             )
-    # It is correct but I am calculating the small earth frame heading in the absolut azimuth and then translating it by the fd kite azimuth(respect to wind direction)
-    # It would make more sense to calculate it in the fd azimuth and then translating it by the wind direction (potato potato but still)
+        # It is correct but I am calculating the small earth frame heading in the absolut azimuth and then translating it by the fd kite azimuth(respect to wind direction)
+        # It would make more sense to calculate it in the fd azimuth and then translating it by the wind direction (potato potato but still)
         # heading.append(calculate_heading(dcm, fd["kite_azimuth"], res["tether_elevation"], res["tether_azimuth"]))
-        
+
         at = (
             np.dot(a_kite[i], np.array(v_kite[i]) / np.linalg.norm(v_kite[i]))
             * np.array(v_kite[i])
@@ -407,7 +413,7 @@ def calculate_wind_speed_airborne_sensors(results, flight_data, imus=[0]):
     # measured_aoa = results['aoa_IMU_0']
     # measured_ss =  results['ss_IMU_0']
 
-    measured_va = results["kite_apparent_windspeed"]-2.4
+    measured_va = results["kite_apparent_windspeed"] - 2.4
     for i in range(len(flight_data)):
         for imu in imus:
             ex_kite, ey_kite, ez_kite = calculate_reference_frame_euler(
@@ -430,9 +436,15 @@ def calculate_wind_speed_airborne_sensors(results, flight_data, imus=[0]):
                 + ez_kite * measured_va[i] * np.sin(measured_aoa[i] / 180 * np.pi)
             )
             # Calculate wind velocity based on KCU orientation and wind speed and direction
-            flight_data.loc[i, "vwx_IMU_" + str(imu)] = va[0] + results["kite_velocity_x"][i]
-            flight_data.loc[i, "vwy_IMU_" + str(imu)] = va[1] + results["kite_velocity_y"][i]
-            flight_data.loc[i, "vwz_IMU_" + str(imu)] = va[2] + results["kite_velocity_z"][i]
+            flight_data.loc[i, "vwx_IMU_" + str(imu)] = (
+                va[0] + results["kite_velocity_x"][i]
+            )
+            flight_data.loc[i, "vwy_IMU_" + str(imu)] = (
+                va[1] + results["kite_velocity_y"][i]
+            )
+            flight_data.loc[i, "vwz_IMU_" + str(imu)] = (
+                va[2] + results["kite_velocity_z"][i]
+            )
 
     return flight_data
 
@@ -475,12 +487,12 @@ def correct_aoa_ss_measurements(results, flight_data, imu=0):
     ss_vane = np.array(flight_data["bridle_sideslip_angle"])
     ss_vane = np.convolve(ss_vane, np.ones(10) / 10, mode="same")
 
-    mask_pow = (flight_data["tether_reelout_speed"] > 0) & (
-        flight_data["up"] < 0.2
-    )
+    mask_pow = (flight_data["tether_reelout_speed"] > 0) & (flight_data["up"] < 0.2)
     aoa_trim = np.mean(aoa_imu[mask_pow])
 
-    offset_aoa_vane = aoa_trim - np.mean(flight_data["bridle_angle_of_attack"][mask_pow])
+    offset_aoa_vane = aoa_trim - np.mean(
+        flight_data["bridle_angle_of_attack"][mask_pow]
+    )
     offset_aoa_ekf = aoa_trim - np.mean(results["kite_angle_of_attack"][mask_pow])
 
     offset_ss_vane = np.mean(results["kite_sideslip_angle"]) - np.mean(
@@ -508,7 +520,15 @@ def correct_aoa_ss_measurements(results, flight_data, imu=0):
     ] - np.degrees(results["offset_depower_imu_0"])
 
     return results, flight_data
-from awes_ekf.utils import rotation_matrix_azth_from_wind, project_onto_plane, Rz, calculate_angle_2vec
+
+
+from awes_ekf.utils import (
+    rotation_matrix_azth_from_wind,
+    project_onto_plane,
+    Rz,
+    calculate_angle_2vec,
+)
+
 
 def calculate_heading(dcm, az_wind, elevation, azimuth):
     """
@@ -518,21 +538,21 @@ def calculate_heading(dcm, az_wind, elevation, azimuth):
     :return: heading
     """
     # Rotate dcm around z-axis by wind azimuth
-    wind_from_azth = rotation_matrix_azth_from_wind(elevation,azimuth).T
+    wind_from_azth = rotation_matrix_azth_from_wind(elevation, azimuth).T
 
-    z_se = wind_from_azth @ np.array([0,0,1])
-    x_se = wind_from_azth @ np.array([0,1,0])
+    z_se = wind_from_azth @ np.array([0, 0, 1])
+    x_se = wind_from_azth @ np.array([0, 1, 0])
 
     # Rotate to the north-east-up frame
-    
+
     z_se_enu = Rz(-az_wind) @ z_se
     x_se_enu = Rz(-az_wind) @ x_se
 
     # Project x-axis dcm onto plane defined by z-axis
-    dcm =  dcm
-    x_kite = dcm[:,0]
-    x_kite_proj = project_onto_plane(x_kite,z_se_enu)
+    dcm = dcm
+    x_kite = dcm[:, 0]
+    x_kite_proj = project_onto_plane(x_kite, z_se_enu)
 
     # Calculate heading as angle between x-axis and x-axis projection
-    heading = calculate_angle_2vec(x_se_enu,x_kite, reference_vector=z_se_enu)
+    heading = calculate_angle_2vec(x_se_enu, x_kite, reference_vector=z_se_enu)
     return heading

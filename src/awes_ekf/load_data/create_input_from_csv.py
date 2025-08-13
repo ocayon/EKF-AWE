@@ -131,10 +131,6 @@ def create_input_from_csv(
     try:
         kite_course = np.array(flight_data["kite_course"])
     except KeyError:
-        if simConfig.obsData.kite_course:
-            raise ValueError(
-                "No kite course data found, but required by the config file"
-            )
         kite_course = np.zeros(n_intervals)
     try:
         bridle_angle_of_attack = np.array(flight_data["bridle_angle_of_attack"])
@@ -252,7 +248,7 @@ def find_initial_state_vector(
     tether,
     ekf_input,
     simConfig,
-    wind_velocity=np.array([1e-3, 1e-3, 0]),
+    wind_velocity=np.array([1e-3, 8, 0]),
     CL=None,
     CD=None,
     CS=None,
