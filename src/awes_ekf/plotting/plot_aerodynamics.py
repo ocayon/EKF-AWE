@@ -57,6 +57,21 @@ def plot_aerodynamics(results, flight_data, config_data):
         print(f"Mean CD depowered: {CD_mean_depowered:.2f}")
         print(f"Mean CL/CD depowered: {CL_mean_depowered/CD_mean_depowered:.2f}")
 
+        mean_aoa_powered = results["wing_angle_of_attack_bridle"][
+            flight_data["powered"] == "powered"
+        ].mean()
+        std_aoa_powered = results["wing_angle_of_attack_bridle"][
+            flight_data["powered"] == "powered"
+        ].std()
+        mean_aoa_depowered = results["wing_angle_of_attack_bridle"][
+            flight_data["powered"] == "depowered"
+        ].mean()
+        std_aoa_depowered = results["wing_angle_of_attack_bridle"][
+            flight_data["powered"] == "depowered"
+        ].std()
+        print(f"Mean AoA powered: {mean_aoa_powered:.2f} ± {std_aoa_powered:.2f}")
+        print(f"Mean AoA depowered: {mean_aoa_depowered:.2f} ± {std_aoa_depowered:.2f}")
+
     except KeyError as e:
         print(f"KeyError: {e}. Some aerodynamic coefficients may not be available.")
 

@@ -54,6 +54,7 @@ class Tether:
         res = self.calculate_tether_shape_symbolic()
         self.kite_position = res["kite_position"]
         self.tether_force_kite = res["tether_force_kite"]
+        self.radial_frame = res["radial_frame"]
         self.bridle_frame_va = res["bridle_frame_va"]
         self.bridle_frame_vk = res["bridle_frame_vk"]
         self.tether_frame = res["tether_frame"]
@@ -343,6 +344,11 @@ class Tether:
         ex_tether = ca.cross(ey_tether, ez_tether)
         dcm_t2w = ca.horzcat(ex_tether, ey_tether, ez_tether)
 
+        ez_radial = -r_kite / ca.norm_2(r_kite)
+        ey_radial = ca.cross(ez_radial, -va) / ca.norm_2(ca.cross(ez_radial, -va))
+        ex_radial = ca.cross(ey_radial, ez_radial)
+        dcm_r2w = ca.horzcat(ex_radial, ey_radial, ez_radial)
+
         tension_kite = tensions[-1, :].T
         # Calculate aerodynamic coefficients
         dir_D = va / ca.norm_2(va)
@@ -396,6 +402,7 @@ class Tether:
             "bridle_frame_va": ca.Function("bridle_frame_va", args, [dcm_b2w]),
             "bridle_frame_vk": ca.Function("bridle_frame_vk", args, [dcm_b2vel]),
             "tether_frame": ca.Function("tether_frame", args, [dcm_t2w]),
+            "radial_frame": ca.Function("radial_frame", args, [dcm_r2w]),
             "cd_kcu": ca.Function("cd_kcu", args, [cd_kcu]),
             "cd_bridles": ca.Function("cd_bridles", args, [cd_bridles]),
             "cd_tether": ca.Function("cd_tether", args, [cd_tether]),

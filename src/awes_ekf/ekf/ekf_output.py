@@ -58,6 +58,9 @@ class EKFOutput:
     tether_yaw: float = (
         None  # Yaw of the first tether element below KCU (rad) (Velocity direction)
     )
+    radial_roll: float = None  # Roll of the radial frame (rad)
+    radial_pitch: float = None  # Pitch of the radial frame (rad)
+    radial_yaw: float = None  # Yaw of the radial frame (rad) (Velocity direction)
 
     # Aerodynamic parameters
     kite_apparent_windspeed: float = None  # Apparent wind speed at the kite (m/s)
@@ -146,8 +149,10 @@ def create_ekf_output(x, u, ekf_input, tether, kite, simConfig):
     dcm_b2w = np.array(tether.bridle_frame_va(*args))
     dcm_b2vel = np.array(tether.bridle_frame_vk(*args))
     dcm_t2w = np.array(tether.tether_frame(*args))
+    dcm_r2w = np.array(tether.radial_frame(*args))
 
     euler_angles = calculate_euler_from_reference_frame(rotate_ENU2NED(dcm_b2w))
+    euler_angles_radial = calculate_euler_from_reference_frame(rotate_ENU2NED(dcm_r2w))
     euler_angles1 = calculate_euler_from_reference_frame(rotate_ENU2NED(dcm_t2w))
     euler_angles_kin = calculate_euler_from_reference_frame(rotate_ENU2NED(dcm_b2vel))
     drag_coefficient_kcu = float(tether.cd_kcu(*args))
@@ -204,6 +209,9 @@ def create_ekf_output(x, u, ekf_input, tether, kite, simConfig):
         tether_roll=euler_angles1[0],
         tether_pitch=euler_angles1[1],
         tether_yaw=euler_angles1[2],
+        radial_roll=euler_angles_radial[0],
+        radial_pitch=euler_angles_radial[1],
+        radial_yaw=euler_angles_radial[2],
         tether_length_offset=x[state_index_map.get("tether_length_offset", 0)],
         tether_elevation_offset=x[state_index_map.get("tether_elevation_offset", 0)],
         tether_azimuth_offset=x[state_index_map.get("tether_azimuth_offset", 0)],
