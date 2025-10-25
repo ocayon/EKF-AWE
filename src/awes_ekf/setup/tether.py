@@ -3,7 +3,7 @@ from awes_ekf.setup.settings import g, rho, z0
 from scipy.optimize import least_squares
 from awes_ekf.utils import project_onto_plane, calculate_angle_2vec
 import casadi as ca
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 tether_materials = {
     "Dyneema-SK78": {
@@ -445,7 +445,7 @@ class TetherInput:
     tether_length: float
     tether_elevation: float
     tether_azimuth: float
-    wind_velocity: np.ndarray = np.array([1e-3, 1e-3, 0])
+    wind_velocity: np.ndarray = field(default_factory=lambda: np.array([1e-3, 1e-3, 0]))
     kite_acceleration: np.ndarray = None
     kcu_acceleration: np.ndarray = None
     kcu_velocity: np.ndarray = None

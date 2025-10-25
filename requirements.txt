@@ -12,3 +12,4 @@ scipy
 seaborn
 dataclasses; python_version < "3.7"
 h5py
+prompt_toolkit
