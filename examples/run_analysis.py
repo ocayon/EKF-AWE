@@ -242,17 +242,21 @@ class AnalyzeAweFromCsvLog:
 def main() -> None:
     default_log_dir = Path('./data/flight_logs/v3/')
     
-    from prompt_toolkit import prompt
-    from prompt_toolkit.completion import PathCompleter
+    try:
+        from prompt_toolkit import prompt
+        from prompt_toolkit.completion import PathCompleter
 
-    # Set up a PathCompleter to enable tab-completion for file paths
-    path_completer = PathCompleter(expanduser=False)  # Enables ~ expansion
+        # Set up a PathCompleter to enable tab-completion for file paths
+        path_completer = PathCompleter(expanduser=False)  # Enables ~ expansion
 
-    # Prompt the user with tab-completion support for nested directories
-    user_input = prompt(
-        f"Enter the directory with the flight logs [default: {default_log_dir}]: ",
-        completer=path_completer
-    ).strip()
+        # Prompt the user with tab-completion support for nested directories
+        user_input = prompt(
+            f"Enter the directory with the flight logs [default: {default_log_dir}]: ",
+            completer=path_completer
+        ).strip()
+    except ImportError:
+        # Fallback to standard input if prompt_toolkit is not available
+        user_input = input(f"Enter the directory with the flight logs [default: {default_log_dir}]: ").strip()
     
     # Use the default if the user didn't provide input
     log_dir = Path(user_input) if user_input else default_log_dir
