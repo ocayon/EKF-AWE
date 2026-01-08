@@ -107,7 +107,7 @@ def fuse_sensor_data(
 
 
 def add_orientation_data(
-    log: pd.DataFrame, sensors: list, prefix: str, flight_data: pd.DataFrame
+    log: pd.DataFrame, sensors: list, prefix: str, flight_data: pd.DataFrame, dt: float
 ):
     valid_sensors = [sensor for sensor in sensors if sensor is not None]
     if not valid_sensors:
@@ -129,7 +129,6 @@ def add_orientation_data(
             col in log.columns for col in [roll_rate_col, pitch_rate_col, yaw_rate_col]
         ):
             if log[yaw_rate_col].isnull().all():
-                dt = log["time"].iloc[1] - log["time"].iloc[0]
                 roll_rate = np.gradient(flight_data[f"{prefix}_roll_{sensor}"], dt)
                 pitch_rate = np.gradient(flight_data[f"{prefix}_pitch_{sensor}"], dt)
                 yaw_rate = np.gradient(flight_data[f"{prefix}_yaw_{sensor}"], dt)
@@ -153,7 +152,6 @@ def add_orientation_data(
                 flight_data[f"{prefix}_yaw_rate_{sensor}"] = log[yaw_rate_col]
         else:
             # If any of the rate columns are missing, compute from orientation
-            dt = log["time"].iloc[1] - log["time"].iloc[0]
             roll_rate = np.gradient(flight_data[f"{prefix}_roll_{sensor}"], dt)
             pitch_rate = np.gradient(flight_data[f"{prefix}_pitch_{sensor}"], dt)
             yaw_rate = np.gradient(flight_data[f"{prefix}_yaw_{sensor}"], dt)
@@ -187,7 +185,9 @@ def process_data(config_data: dict, log_directory: Path) -> pd.DataFrame:
     log_date = f'{config_data["year"]}-{config_data["month"]}-{config_data["day"]}'
     log = load_log_file(log_directory, log_date)
     window_size = 20
-    dt = log["time"].iloc[1] - log["time"].iloc[0]
+    # Use mean time difference to avoid division by zero when consecutive samples have same timestamp
+    time_diff = np.diff(log["time"].values)
+    dt = np.mean(time_diff[time_diff > 0]) if np.any(time_diff > 0) else 1.0
     log = log.reset_index()
     log.loc[:, log.select_dtypes(include=[float, int]).columns] = log.select_dtypes(
         include=[float, int]
@@ -229,11 +229,11 @@ def process_data(config_data: dict, log_directory: Path) -> pd.DataFrame:
         fused_kite_data = fuse_sensor_data(log, kite_sensors, "kite", dt, window_size)
         flight_data = flight_data.assign(**fused_kite_data)
 
-    add_orientation_data(log, kite_sensors, "kite", flight_data)
+    add_orientation_data(log, kite_sensors, "kite", flight_data, dt)
 
     kcu_sensors = config_data["kcu"].get("sensor_ids", [])
     if kcu_sensors:
-        add_orientation_data(log, kcu_sensors, "kcu", flight_data)
+        add_orientation_data(log, kcu_sensors, "kcu", flight_data, dt)
 
     # Ground station data
     flight_data["ground_tether_force"] = log["ground_tether_force"] * 9.81

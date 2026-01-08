@@ -14,39 +14,46 @@ z0 = 0.1  # Surface roughness [m]
 def load_config():
     # Set the directory path where configuration files are stored
     config_directory = "data/config/"
-    
+
     # List all files in the config directory
     config_files = os.listdir(config_directory)
-    
+
     # Prompt user to select a file from the list
     print("Available configuration files:")
     for index, filename in enumerate(config_files, start=1):
         print(f"{index}: {filename}")
-    
+
     # Get user selection
     selection = int(input("Select a configuration file by number: ")) - 1
-    
+
     # Ensure selection is valid
     if 0 <= selection < len(config_files):
         selected_file = config_files[selection]
         config_path = os.path.join(config_directory, selected_file)
-        
+
         # Load the configuration file
         with open(config_path, "r") as file:
             config_data = yaml.safe_load(file)
-        
+
         # Optional: Check if the config has all required data
         if not validate_config(config_data):
             raise ValueError("Configuration file is missing required data.")
-        
+
         print(f"Configuration loaded from: {selected_file}")
         return config_data
     else:
         raise ValueError("Invalid selection. Please choose a valid file number.")
 
+
 def validate_config(config_data):
     # Placeholder validation function to ensure required fields are present
-    required_keys = ["simulation_parameters", "tuning_parameters", "kite", "kcu","tether"]  # Example keys
+    required_keys = [
+        "simulation_parameters",
+        "tuning_parameters",
+        "kite",
+        "kcu",
+        "tether",
+    ]  # Example keys
     return all(key in config_data for key in required_keys)
 
 
@@ -59,7 +66,9 @@ class SimulationConfig:
         self.max_iterations = kwargs.get("max_iterations", 200)
         self.log_profile = kwargs.get("log_profile", False)
         self.tether_offset = kwargs.get("tether_offset", True)
-        self.enforce_vertical_wind_to_0 = kwargs.get("enforce_vertical_wind_to_0", False)
+        self.enforce_vertical_wind_to_0 = kwargs.get(
+            "enforce_vertical_wind_to_0", False
+        )
         self.model_yaw = kwargs.get("model_yaw", False)
         self.thrust_force = kwargs.get("thrust_force", False)
         self.debug = kwargs.get("debug", False)
@@ -84,6 +93,7 @@ class ObservationData:
     bridle_angle_of_sideslip: bool = False
     kite_yaw_angle: bool = False
     kite_thrust_force: bool = False
+    dynamic_depower: bool = False
 
 
 class TuningParameters:
@@ -128,13 +138,18 @@ class TuningParameters:
                 "tether_azimuth",
             ]
 
-        self.stdv_dynamic_model = np.array([float(self.dict_model_stdv[key]) for key in indices])
+        self.stdv_dynamic_model = np.array(
+            [float(self.dict_model_stdv[key]) for key in indices]
+        )
         if simConfig.model_yaw:
             self.stdv_dynamic_model = np.append(
-                self.stdv_dynamic_model, [self.dict_model_stdv["yaw"], 1e-6]  # Yaw  and yaw offset
+                self.stdv_dynamic_model,
+                [self.dict_model_stdv["yaw"], 1e-6],  # Yaw  and yaw offset
             )
         if simConfig.obsData.tether_length:
-            self.stdv_dynamic_model = np.append(self.stdv_dynamic_model, 1e-6) # Tether length offset
+            self.stdv_dynamic_model = np.append(
+                self.stdv_dynamic_model, 1e-6
+            )  # Tether length offset
         if simConfig.obsData.tether_elevation:
             self.stdv_dynamic_model = np.append(self.stdv_dynamic_model, 1e-6)
         if simConfig.obsData.tether_azimuth:
@@ -150,7 +165,6 @@ class TuningParameters:
             "least_squares",
             "least_squares",
         ]
-        
 
         self.update_observation_vector(simConfig)
 
@@ -180,5 +194,3 @@ class TuningParameters:
             stdv_y.append(self.dict_meas_stdv["aoa"])
 
         self.stdv_measurements = np.array(stdv_y)
-        
-        
