@@ -275,6 +275,9 @@ def load_data(args):
     path_to_h5 = (
         "/home/jellepoland/ownCloud/phd/code/EKF-AWE/results/v3/v3_2019-10-08.h5"
     )
+    path_to_h5 = (
+        "/home/jellepoland/ownCloud/phd/code/EKF-AWE/results/v3/v3_2025-10-09.h5"
+    )
     return read_results_from_hdf5(path_to_h5)
 
     # # Priority: explicit --hdf5, then explicit year/month/day/model, else auto-detect a lone HDF5.
