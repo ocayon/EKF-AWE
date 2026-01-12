@@ -220,7 +220,7 @@ def main():
     # Time-based filtering: 1800.0 s to 9986.2 s
     # time_mask = (results["time"] >= 1800.0) & (results["time"] <= 9986.2)
     # Time-based filtering: 10.0 s to 1484.5s -- 2025
-    time_mask = (results["time"] >= 000.0) & (results["time"] <= 1500)
+    time_mask = (results["time"] >= 400.0) & (results["time"] <= 1000.0)
 
     # print beg,end total time
     print(f"Total time range: {results['time'].min()} s to {results['time'].max()} s")

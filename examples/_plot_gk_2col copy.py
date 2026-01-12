@@ -14,6 +14,54 @@ from awes_ekf.load_data.read_data import read_results
 from awes_ekf.plotting.color_palette import get_color_list, set_plot_style
 
 
+def convert_2019_depower_to_2025_updata(
+    x19_depower,
+    x19_pow=22.68,
+    x19_dep=0.02,
+    ld_0=1.098,
+    delta_d=0.08,
+    delta_ld_max=4.8,
+    ld_2025_offset=0.2,
+    ld_2025_scale=5.0,
+):
+    """
+    Convert 2019 kcu_actual_depower (depower angle in degrees) to 2025-equivalent up_data.
+
+    This conversion assumes both systems measure the same physical tape deployment (ld),
+    using the paper's physics as the bridge:
+
+    1. Map 2019 depower angle → paper's normalized up_paper ∈ [0,1]
+    2. Calculate physical tape deployment: ld = ld_0 + δd·Δld,max·(1 - up_paper)
+    3. Convert to 2025 notation: up_data_2025 = (ld - 0.2) / 5
+
+    From paper (Table 2, Equations 1-2):
+    - ld_0 = 1.098 m (baseline at fully powered)
+    - δd = 0.08 (8% of max tape used, from 2019 campaign)
+    - Δld,max = 4.8 m (maximum tape capacity)
+
+    2025 affine relation: ld = 0.2 + 5·up_data_2025
+
+    Verification:
+    - At powered (up_paper=1): ld=1.098m → up_data_2025=0.1796
+    - At depowered (up_paper=0): ld=1.482m → up_data_2025=0.2564
+    """
+    x19_depower = np.asarray(x19_depower)
+
+    # Step 1: Normalize 2019 depower to paper's up_paper ∈ [0, 1]
+    # up_paper = 1 at fully powered, 0 at fully depowered
+    up_paper_2019 = np.clip((x19_depower - x19_dep) / (x19_pow - x19_dep), 0, 1)
+
+    # Step 2: Calculate physical tape deployment using paper's physics
+    # ld = ld_0 + δd·Δld,max·(1 - up_paper)
+    ld_2019 = ld_0 + delta_d * delta_ld_max * (1.0 - up_paper_2019)
+
+    # Step 3: Convert to 2025 notation
+    # From ld = 0.2 + 5·up_data_2025, solve for up_data_2025
+    up_data_2025 = (ld_2019 - ld_2025_offset) / ld_2025_scale
+
+    return up_data_2025
+
+
 def plot_yaw_rate_vs_steering(
     downsampled_data,
     downsampled_results,
@@ -28,6 +76,9 @@ def plot_yaw_rate_vs_steering(
     steering_norm: float = 1.0,
     ax: Optional[Axes] = None,
     show_legend: bool = True,
+    exclude_quadrant_filter: bool = False,
+    y_exclude_threshold_deg: float = 20.0,
+    hide_region_labels: bool = False,
 ):
     """
     Create a generalized yaw rate vs steering*windspeed plot.
@@ -77,6 +128,17 @@ def plot_yaw_rate_vs_steering(
     y = downsampled_data["kite_yaw_rate"]
     y_deg = y * 180 / np.pi
 
+    # Quadrant filter (optional) for 2025 data: mismatched sign/high magnitude points
+    mask_excluded = np.zeros_like(y_deg, dtype=bool)
+    if exclude_quadrant_filter:
+        mask_excluded = ((y_deg > y_exclude_threshold_deg) & (x_kcu < 0)) | (
+            (y_deg < -y_exclude_threshold_deg) & (x_kcu > 0)
+        )
+    mask_include = ~mask_excluded
+
+    # Finite mask for regression (exclude circle batch overlays by construction)
+    finite_mask = np.isfinite(x_kcu) & np.isfinite(y_deg) & mask_include
+
     created_fig = False
     if ax is None:
         fig, ax = plt.subplots(1, 1, figsize=(6, 4))
@@ -91,22 +153,30 @@ def plot_yaw_rate_vs_steering(
         lower_threshold_us = lower_threshold / (steering_norm / 100.0)
         upper_threshold_us = upper_threshold / (steering_norm / 100.0)
 
-        mask_straight_kcu = x_no_delay_kcu.between(lower_threshold, upper_threshold)
-        mask_left_kcu = x_no_delay_kcu < lower_threshold
-        mask_right_kcu = x_no_delay_kcu > upper_threshold
+        mask_straight_kcu = mask_include & x_no_delay_kcu.between(
+            lower_threshold, upper_threshold
+        )
+        mask_left_kcu = mask_include & (x_no_delay_kcu < lower_threshold)
+        mask_right_kcu = mask_include & (x_no_delay_kcu > upper_threshold)
 
-        mask_straight_us = x_no_delay_us.between(lower_threshold_us, upper_threshold_us)
-        mask_left_us = x_no_delay_us < lower_threshold_us
-        mask_right_us = x_no_delay_us > upper_threshold_us
+        mask_straight_us = mask_include & x_no_delay_us.between(
+            lower_threshold_us, upper_threshold_us
+        )
+        mask_left_us = mask_include & (x_no_delay_us < lower_threshold_us)
+        mask_right_us = mask_include & (x_no_delay_us > upper_threshold_us)
 
         # Plot regions for kcu panel
+        label_straight = None if hide_region_labels else "Straight"
+        label_left = None if hide_region_labels else "Left Turn"
+        label_right = None if hide_region_labels else "Right Turn"
+
         ax.scatter(
             x_kcu[mask_straight_kcu],
             y_deg[mask_straight_kcu],
             color=colors[1],
             alpha=0.4,
             marker=".",
-            label="Straight",
+            label=label_straight,
         )
         ax.scatter(
             x_kcu[mask_left_kcu],
@@ -114,7 +184,7 @@ def plot_yaw_rate_vs_steering(
             color=colors[2],
             marker=".",
             alpha=0.4,
-            label="Left Turn",
+            label=label_left,
         )
         ax.scatter(
             x_kcu[mask_right_kcu],
@@ -122,7 +192,7 @@ def plot_yaw_rate_vs_steering(
             color=colors[3],
             marker=".",
             alpha=0.4,
-            label="Right Turn",
+            label=label_right,
         )
 
     elif bucket_type == "continuous":
@@ -141,8 +211,8 @@ def plot_yaw_rate_vs_steering(
                 mask_bucket = (bucket_data >= low) & (bucket_data < high)
 
             # Process kcu panel
-            x_vals_kcu = x_kcu[mask_bucket]
-            y_vals_kcu = y_deg[mask_bucket]
+            x_vals_kcu = x_kcu[mask_bucket & mask_include]
+            y_vals_kcu = y_deg[mask_bucket & mask_include]
             finite_kcu = np.isfinite(x_vals_kcu) & np.isfinite(y_vals_kcu)
             x_vals_kcu = x_vals_kcu[finite_kcu]
             y_vals_kcu = y_vals_kcu[finite_kcu]
@@ -181,22 +251,46 @@ def plot_yaw_rate_vs_steering(
                 ax.scatter(
                     rows["us"] * rows["v_app"],
                     rows["yaw_rate_paper"],
-                    s=80,
-                    alpha=1.0,
-                    color=(
-                        circle_colors[i] if circle_colors else colors[i % len(colors)]
-                    ),
+                    s=60,
+                    alpha=0.9,
+                    color="black",
                     marker="x",
-                    label="_nolegend_",
+                    label="Circular simulation",
                 )
 
+    # Plot excluded quadrant-mismatch points (still visible, not used in fit)
+    if mask_excluded.any():
+        ax.scatter(
+            x_kcu[mask_excluded],
+            y_deg[mask_excluded],
+            color="0.7",
+            alpha=0.5,
+            marker=".",
+            label="Excluded",
+        )
+
+    # Global linear fit on experimental points (not circle markers)
+    x_fit = x_kcu[finite_mask]
+    y_fit = y_deg[finite_mask]
+    if len(x_fit) > 1:
+        slope, intercept, r, _, _ = linregress(x_fit, y_fit)
+        r2 = r**2
+        x_line = np.linspace(x_fit.min(), x_fit.max(), 200)
+        y_line = slope * x_line + intercept
+        ax.plot(
+            x_line,
+            y_line,
+            color="black",
+            linestyle="--",
+            linewidth=1.5,
+            label=f"Fit k={slope:.3f}, R$^2$={r2:.2f}",
+        )
+
     # Set labels
-    ax.set_xlabel(
-        r"$\mathrm{kcu\_actual\_steering}/100 \cdot v_a\;(\mathrm{m\,s^{-1}})$"
-    )
+    ax.set_xlabel(r"$u_\mathrm{dp}v_\mathrm{a}$ (-)")
     ax.set_ylabel(r"$\dot{\psi}\;(^\circ\,\mathrm{s^{-1}})$")
     if show_legend:
-        ax.legend(frameon=True)
+        ax.legend(frameon=True, loc="upper left")
 
     # Save figure only when we created it here
     if output_filename and created_fig:
@@ -247,6 +341,12 @@ def prepare_dataset(
     )
 
     # Downsample the data
+
+    if year == "2019":
+        downsample_fraction = 0.1
+    else:
+        downsample_fraction = 1
+
     downsampled_data = flight_data.sample(frac=downsample_fraction, random_state=42)
     downsampled_results = results.loc[downsampled_data.index]
     downsampled_data = downsampled_data[downsampled_data["powered"] == "powered"]
@@ -320,7 +420,7 @@ def main():
             "day": "09",
             "kite_model": "v3",
             "addition": "",
-            "time_range": (0.0, 1500.0),
+            "time_range": (300.0, 1080.0),
         },
     ]
 
@@ -338,9 +438,12 @@ def main():
         )
 
     # Build two-column figure
-    fig, axes = plt.subplots(1, 2, figsize=(12, 4), sharey=True)
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4), sharey=True)
 
+    x_limits = []
     for idx, dataset in enumerate(prepared_datasets):
+        exclude_quadrant = dataset["title"] == "2025-10-09"
+        hide_regions = exclude_quadrant  # simplify legend on col 2
         plot_yaw_rate_vs_steering(
             dataset["data"],
             dataset["results"],
@@ -352,10 +455,23 @@ def main():
             circle_colors=circle_colors,
             steering_norm=dataset["steering_norm"],
             ax=axes[idx],
-            show_legend=(idx == 0),
+            show_legend=True,
+            exclude_quadrant_filter=exclude_quadrant,
+            hide_region_labels=hide_regions,
         )
         axes[idx].set_title(dataset["title"])
-        axes[idx].set_ylim(-100, 100)
+        axes[idx].set_ylim(-120, 120)
+        x_limits.append(axes[idx].get_xlim())
+
+    # Remove y-label from second column
+    axes[1].set_ylabel("")
+
+    # Synchronize x-axis limits across both panels
+    if x_limits:
+        xmin = min(lim[0] for lim in x_limits)
+        xmax = max(lim[1] for lim in x_limits)
+        for ax in axes:
+            ax.set_xlim(xmin, xmax)
 
     fig.tight_layout()
 

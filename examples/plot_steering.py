@@ -44,11 +44,11 @@ def cut_data(results, flight_data, range):
 
 
 set_plot_style()
-year = "2019"
-month = "10"
-day = "08"
-kite_model = "v3"
-addition = "_t26"
+# year = "2019"
+# month = "10"
+# day = "08"
+# kite_model = "v3"
+# addition = "_t26"
 
 year = "2025"
 month = "10"
@@ -65,8 +65,11 @@ res_min, fd_min, config_data_min = read_results(
 
 # Time-based filtering: 1800.0 s to 9986.2 s -- 2019
 # time_mask = (results["time"] >= 1800.0) & (results["time"] <= 9986.2)
+# downsample_fraction = 0.1
+
 # Time-based filtering: 10.0 s to 1080s -- 2025
-time_mask = (results["time"] >= 180.0) & (results["time"] <= 1080)
+time_mask = (results["time"] >= 400.0) & (results["time"] <= 1000.0)
+downsample_fraction = 0.5
 
 print(config_data["simulation_parameters"]["measurements"])
 print(
@@ -129,7 +132,6 @@ import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde
 
 # Downsample the data (e.g., use only 10% of the data)
-downsample_fraction = 0.5
 downsampled_data = flight_data.sample(frac=downsample_fraction, random_state=42)
 downsampled_results = results.loc[downsampled_data.index]
 downsampled_data = downsampled_data[downsampled_data["powered"] == "powered"]
@@ -335,6 +337,67 @@ if multi_row_signals:
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
+
+
+def convert_2019_depower_to_2025_updata(
+    x19_depower,
+    x19_pow=22.68,
+    x19_dep=0.02,
+    ld_max=1.7,
+    ld_affine_offset=0.2,
+    ld_affine_scale=5.0,
+):
+    """
+    Convert 2019 kcu_actual_depower (depower angle in degrees) to 2025-equivalent up_data.
+
+    Physical chain:
+    1. Normalize 2019 depower angle to powered fraction u_p ∈ [0, 1]
+    2. Convert u_p to tape deployment ld = (1 - u_p) * ld_max
+    3. Invert 2025 affine relation: up_data_25 = (ld - offset) / scale
+
+    Parameters
+    ----------
+    x19_depower : array-like
+        2019 kcu_actual_depower values (degrees). Increasing angle = more power.
+    x19_pow : float, optional
+        Depower angle for fully powered mode in 2019 (degrees). Default: 22.68°
+    x19_dep : float, optional
+        Depower angle for fully depowered mode in 2019 (degrees). Default: 0.02°
+    ld_max : float, optional
+        Maximum tape deployment length (m). Default: 1.7 m
+    ld_affine_offset : float, optional
+        Offset in 2025 affine relation: ld = offset + scale * up_data_25. Default: 0.2
+    ld_affine_scale : float, optional
+        Scale in 2025 affine relation. Default: 5.0
+
+    Returns
+    -------
+    up_data_25 : array-like
+        Equivalent 2025 up_data values.
+
+    Notes
+    -----
+    The 2019 system uses inverse convention (higher angle = more power).
+    The 2025 system uses intuitive convention (higher angle = less power).
+    This function reconciles them through a common physical intermediate (tape deployment).
+    """
+    x19_depower = np.asarray(x19_depower)
+
+    # Step 1: Normalize 2019 depower to u_p ∈ [0, 1]
+    # Higher depower angle in 2019 = more power
+    u_p_19 = np.clip((x19_depower - x19_dep) / (x19_pow - x19_dep), 0, 1)
+
+    # Step 2: Convert u_p to tape deployment
+    # ld = (1 - u_p) * ld_max
+    # where u_p=1 (powered) → ld=0, u_p=0 (depowered) → ld=ld_max
+    ld = (1.0 - u_p_19) * ld_max
+
+    # Step 3: Invert 2025 affine relation: ld = offset + scale * up_data_25
+    # Solve for up_data_25: up_data_25 = (ld - offset) / scale
+    up_data_25 = (ld - ld_affine_offset) / ld_affine_scale
+
+    return up_data_25
+
 
 # Define data
 max_abs_steering = flight_data["kcu_actual_steering"].abs().max()
@@ -680,7 +743,7 @@ if circle_df is not None and not circle_df.empty:
             alpha=1.0,
             color=circle_colors[i],
             marker="x",
-            label=f"Batch up={up_val:.3f}, us={us_val.values[i]:.3f}",
+            label=f"Batch up={up_val:.3f}, us={us_val:.3f}",
         )
         ax_yaw_kcu.scatter(
             rows["us"] * rows["v_app"],
@@ -689,7 +752,7 @@ if circle_df is not None and not circle_df.empty:
             alpha=1.0,
             color=circle_colors[i],
             marker="x",
-            label=f"Batch up={up_val:.3f}, us={us_val.values[i]:.3f}",
+            label=f"Batch up={up_val:.3f}, us={us_val:.3f}",
         )
 
 # kcu_actual_steering panel

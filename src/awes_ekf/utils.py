@@ -397,7 +397,94 @@ def calculate_steering_law(results, flight_data):
 
     coeffs = calculate_weighted_least_squares(sideforce_coeff, A, W)
     sideforce_est = A @ coeffs
+
     # Re-expand to full length, filling invalid rows with NaN for alignment.
+    sideforce_expanded = np.full_like(sideforce_coeff, np.nan, dtype=float)
+    sideforce_expanded[valid] = sideforce_est
+
+    return sideforce_expanded, coeffs
+
+
+# --- Tether length approximation utilities ---
+
+
+def _as_array(x):
+    """Helper: return numpy array or None if not provided."""
+    if x is None:
+        return None
+    return np.asarray(x)
+
+
+def estimate_tether_length(
+    kite_distance=None,
+    pos_east=None,
+    pos_north=None,
+    height=None,
+    elevation=None,
+    ground_tether_force=None,
+    tether_mass_per_m=None,
+    g: float = 9.81,
+):
+    """
+    Estimate tether length from available measurements with sensible fallbacks.
+
+    Priority of base straight-line estimate L0:
+      1) If `kite_distance` available: L0 = kite_distance
+      2) Else if ENU components available: L0 = sqrt(E^2 + N^2 + H^2)
+      3) Else if height and elevation available: L0 = height / sin(elevation)
+
+    Optional small-sag catenary correction (if mass and force provided):
+        ΔL ≈ (w^2 * L0^3) / (24 * H_h^2), where w = m*g (N/m) and
+        H_h ≈ max(ground_tether_force * cos(elevation), eps)
+
+    Parameters may be scalars or array-like and will be broadcast where possible.
+
+    Returns:
+        np.ndarray or float: Estimated tether length.
+    """
+
+    kd = _as_array(kite_distance)
+    e = _as_array(pos_east)
+    n = _as_array(pos_north)
+    h = _as_array(height)
+    el = _as_array(elevation)
+    gf = _as_array(ground_tether_force)
+
+    L0 = None
+
+    # 1) Use kite_distance if available
+    if kd is not None:
+        L0 = kd.astype(float)
+
+    # 2) Else compute from ENU components
+    if L0 is None and e is not None and n is not None and h is not None:
+        L0 = np.sqrt(e.astype(float) ** 2 + n.astype(float) ** 2 + h.astype(float) ** 2)
+
+    # 3) Else compute from elevation and height
+    if L0 is None and h is not None and el is not None:
+        # Protect against sin(el) ~ 0
+        s = np.sin(el.astype(float))
+        s = np.where(np.abs(s) < 1e-6, np.nan, s)
+        L0 = h.astype(float) / s
+
+    if L0 is None:
+        raise ValueError(
+            "Insufficient inputs: provide kite_distance or (pos_east,pos_north,height) or (height,elevation)."
+        )
+
+    # Optional catenary small-sag correction if mass per meter and force are provided
+    if tether_mass_per_m is not None and gf is not None:
+        w = float(tether_mass_per_m) * float(g)  # N/m
+        # Estimate horizontal tension component; if elevation unknown assume all in horizontal
+        if el is None:
+            H_h = np.maximum(gf.astype(float), 1e-3)
+        else:
+            H_h = np.maximum(gf.astype(float) * np.cos(el.astype(float)), 1e-3)
+        dL = (w**2) * (L0**3) / (24.0 * (H_h**2))
+        return L0 + dL
+
+    return L0
+
     full_est = np.full(len(valid), np.nan)
     full_est[valid] = sideforce_est
     return full_est, coeffs
