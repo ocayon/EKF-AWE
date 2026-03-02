@@ -1,121 +1,48 @@
 """
-Two-column comparison plots of 2019 vs 2025 flight statistics.
-Produces statistics_all.pdf and statistics_right_turn.pdf.
+Plot kite position in the Y-Z plane for two v3 flights loaded from EKF .h5 files.
+
+Creates a 1x2 scatter figure (2019 and 2025), with marker color mapped to kite
+speed and one shared colorbar.
 """
 
 from pathlib import Path
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+from matplotlib.cm import ScalarMappable
+from matplotlib.colors import Normalize
+
 from awes_ekf.load_data.read_data import read_results
-from awes_ekf.plotting.color_palette import get_color_list, set_plot_style
-from awes_ekf.setup.settings import SimulationConfig
-from awes_ekf.setup.kite import PointMassEKF
-from awes_ekf.setup.kcu import KCU
-
-
-def convert_2019_depower_to_2025_updata(
-    x19_depower,
-    x19_pow=22.68,
-    x19_dep=0.02,
-    ld_0=1.098,
-    delta_d=0.08,
-    delta_ld_max=4.8,
-    ld_2025_offset=0.2,
-    ld_2025_scale=5.0,
-):
-    """
-    Convert 2019 kcu_actual_depower (depower angle in degrees) to 2025-equivalent up_data.
-
-    This conversion assumes both systems measure the same physical tape deployment (ld),
-    using the paper's physics as the bridge:
-
-    1. Map 2019 depower angle → paper's normalized up_paper ∈ [0,1]
-    2. Calculate physical tape deployment: ld = ld_0 + δd·Δld,max·(1 - up_paper)
-    3. Convert to 2025 notation: up_data_2025 = (ld - 0.2) / 5
-
-    From paper (Table 2, Equations 1-2):
-    - ld_0 = 1.098 m (baseline at fully powered)
-    - δd = 0.08 (8% of max tape used, from 2019 campaign)
-    - Δld,max = 4.8 m (maximum tape capacity)
-
-    2025 affine relation: ld = 0.2 + 5·up_data_2025
-
-    Verification:
-    - At powered (up_paper=1): ld=1.098m → up_data_2025=0.1796
-    - At depowered (up_paper=0): ld=1.482m → up_data_2025=0.2564
-
-    Note: If observed 2025 range differs from [0.18, 0.26], it may indicate:
-    - Different δd value used in 2025 operations
-    - Different ld_0 baseline configuration
-    - Different physical measurements (not the same tape)
-
-    Parameters:
-    -----------
-    x19_depower : array-like
-        2019 depower angle in degrees
-    x19_pow : float
-        2019 depower angle at fully powered state (degrees)
-    x19_dep : float
-        2019 depower angle at fully depowered state (degrees)
-    ld_0 : float
-        Baseline tape deployment at fully powered (meters)
-    delta_d : float
-        Fraction of max tape capacity used (dimensionless)
-    delta_ld_max : float
-        Maximum tape capacity (meters)
-    ld_2025_offset : float
-        2025 affine relation offset (meters)
-    ld_2025_scale : float
-        2025 affine relation scale (meters)
-
-    Returns:
-    --------
-    up_data_2025 : array-like
-        2025-equivalent up_data values
-    """
-    x19_depower = np.asarray(x19_depower)
-
-    # Step 1: Normalize 2019 depower to paper's up_paper ∈ [0, 1]
-    # up_paper = 1 at fully powered, 0 at fully depowered
-    up_paper_2019 = np.clip((x19_depower - x19_dep) / (x19_pow - x19_dep), 0, 1)
-
-    # Step 2: Calculate physical tape deployment using paper's physics
-    # ld = ld_0 + δd·Δld,max·(1 - up_paper)
-    ld_2019 = ld_0 + delta_d * delta_ld_max * (1.0 - up_paper_2019)
-
-    # Step 3: Convert to 2025 notation
-    # From ld = 0.2 + 5·up_data_2025, solve for up_data_2025
-    up_data_2025 = (ld_2019 - ld_2025_offset) / ld_2025_scale
-
-    return up_data_2025
+from awes_ekf.plotting.color_palette import set_plot_style
 
 
 def load_and_process_data(
-    year, month, day, kite_model, addition, time_range, downsample_frac
-):
-    """Load and process flight data for a given year."""
-    results, flight_data, config_data = read_results(
+    year: str,
+    month: str,
+    day: str,
+    kite_model: str,
+    addition: str,
+    time_range: tuple[float, float],
+    downsample_frac: float,
+) -> pd.DataFrame:
+    """Load .h5 results and apply the same filtering pipeline used before."""
+    results, flight_data, _ = read_results(
         year, month, day, kite_model, addition=addition
     )
 
-    # Time-based filtering
     time_mask = (results["time"] >= time_range[0]) & (results["time"] <= time_range[1])
     results = results.loc[time_mask].reset_index(drop=True)
     flight_data = flight_data.loc[time_mask].reset_index(drop=True)
 
-    # Create system components
-    simConfig = SimulationConfig(**config_data["simulation_parameters"])
-    kite = PointMassEKF(simConfig, **config_data["kite"])
-    kcu = KCU(**config_data["kcu"])
+    # Keep preprocessing steps consistent with prior script behavior.
+    if "kite_yaw_rate_1" in flight_data.columns:
+        flight_data["kite_yaw_rate"] = flight_data["kite_yaw_rate_1"]
+    if "kcu_actual_steering" in flight_data.columns:
+        flight_data["kcu_actual_steering_delay"] = np.roll(
+            flight_data["kcu_actual_steering"], int(8)
+        )
 
-    # Prepare yaw rate
-    flight_data["kite_yaw_rate"] = flight_data["kite_yaw_rate_1"]
-    flight_data["kcu_actual_steering_delay"] = np.roll(
-        flight_data["kcu_actual_steering"], int(8)
-    )
-
-    # Downsample and filter to powered mode
     downsampled_data = flight_data.sample(frac=downsample_frac, random_state=42)
     downsampled_results = results.loc[downsampled_data.index]
     downsampled_data = downsampled_data[downsampled_data["powered"] == "powered"]
@@ -124,449 +51,247 @@ def load_and_process_data(
     downsampled_sorted = downsampled_data.sort_values("time")
     downsampled_results_sorted = downsampled_results.loc[downsampled_sorted.index]
 
-    return (
-        downsampled_data,
-        downsampled_results,
-        downsampled_sorted,
-        downsampled_results_sorted,
+    if all(
+        col in downsampled_sorted.columns
+        for col in ("kite_velocity_x", "kite_velocity_y", "kite_velocity_z")
+    ):
+        downsampled_sorted["kite_speed"] = np.sqrt(
+            downsampled_sorted["kite_velocity_x"] ** 2
+            + downsampled_sorted["kite_velocity_y"] ** 2
+            + downsampled_sorted["kite_velocity_z"] ** 2
+        )
+    elif "kite_apparent_windspeed" in downsampled_sorted.columns:
+        downsampled_sorted["kite_speed"] = downsampled_sorted["kite_apparent_windspeed"]
+    else:
+        raise ValueError(
+            "Could not compute kite speed: require velocity components "
+            "('kite_velocity_x', 'kite_velocity_y', 'kite_velocity_z') "
+            "or 'kite_apparent_windspeed'."
+        )
+
+    if "wind_direction" in downsampled_results_sorted.columns:
+        wind_dir = downsampled_results_sorted["wind_direction"].to_numpy(dtype=float)
+    elif "ground_wind_direction" in downsampled_sorted.columns:
+        wind_dir = downsampled_sorted["ground_wind_direction"].to_numpy(dtype=float)
+        # In legacy logs, ground_wind_direction is often stored in degrees.
+        if np.nanmax(np.abs(wind_dir)) > 2 * np.pi:
+            wind_dir = np.deg2rad(wind_dir)
+    else:
+        raise ValueError(
+            "No wind-direction signal found in results/flight_data "
+            "(expected 'wind_direction' or 'ground_wind_direction')."
+        )
+
+    # Circular mean avoids bias across angle wrap-around.
+    mean_wind_dir = np.arctan2(
+        np.nanmean(np.sin(wind_dir)), np.nanmean(np.cos(wind_dir))
+    )
+    x = downsampled_sorted["kite_position_x"].to_numpy(dtype=float)
+    y = downsampled_sorted["kite_position_y"].to_numpy(dtype=float)
+    crosswind = -x * np.sin(mean_wind_dir) + y * np.cos(mean_wind_dir)
+    downsampled_sorted["kite_position_y_wind"] = crosswind - np.nanmean(crosswind)
+    downsampled_sorted["mean_wind_direction_deg"] = (
+        np.rad2deg(mean_wind_dir) + 360
+    ) % 360
+
+    required_columns = {
+        "kite_position_x",
+        "kite_position_y",
+        "kite_position_y_wind",
+        "kite_position_z",
+        "kite_speed",
+    }
+    missing_columns = required_columns - set(downsampled_sorted.columns)
+    if missing_columns:
+        raise ValueError(
+            f"Missing required columns {sorted(missing_columns)} in "
+            f"results/{kite_model}/{kite_model}_{year}-{month}-{day}{addition}.h5"
+        )
+
+    return downsampled_sorted
+
+
+def scatter_yz(
+    ax: plt.Axes,
+    df: pd.DataFrame,
+    label: str,
+    marker: str,
+    marker_size: float,
+    norm: Normalize,
+    y_column: str = "kite_position_y_wind",
+    x_label: str = r"crosswind position $y_\perp$ (m)",
+    cmap: str = "viridis",
+    alpha: float = 0.5,
+) -> plt.PathCollection:
+    """Scatter kite Y-Z positions with marker color based on kite speed."""
+    scatter = ax.scatter(
+        df[y_column],
+        df["kite_position_z"],
+        c=df["kite_speed"],
+        cmap=cmap,
+        norm=norm,
+        s=marker_size,
+        alpha=alpha,
+        marker=marker,
+        linewidths=0,
+        label=label,
+    )
+    ax.set_xlabel(x_label)
+    ax.set_ylabel("kite_position_z (m)")
+    ax.set_aspect("equal", adjustable="box")
+    ax.grid(True, alpha=0.25)
+    ax.axvline(0.0, color="black", linestyle="--", linewidth=1.0, alpha=0.6)
+    return scatter
+
+
+def set_shared_limits(
+    ax: plt.Axes,
+    df_a: pd.DataFrame,
+    df_b: pd.DataFrame,
+    y_column: str = "kite_position_y_wind",
+) -> None:
+    """Apply equal axis limits for the combined dataset."""
+    y_all = pd.concat([df_a[y_column], df_b[y_column]], ignore_index=True)
+    z_all = pd.concat(
+        [df_a["kite_position_z"], df_b["kite_position_z"]], ignore_index=True
     )
 
+    y_min, y_max = y_all.min(), y_all.max()
+    z_min, z_max = z_all.min(), z_all.max()
 
-def get_multi_row_signals(
-    downsampled_data,
-    downsampled_results_sorted,
-    downsampled_sorted,
-):
-    """Define the multi-row signal list."""
-    signals = [
-        (
-            "tether_length",
-            (
-                downsampled_sorted["tether_length"]
-                if "tether_length" in downsampled_sorted.columns
-                else None
-            ),
-            r"$\mathrm{tether\_length}\;(\mathrm{m})$",
-            r"\mathrm{m}",
-        ),
-        (
-            "kite_elevation",
-            (
-                np.degrees(downsampled_sorted["kite_elevation"])
-                if "kite_elevation" in downsampled_sorted.columns
-                else None
-            ),
-            r"$\mathrm{kite\_elevation}\;(^\circ)$",
-            r"^\circ",
-        ),
-        (
-            "wind_speed_horizontal",
-            (
-                downsampled_results_sorted["wind_speed_horizontal"]
-                if "wind_speed_horizontal" in downsampled_results_sorted.columns
-                else None
-            ),
-            r"$\mathrm{wind\_speed\_horizontal}\;(\mathrm{m\,s^{-1}})$",
-            r"\mathrm{m\,s^{-1}}",
-        ),
-        (
-            "wing_angle_of_attack",
-            (
-                downsampled_results_sorted["wing_angle_of_attack"]
-                if "wing_angle_of_attack" in downsampled_results_sorted.columns
-                else None
-            ),
-            r"$\mathrm{wing\_angle\_of\_attack}\;(^\circ)$",
-            r"^\circ",
-        ),
-        (
-            "kite_apparent_windspeed",
-            (
-                downsampled_results_sorted["kite_apparent_windspeed"]
-                if "kite_apparent_windspeed" in downsampled_results_sorted.columns
-                else None
-            ),
-            r"$\mathrm{kite\_apparent\_windspeed}\;(\mathrm{m\,s^{-1}})$",
-            r"\mathrm{m\,s^{-1}}",
-        ),
-        (
-            "radius_turn",
-            (
-                downsampled_results_sorted["radius_turn"]
-                if "radius_turn" in downsampled_results_sorted.columns
-                else None
-            ),
-            r"$\mathrm{radius\_turn}\;(\mathrm{m})$",
-            r"\mathrm{m}",
-        ),
-        (
-            "kcu_actual_depower",
-            (
-                downsampled_sorted["kcu_actual_depower"]
-                if "kcu_actual_depower" in downsampled_sorted.columns
-                else None
-            ),
-            r"$\mathrm{kcu\_actual\_depower}$",
-            r"",
-        ),
-        (
-            "kcu_actual_steering",
-            (
-                downsampled_sorted["kcu_actual_steering"]
-                if "kcu_actual_steering" in downsampled_sorted.columns
-                else None
-            ),
-            r"$\mathrm{kcu\_actual\_steering}\;(\%)$",
-            r"\%",
-        ),
-    ]
+    y_pad = 0.03 * (y_max - y_min) if y_max > y_min else 1.0
+    z_pad = 0.03 * (z_max - z_min) if z_max > z_min else 1.0
 
-    return [entry for entry in signals if entry[1] is not None]
+    x_limits = (y_min - y_pad, y_max + y_pad)
+    y_limits = (z_min - z_pad, z_max + z_pad)
+
+    ax.set_xlim(x_limits)
+    ax.set_ylim(y_limits)
 
 
-def plot_multi_row_comparison(
-    data_2019,
-    results_2019,
-    sorted_2019,
-    results_sorted_2019,
-    data_2025,
-    results_2025,
-    sorted_2025,
-    results_sorted_2025,
-    colors,
-    output_filename,
-):
-    """Create 2-column multi-row comparison plot (all data)."""
-
-    # Get signal definitions
-    signals_2019 = get_multi_row_signals(data_2019, results_sorted_2019, sorted_2019)
-    signals_2025 = get_multi_row_signals(data_2025, results_sorted_2025, sorted_2025)
-
-    # Use signals that exist in both years
-    signal_names_2019 = {s[0] for s in signals_2019}
-    signal_names_2025 = {s[0] for s in signals_2025}
-    common_names = signal_names_2019 & signal_names_2025
-
-    signals_2019 = [s for s in signals_2019 if s[0] in common_names]
-    signals_2025 = [s for s in signals_2025 if s[0] in common_names]
-
-    n_rows = len(signals_2019)
-    fig, axes = plt.subplots(n_rows, 2, figsize=(12, 3 * n_rows), sharex=False)
-
-    if n_rows == 1:
-        axes = axes.reshape(1, -1)
-
-    for row_idx, (sig_2019, sig_2025) in enumerate(zip(signals_2019, signals_2025)):
-        name_19, series_19, label_19, unit_19 = sig_2019
-        name_25, series_25, label_25, unit_25 = sig_2025
-
-        # 2019 column (left)
-        ax_left = axes[row_idx, 0]
-        mean_val = float(series_19.mean())
-        min_val = float(series_19.min())
-        max_val = float(series_19.max())
-
-        ax_left.plot(
-            sorted_2019["time"],
-            series_19,
-            color=colors[0],
-            marker=".",
-            linestyle="None",
-            alpha=0.6,
-            label=label_19,
-        )
-        ax_left.axhline(
-            mean_val,
-            color=colors[1],
-            linestyle="--",
-            label=rf"$\mathrm{{mean}} = {mean_val:.3f}\,{unit_19}$",
-        )
-        ax_left.axhline(
-            min_val,
-            color=colors[2],
-            linestyle=":",
-            label=rf"$\mathrm{{min}} = {min_val:.3f}\,{unit_19}$",
-        )
-        ax_left.axhline(
-            max_val,
-            color=colors[3],
-            linestyle=":",
-            label=rf"$\mathrm{{max}} = {max_val:.3f}\,{unit_19}$",
-        )
-        ax_left.set_ylabel(label_19)
-        ax_left.legend(frameon=True, loc="upper left", framealpha=1.0, fontsize=8)
-        ax_left.set_title("2019" if row_idx == 0 else "")
-
-        # 2025 column (right)
-        ax_right = axes[row_idx, 1]
-        mean_val = float(series_25.mean())
-        min_val = float(series_25.min())
-        max_val = float(series_25.max())
-
-        ax_right.plot(
-            sorted_2025["time"],
-            series_25,
-            color=colors[0],
-            marker=".",
-            linestyle="None",
-            alpha=0.6,
-            label=label_25,
-        )
-        ax_right.axhline(
-            mean_val,
-            color=colors[1],
-            linestyle="--",
-            label=rf"$\mathrm{{mean}} = {mean_val:.3f}\,{unit_25}$",
-        )
-        ax_right.axhline(
-            min_val,
-            color=colors[2],
-            linestyle=":",
-            label=rf"$\mathrm{{min}} = {min_val:.3f}\,{unit_25}$",
-        )
-        ax_right.axhline(
-            max_val,
-            color=colors[3],
-            linestyle=":",
-            label=rf"$\mathrm{{max}} = {max_val:.3f}\,{unit_25}$",
-        )
-        ax_right.set_ylabel(label_25)
-        ax_right.legend(frameon=True, loc="upper left", framealpha=1.0, fontsize=8)
-        ax_right.set_title("2025" if row_idx == 0 else "")
-
-    axes[-1, 0].set_xlabel("time (s)")
-    axes[-1, 1].set_xlabel("time (s)")
-
-    fig.tight_layout()
-    fig.savefig(output_filename, dpi=150)
-    print(f"Saved {output_filename}")
-    plt.close(fig)
-
-
-def plot_turn_comparison(
-    data_2019,
-    results_2019,
-    sorted_2019,
-    results_sorted_2019,
-    data_2025,
-    results_2025,
-    sorted_2025,
-    results_sorted_2025,
-    colors,
-    output_filename,
-):
-    """Create 2-column multi-row comparison plot (right turns only)."""
-
-    # Define steering thresholds
-    upper_threshold_19 = 0.08 * 100  # Convert to % scale for 2019 data
-    upper_threshold_25 = 0.08 * 100
-
-    # Get masks for right turns
-    x_full_kcu_sorted_19 = -sorted_2019["kcu_actual_steering_delay"] / 100
-    mask_right_19 = x_full_kcu_sorted_19 > upper_threshold_19 / 100
-
-    x_full_kcu_sorted_25 = -sorted_2025["kcu_actual_steering_delay"] / 100
-    mask_right_25 = x_full_kcu_sorted_25 > upper_threshold_25 / 100
-
-    # Filter signals to right-turn periods
-    signals_2019 = get_multi_row_signals(data_2019, results_sorted_2019, sorted_2019)
-    signals_2025 = get_multi_row_signals(data_2025, results_sorted_2025, sorted_2025)
-
-    signals_2019_turn = [
-        (name, series.loc[mask_right_19], label, unit)
-        for (name, series, label, unit) in signals_2019
-    ]
-    signals_2025_turn = [
-        (name, series.loc[mask_right_25], label, unit)
-        for (name, series, label, unit) in signals_2025
-    ]
-
-    # Filter out empty series
-    signals_2019_turn = [
-        s for s in signals_2019_turn if s[1] is not None and not s[1].empty
-    ]
-    signals_2025_turn = [
-        s for s in signals_2025_turn if s[1] is not None and not s[1].empty
-    ]
-
-    # Use signals that exist in both
-    signal_names_19 = {s[0] for s in signals_2019_turn}
-    signal_names_25 = {s[0] for s in signals_2025_turn}
-    common_names = signal_names_19 & signal_names_25
-
-    signals_2019_turn = [s for s in signals_2019_turn if s[0] in common_names]
-    signals_2025_turn = [s for s in signals_2025_turn if s[0] in common_names]
-
-    n_rows = len(signals_2019_turn)
-    fig, axes = plt.subplots(n_rows, 2, figsize=(12, 3 * n_rows), sharex=False)
-
-    if n_rows == 1:
-        axes = axes.reshape(1, -1)
-
-    time_turn_2019 = sorted_2019.loc[mask_right_19, "time"]
-    time_turn_2025 = sorted_2025.loc[mask_right_25, "time"]
-
-    for row_idx, (sig_2019, sig_2025) in enumerate(
-        zip(signals_2019_turn, signals_2025_turn)
-    ):
-        name_19, series_19, label_19, unit_19 = sig_2019
-        name_25, series_25, label_25, unit_25 = sig_2025
-
-        # 2019 column (left)
-        ax_left = axes[row_idx, 0]
-        if len(series_19) > 0:
-            mean_val = float(series_19.mean())
-            min_val = float(series_19.min())
-            max_val = float(series_19.max())
-
-            ax_left.plot(
-                time_turn_2019,
-                series_19,
-                color=colors[0],
-                marker=".",
-                linestyle="None",
-                alpha=0.6,
-                label=label_19,
-            )
-            ax_left.axhline(
-                mean_val,
-                color=colors[1],
-                linestyle="--",
-                label=rf"$\mathrm{{mean}} = {mean_val:.3f}\,{unit_19}$",
-            )
-            ax_left.axhline(
-                min_val,
-                color=colors[2],
-                linestyle=":",
-                label=rf"$\mathrm{{min}} = {min_val:.3f}\,{unit_19}$",
-            )
-            ax_left.axhline(
-                max_val,
-                color=colors[3],
-                linestyle=":",
-                label=rf"$\mathrm{{max}} = {max_val:.3f}\,{unit_19}$",
-            )
-        ax_left.set_ylabel(label_19)
-        ax_left.legend(frameon=True, loc="upper left", framealpha=1.0, fontsize=8)
-        ax_left.set_title("2019 (Right Turns)" if row_idx == 0 else "")
-
-        # 2025 column (right)
-        ax_right = axes[row_idx, 1]
-        if len(series_25) > 0:
-            mean_val = float(series_25.mean())
-            min_val = float(series_25.min())
-            max_val = float(series_25.max())
-
-            ax_right.plot(
-                time_turn_2025,
-                series_25,
-                color=colors[0],
-                marker=".",
-                linestyle="None",
-                alpha=0.6,
-                label=label_25,
-            )
-            ax_right.axhline(
-                mean_val,
-                color=colors[1],
-                linestyle="--",
-                label=rf"$\mathrm{{mean}} = {mean_val:.3f}\,{unit_25}$",
-            )
-            ax_right.axhline(
-                min_val,
-                color=colors[2],
-                linestyle=":",
-                label=rf"$\mathrm{{min}} = {min_val:.3f}\,{unit_25}$",
-            )
-            ax_right.axhline(
-                max_val,
-                color=colors[3],
-                linestyle=":",
-                label=rf"$\mathrm{{max}} = {max_val:.3f}\,{unit_25}$",
-            )
-        ax_right.set_ylabel(label_25)
-        ax_right.legend(frameon=True, loc="upper left", framealpha=1.0, fontsize=8)
-        ax_right.set_title("2025 (Right Turns)" if row_idx == 0 else "")
-
-    axes[-1, 0].set_xlabel("time (s)")
-    axes[-1, 1].set_xlabel("time (s)")
-
-    fig.tight_layout()
-    fig.savefig(output_filename, dpi=150)
-    print(f"Saved {output_filename}")
-    plt.close(fig)
-
-
-def main():
+def main() -> None:
     set_plot_style()
-    colors = get_color_list()
 
-    # Load 2019 data
-    print("Loading 2019 data...")
-    data_19, results_19, sorted_19, results_sorted_19 = load_and_process_data(
+    repo_root = Path(__file__).resolve().parents[1]
+    df_2019 = load_and_process_data(
         year="2019",
         month="10",
         day="08",
         kite_model="v3",
         addition="_t26",
-        time_range=(1800.0, 9986.2),
-        downsample_frac=0.1,
+        time_range=(2190, 2255),  # (1800.0, 9986.2),
+        downsample_frac=1.0,
     )
-
-    # Convert 2019 depower to 2025-equivalent up_data using paper physics
-    if "kcu_actual_depower" in sorted_19.columns:
-        sorted_19["kcu_actual_depower"] = convert_2019_depower_to_2025_updata(
-            sorted_19["kcu_actual_depower"]
-        )
-        print(
-            f"2019 kcu_actual_depower converted to 2025-equivalent (via paper physics): "
-            f"min={sorted_19['kcu_actual_depower'].min():.4f}, "
-            f"max={sorted_19['kcu_actual_depower'].max():.4f}"
-        )
-
-    # Load 2025 data
-    print("Loading 2025 data...")
-    data_25, results_25, sorted_25, results_sorted_25 = load_and_process_data(
+    df_2025 = load_and_process_data(
         year="2025",
         month="10",
         day="09",
         kite_model="v3",
         addition="",
-        time_range=(400.0, 1000.0),
-        # time_range=(0, 2000),
-        downsample_frac=1,
+        time_range=(700, 800),  # (400.0, 1000.0),
+        downsample_frac=1.0,
     )
 
-    # Create comparison plots
-    print("Creating statistics_all.pdf...")
-    plot_multi_row_comparison(
-        data_19,
-        results_19,
-        sorted_19,
-        results_sorted_19,
-        data_25,
-        results_25,
-        sorted_25,
-        results_sorted_25,
-        colors,
-        "./results/plots_paper/statistics_all.pdf",
-    )
+    fig = plt.figure(figsize=(10, 4), constrained_layout=True)
+    gs = fig.add_gridspec(1, 3, width_ratios=[1.0, 1.0, 0.08], wspace=0.02)
+    ax_2019 = fig.add_subplot(gs[0, 0])
+    ax_2025 = fig.add_subplot(gs[0, 1], sharey=ax_2019)
+    cax = fig.add_subplot(gs[0, 2])
 
-    print("Creating statistics_right_turn.pdf...")
-    plot_turn_comparison(
-        data_19,
-        results_19,
-        sorted_19,
-        results_sorted_19,
-        data_25,
-        results_25,
-        sorted_25,
-        results_sorted_25,
-        colors,
-        "./results/plots_paper/statistics_right_turn.pdf",
-    )
+    speed_min = min(df_2019["kite_speed"].min(), df_2025["kite_speed"].min())
+    speed_max = max(df_2019["kite_speed"].max(), df_2025["kite_speed"].max())
+    norm = Normalize(vmin=speed_min, vmax=speed_max)
 
-    print("Done!")
+    # Marker size 10 = 5x larger than previous size 2.
+    marker_size = 18
+    scatter_yz(
+        ax_2019,
+        df_2019,
+        label="2019",
+        marker="o",
+        marker_size=marker_size,
+        norm=norm,
+        alpha=0.7,  # 0.45,
+    )
+    scatter_yz(
+        ax_2025,
+        df_2025,
+        label="2025",
+        marker="o",
+        marker_size=marker_size,
+        norm=norm,
+        alpha=0.6,  # 0.45,
+    )
+    ax_2019.text(
+        0.02,
+        0.98,
+        f"2019-10-08",
+        transform=ax_2019.transAxes,
+        ha="left",
+        va="top",
+        fontsize=12,
+    )
+    ax_2025.text(
+        0.02,
+        0.98,
+        f"2025-10-09",
+        transform=ax_2025.transAxes,
+        ha="left",
+        va="top",
+        fontsize=12,
+    )
+    # ax_2019.set_title("2019-10-08")
+    # ax_2025.set_title("2025-10-09")
+    ax_2019.set_ylabel(r"$z_\mathrm{W}$ (m)")
+    ax_2019.set_xlabel(r"$y_\mathrm{W,\perp}$ (m)")
+    ax_2025.set_xlabel(r"$y_\mathrm{W,\perp}$ (m)")
+    # ax_2019.text(
+    #     0.02,
+    #     0.98,
+    #     f"mean downwind: {df_2019['mean_wind_direction_deg'].iloc[0]:.1f} deg",
+    #     transform=ax_2019.transAxes,
+    #     ha="left",
+    #     va="top",
+    #     fontsize=9,
+    # )
+    # ax_2025.text(
+    #     0.02,
+    #     0.98,
+    #     f"mean downwind: {df_2025['mean_wind_direction_deg'].iloc[0]:.1f} deg",
+    #     transform=ax_2025.transAxes,
+    #     ha="left",
+    #     va="top",
+    #     fontsize=9,
+    # )
+
+    # Use a clean scalar mappable so colorbar is fully opaque (independent of point alpha).
+    sm_speed = ScalarMappable(norm=norm, cmap="viridis")
+    sm_speed.set_array([])
+    cbar = fig.colorbar(sm_speed, cax=cax)
+    cbar.set_label(r"$v_\mathrm{k}$ (ms$^{-1}$)")  # , pad=6)
+
+    set_shared_limits(ax_2019, df_2019, df_2025, y_column="kite_position_y_wind")
+    set_shared_limits(ax_2025, df_2019, df_2025, y_column="kite_position_y_wind")
+
+    # Right panel shares z-axis with left panel, so hide duplicate z-axis labels/ticks.
+    ax_2025.set_ylabel("")
+    ax_2025.tick_params(axis="y", which="both", left=False, labelleft=False)
+
+    # Match colorbar height to the actually rendered panel height with equal aspect.
+    fig.canvas.draw()
+    pos_2019 = ax_2019.get_position()
+    pos_2025 = ax_2025.get_position()
+    pos_cax = cax.get_position()
+    y0 = min(pos_2019.y0, pos_2025.y0) + 0.021
+    y1 = max(pos_2019.y1, pos_2025.y1)
+    cax.set_position([pos_cax.x0 + 0.05, y0, pos_cax.width - 0.01, y1 - y0])
+
+    output_path = repo_root / "results/plots_paper/yz_plane_lemniscate.pdf"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+    print(f"Saved {output_path}")
 
 
 if __name__ == "__main__":

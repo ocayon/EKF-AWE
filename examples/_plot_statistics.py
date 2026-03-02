@@ -1,6 +1,6 @@
 """
 Two-column comparison plots of 2019 vs 2025 flight statistics.
-Produces statistics_all.pdf and statistics_right_turn.pdf.
+Produces statistics_all.pdf and statistics_turns.pdf.
 """
 
 from pathlib import Path
@@ -355,29 +355,29 @@ def plot_turn_comparison(
     colors,
     output_filename,
 ):
-    """Create 2-column multi-row comparison plot (right turns only)."""
+    """Create 2-column multi-row comparison plot (left and right turns)."""
 
     # Define steering thresholds
     upper_threshold_19 = 0.08 * 100  # Convert to % scale for 2019 data
     upper_threshold_25 = 0.08 * 100
 
-    # Get masks for right turns
+    # Get masks for left and right turns
     x_full_kcu_sorted_19 = -sorted_2019["kcu_actual_steering_delay"] / 100
-    mask_right_19 = x_full_kcu_sorted_19 > upper_threshold_19 / 100
+    mask_turn_19 = np.abs(x_full_kcu_sorted_19) > upper_threshold_19 / 100
 
     x_full_kcu_sorted_25 = -sorted_2025["kcu_actual_steering_delay"] / 100
-    mask_right_25 = x_full_kcu_sorted_25 > upper_threshold_25 / 100
+    mask_turn_25 = np.abs(x_full_kcu_sorted_25) > upper_threshold_25 / 100
 
-    # Filter signals to right-turn periods
+    # Filter signals to turn periods
     signals_2019 = get_multi_row_signals(data_2019, results_sorted_2019, sorted_2019)
     signals_2025 = get_multi_row_signals(data_2025, results_sorted_2025, sorted_2025)
 
     signals_2019_turn = [
-        (name, series.loc[mask_right_19], label, unit)
+        (name, series.loc[mask_turn_19], label, unit)
         for (name, series, label, unit) in signals_2019
     ]
     signals_2025_turn = [
-        (name, series.loc[mask_right_25], label, unit)
+        (name, series.loc[mask_turn_25], label, unit)
         for (name, series, label, unit) in signals_2025
     ]
 
@@ -403,8 +403,8 @@ def plot_turn_comparison(
     if n_rows == 1:
         axes = axes.reshape(1, -1)
 
-    time_turn_2019 = sorted_2019.loc[mask_right_19, "time"]
-    time_turn_2025 = sorted_2025.loc[mask_right_25, "time"]
+    time_turn_2019 = sorted_2019.loc[mask_turn_19, "time"]
+    time_turn_2025 = sorted_2025.loc[mask_turn_25, "time"]
 
     for row_idx, (sig_2019, sig_2025) in enumerate(
         zip(signals_2019_turn, signals_2025_turn)
@@ -448,7 +448,7 @@ def plot_turn_comparison(
             )
         ax_left.set_ylabel(label_19)
         ax_left.legend(frameon=True, loc="upper left", framealpha=1.0, fontsize=8)
-        ax_left.set_title("2019 (Right Turns)" if row_idx == 0 else "")
+        ax_left.set_title("2019 (Left + Right Turns)" if row_idx == 0 else "")
 
         # 2025 column (right)
         ax_right = axes[row_idx, 1]
@@ -486,7 +486,7 @@ def plot_turn_comparison(
             )
         ax_right.set_ylabel(label_25)
         ax_right.legend(frameon=True, loc="upper left", framealpha=1.0, fontsize=8)
-        ax_right.set_title("2025 (Right Turns)" if row_idx == 0 else "")
+        ax_right.set_title("2025 (Left + Right Turns)" if row_idx == 0 else "")
 
     axes[-1, 0].set_xlabel("time (s)")
     axes[-1, 1].set_xlabel("time (s)")
@@ -509,8 +509,8 @@ def main():
         day="08",
         kite_model="v3",
         addition="_t26",
-        time_range=(1800.0, 9986.2),
-        downsample_frac=0.1,
+        time_range=(2190, 2255),  # (1800.0, 9986.2),
+        downsample_frac=1,
     )
 
     # Convert 2019 depower to 2025-equivalent up_data using paper physics
@@ -532,7 +532,7 @@ def main():
         day="09",
         kite_model="v3",
         addition="",
-        time_range=(400.0, 1000.0),
+        time_range=(700, 800),  # (400.0, 1000.0),
         # time_range=(0, 2000),
         downsample_frac=1,
     )
@@ -552,7 +552,7 @@ def main():
         "./results/plots_paper/statistics_all.pdf",
     )
 
-    print("Creating statistics_right_turn.pdf...")
+    print("Creating statistics_turns.pdf...")
     plot_turn_comparison(
         data_19,
         results_19,
@@ -563,7 +563,7 @@ def main():
         sorted_25,
         results_sorted_25,
         colors,
-        "./results/plots_paper/statistics_right_turn.pdf",
+        "./results/plots_paper/statistics_turns.pdf",
     )
 
     print("Done!")
