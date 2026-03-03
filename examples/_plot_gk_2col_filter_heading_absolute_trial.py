@@ -84,7 +84,9 @@ def load_simulation_varying_dataset() -> pd.DataFrame:
     """Load varying-up simulation CSV used for overlays."""
     base = Path(__file__).resolve().parents[1] / "data"
     candidates = [
-        base / "circle_batch_analysis_varying_up_manually_reduced.csv",
+        # base / "circle_batch_analysis_varying_up_manually_reduced.csv",
+        base
+        / "circles_batch_analysis_2025_3March.csv",
     ]
 
     for path in candidates:
@@ -296,7 +298,7 @@ def format_compact_latex_legend(
     metric_1_value_tex: str,
     metric_2_tex: str,
     metric_2_value_tex: str,
-    title_width_cm: float = 1.5,
+    title_width_cm: float = 2.7,
     metric_width_cm: float = 1.0,
     value_1_width_cm: float = 1.5,
     value_2_width_cm: float = 1.0,
@@ -354,6 +356,7 @@ def plot_heading_binned_panel(
             marker="o",
             edgecolors="none",
             linewidths=0,
+            zorder=1,
         )
 
     # Plotted lines: simple linear fits split by upward/downward flight.
@@ -376,13 +379,13 @@ def plot_heading_binned_panel(
         (
             heading_orient >= 0.0,
             "-",
-            "Upward",
+            "Exp. fit upward",
             "upward",
         ),
         (
             heading_orient < 0.0,
             "--",
-            "Downward",
+            "Exp. fit downward",
             "downward",
         ),
     ]
@@ -394,7 +397,7 @@ def plot_heading_binned_panel(
         x_line = np.linspace(np.min(x_fit_main), np.max(x_fit_main), 200)
         y_line = slope * x_line + intercept
         ax.plot(
-            x_line, y_line, color="black", linestyle=linestyle, linewidth=1.5, zorder=4
+            x_line, y_line, color="black", linestyle=linestyle, linewidth=1.5, zorder=2
         )
 
         fit_other = fit_linear(direction_mask & fit_us_mask_other)
@@ -421,9 +424,9 @@ def plot_heading_binned_panel(
                 1.5,
                 format_compact_latex_legend(
                     title=direction_label,
-                    metric_1_tex=r"g_{k,l-r}",
+                    metric_1_tex=r"g_\mathrm{k,l-r}",
                     metric_1_value_tex=gk_lr_label,
-                    metric_2_tex=r"\bar{R}_{l-r}^{2}",
+                    metric_2_tex=r"\bar{R}_\mathrm{l-r}^{2}",
                     metric_2_value_tex=r2_lr_label,
                 ),
             )
@@ -577,13 +580,13 @@ def overlay_simulation_case(
         ax.scatter(
             x_transient,
             y_transient,
-            s=60,
-            alpha=0.9,
+            s=40,
+            alpha=1,
             marker="X",
-            facecolors="none",
-            edgecolors="black",
+            facecolors="white",
+            edgecolors="red",
             linewidths=1.0,
-            zorder=3,
+            zorder=4,
         )
 
     # Dynamic points: harmonic cases.
@@ -610,7 +613,7 @@ def overlay_simulation_case(
             s=25,
             alpha=0.9,
             marker="+",
-            color="black",
+            color="red",
             zorder=3,
         )
     else:
@@ -810,7 +813,7 @@ def main() -> None:
             plot_heading_binned_panel(ax, df, cfg.title, heading_norm, cmap)
         )
 
-    overlay_up_values = [0.25, 0.40]
+    overlay_up_values = [0.25, 0.42]
     sim_overlay_summaries: list[OverlayFitSummary] = []
     sim_case_limits: list[tuple[float, float]] = []
     for ax, up_value in zip(axes, overlay_up_values):
@@ -865,8 +868,8 @@ def main() -> None:
             else r"\mathrm{n/a}"
         )
         transient_label = format_compact_latex_legend(
-            title="Transient",
-            metric_1_tex=r"g_{k}",
+            title="Sim. uniform",
+            metric_1_tex=r"g_\mathrm{k}",
             metric_1_value_tex=transient_gk_label,
             metric_2_tex=r"R^{2}",
             metric_2_value_tex=transient_r2_label,
@@ -883,8 +886,8 @@ def main() -> None:
             else r"\mathrm{n/a}"
         )
         dynamic_label = format_compact_latex_legend(
-            title="Dynamic",
-            metric_1_tex=r"g_{k}",
+            title="Sim. dynamic",
+            metric_1_tex=r"g_\mathrm{k}",
             metric_1_value_tex=dynamic_gk_label,
             metric_2_tex=r"R^{2}",
             metric_2_value_tex=dynamic_r2_label,
@@ -900,7 +903,7 @@ def main() -> None:
                 linestyle="None",
                 markersize=transient_marker_size,
                 markerfacecolor="none",
-                markeredgecolor="black",
+                markeredgecolor="red",
                 markeredgewidth=1.0,
                 label=transient_label,
             ),
@@ -910,7 +913,7 @@ def main() -> None:
                 marker="+",
                 linestyle="None",
                 markersize=dynamic_marker_size,
-                color="black",
+                color="red",
                 label=dynamic_label,
             ),
         ]

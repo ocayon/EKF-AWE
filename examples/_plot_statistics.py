@@ -132,12 +132,34 @@ def load_and_process_data(
     )
 
 
+def get_first_available_series(df, columns):
+    """Return first matching column as a series, else None."""
+    for col in columns:
+        if col in df.columns:
+            return df[col]
+    return None
+
+
 def get_multi_row_signals(
     downsampled_data,
     downsampled_results_sorted,
     downsampled_sorted,
 ):
     """Define the multi-row signal list."""
+    tether_force_series = get_first_available_series(
+        downsampled_sorted,
+        ["ground_tether_force", "load_cell_main_force", "sensor_tether_force"],
+    )
+    tether_reelout_speed_series = get_first_available_series(
+        downsampled_sorted,
+        ["tether_reelout_speed", "ground_tether_reelout_speed"],
+    )
+    traction_power_proxy_series = (
+        tether_force_series * tether_reelout_speed_series
+        if tether_force_series is not None and tether_reelout_speed_series is not None
+        else None
+    )
+
     signals = [
         (
             "tether_length",
@@ -148,6 +170,18 @@ def get_multi_row_signals(
             ),
             r"$\mathrm{tether\_length}\;(\mathrm{m})$",
             r"\mathrm{m}",
+        ),
+        (
+            "ground_tether_force",
+            tether_force_series,
+            r"$\mathrm{ground\_tether\_force}\;(\mathrm{N})$",
+            r"\mathrm{N}",
+        ),
+        (
+            "traction_power_proxy",
+            traction_power_proxy_series,
+            r"$\mathrm{traction\_power\_proxy}\;(\mathrm{W})$",
+            r"\mathrm{W}",
         ),
         (
             "kite_elevation",
@@ -497,6 +531,77 @@ def plot_turn_comparison(
     plt.close(fig)
 
 
+def plot_tether_reelout_speed_comparison(
+    sorted_2019,
+    sorted_2025,
+    colors,
+    output_filename,
+):
+    """Create a dedicated 2-column plot for tether reelout speed."""
+    reelout_2019 = get_first_available_series(
+        sorted_2019, ["tether_reelout_speed", "ground_tether_reelout_speed"]
+    )
+    reelout_2025 = get_first_available_series(
+        sorted_2025, ["tether_reelout_speed", "ground_tether_reelout_speed"]
+    )
+
+    if reelout_2019 is None or reelout_2025 is None:
+        print("Skipping tether reelout speed plot: missing reelout speed in one dataset.")
+        return
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 3.5), sharey=True)
+    label = r"$\mathrm{tether\_reelout\_speed}\;(\mathrm{m\,s^{-1}})$"
+    unit = r"\mathrm{m\,s^{-1}}"
+
+    plot_specs = [
+        (axes[0], sorted_2019["time"], reelout_2019, "2019"),
+        (axes[1], sorted_2025["time"], reelout_2025, "2025"),
+    ]
+
+    for ax, time_series, reelout_series, title in plot_specs:
+        mean_val = float(reelout_series.mean())
+        min_val = float(reelout_series.min())
+        max_val = float(reelout_series.max())
+
+        ax.plot(
+            time_series,
+            reelout_series,
+            color=colors[0],
+            marker=".",
+            linestyle="None",
+            alpha=0.6,
+            label=label,
+        )
+        ax.axhline(
+            mean_val,
+            color=colors[1],
+            linestyle="--",
+            label=rf"$\mathrm{{mean}} = {mean_val:.3f}\,{unit}$",
+        )
+        ax.axhline(
+            min_val,
+            color=colors[2],
+            linestyle=":",
+            label=rf"$\mathrm{{min}} = {min_val:.3f}\,{unit}$",
+        )
+        ax.axhline(
+            max_val,
+            color=colors[3],
+            linestyle=":",
+            label=rf"$\mathrm{{max}} = {max_val:.3f}\,{unit}$",
+        )
+        ax.set_title(title)
+        ax.set_xlabel("time (s)")
+        ax.legend(frameon=True, loc="upper left", framealpha=1.0, fontsize=8)
+
+    axes[0].set_ylabel(label)
+
+    fig.tight_layout()
+    fig.savefig(output_filename, dpi=150)
+    print(f"Saved {output_filename}")
+    plt.close(fig)
+
+
 def main():
     set_plot_style()
     colors = get_color_list()
@@ -564,6 +669,14 @@ def main():
         results_sorted_25,
         colors,
         "./results/plots_paper/statistics_turns.pdf",
+    )
+
+    print("Creating tether_reelout_speed.pdf...")
+    plot_tether_reelout_speed_comparison(
+        sorted_19,
+        sorted_25,
+        colors,
+        "./results/plots_paper/tether_reelout_speed.pdf",
     )
 
     print("Done!")
