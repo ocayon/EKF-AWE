@@ -47,7 +47,6 @@ class FlightConfig:
 
 @dataclass(frozen=True)
 class OverlayFitSummary:
-    up: float
     transient_gk: float
     transient_r2: float
     dynamic_gk: float
@@ -80,23 +79,53 @@ def configure_typography(fig_width: float, fig_height: float) -> dict[str, float
     return sizes
 
 
-def load_simulation_varying_dataset() -> pd.DataFrame:
-    """Load varying-up simulation CSV used for overlays."""
-    base = Path(__file__).resolve().parents[1] / "data"
-    candidates = [
-        # base / "circle_batch_analysis_varying_up_manually_reduced.csv",
-        base
-        / "circles_batch_analysis_2025_3March.csv",
-    ]
+def read_simulation_csv(path: Path) -> pd.DataFrame:
+    """Read simulation CSV while guarding against malformed row widths."""
+    with path.open("r", encoding="utf-8") as handle:
+        lines = handle.readlines()
+    if not lines:
+        return pd.DataFrame()
 
+    expected_fields = lines[0].count(",") + 1
+    mismatch_rows = sum(
+        1
+        for line in lines[1:]
+        if line.strip() and (line.count(",") + 1) != expected_fields
+    )
+    if mismatch_rows:
+        print(
+            f"{path.name}: {mismatch_rows} rows do not match header width; "
+            "ignoring trailing fields."
+        )
+
+    # Keep only header-defined columns so malformed trailing values cannot
+    # shift expected columns (e.g. 'up', 'us', 'v_app', 'yaw_rate').
+    return pd.read_csv(path, index_col=False, usecols=range(expected_fields))
+
+
+def load_simulation_dataset(candidates: list[Path], dataset_label: str) -> pd.DataFrame:
+    """Load and combine one simulation dataset from a list of candidate CSV paths."""
+    frames: list[pd.DataFrame] = []
     for path in candidates:
-        if path.is_file():
-            df = pd.read_csv(path)
-            print(f"Loaded simulation data from {path}")
-            return df
+        if not path.is_file():
+            continue
+        df = read_simulation_csv(path)
+        if df.empty:
+            print(f"Simulation CSV is empty ({dataset_label}): {path}")
+            continue
+        print(f"Loaded simulation data ({dataset_label}) from {path} ({len(df)} rows)")
+        frames.append(df)
 
-    print("Simulation CSV not found for overlay plotting (varying-up).")
-    return pd.DataFrame()
+    if not frames:
+        print(f"Simulation CSV not found for overlay plotting ({dataset_label}).")
+        return pd.DataFrame()
+
+    combined = pd.concat(frames, ignore_index=True, sort=False)
+    print(
+        f"Combined simulation overlays ({dataset_label}) from {len(frames)} file(s): "
+        f"{len(combined)} rows total."
+    )
+    return combined
 
 
 def load_filtered_dataset(cfg: FlightConfig) -> pd.DataFrame:
@@ -542,12 +571,11 @@ def _fit_line(
 
 
 def overlay_simulation_case(
-    ax: plt.Axes, sim_df: pd.DataFrame, up_value: float
+    ax: plt.Axes, sim_df: pd.DataFrame, sim_label: str
 ) -> tuple[list[tuple[str, str, float, str]], OverlayFitSummary, float, float]:
-    """Overlay one simulation up-case on an experimental panel in black."""
+    """Overlay one full simulation dataset on an experimental panel in red."""
     legend_entries: list[tuple[str, str, float, str]] = []
     summary = OverlayFitSummary(
-        up=up_value,
         transient_gk=np.nan,
         transient_r2=np.nan,
         dynamic_gk=np.nan,
@@ -556,23 +584,20 @@ def overlay_simulation_case(
     if sim_df.empty:
         return legend_entries, summary, 0.0, 0.0
 
-    required = {"up", "us", "v_app", "yaw_rate"}
+    required = {"us", "v_app", "yaw_rate"}
     if not required.issubset(sim_df.columns):
         return legend_entries, summary, 0.0, 0.0
 
-    up_arr = sim_df["up"].to_numpy(dtype=float)
-    mask = np.isfinite(up_arr) & np.isclose(up_arr, up_value, atol=1e-9)
-    if not np.any(mask):
-        print(f"Simulation overlay: no rows for u_dp={up_value:.2f}")
+    df_sim = sim_df.copy()
+    if df_sim.empty:
+        print(f"Simulation overlay: no rows for {sim_label}")
         return legend_entries, summary, 0.0, 0.0
-
-    df_up = sim_df.loc[mask]
 
     # Transient points: base simulation trajectory.
     x_transient = np.abs(
-        df_up["us"].to_numpy(dtype=float) * df_up["v_app"].to_numpy(dtype=float)
+        df_sim["us"].to_numpy(dtype=float) * df_sim["v_app"].to_numpy(dtype=float)
     )
-    y_transient = np.abs(np.deg2rad(df_up["yaw_rate"].to_numpy(dtype=float)))
+    y_transient = np.abs(np.deg2rad(df_sim["yaw_rate"].to_numpy(dtype=float)))
     finite_transient = np.isfinite(x_transient) & np.isfinite(y_transient)
     x_transient = x_transient[finite_transient]
     y_transient = y_transient[finite_transient]
@@ -595,10 +620,10 @@ def overlay_simulation_case(
     for n in range(3, 11):
         usva_col = f"usva_{n}"
         yaw_col = f"yaw_rate_{n}"
-        if usva_col not in df_up.columns or yaw_col not in df_up.columns:
+        if usva_col not in df_sim.columns or yaw_col not in df_sim.columns:
             continue
-        x_dyn = np.abs(df_up[usva_col].to_numpy(dtype=float))
-        y_dyn = np.abs(np.deg2rad(df_up[yaw_col].to_numpy(dtype=float)))
+        x_dyn = np.abs(df_sim[usva_col].to_numpy(dtype=float))
+        y_dyn = np.abs(np.deg2rad(df_sim[yaw_col].to_numpy(dtype=float)))
         finite_dyn = np.isfinite(x_dyn) & np.isfinite(y_dyn)
         if np.any(finite_dyn):
             dyn_x_all.append(x_dyn[finite_dyn])
@@ -632,50 +657,48 @@ def overlay_simulation_case(
     fit_transient = _fit_line(x_transient, y_transient)
     if fit_transient is None:
         label_transient = (
-            rf"Transient sim ($u_{{\mathrm{{dp}}}}={up_value:.2f}$)"
+            rf"Transient sim ({sim_label})"
             + "\n"
             + rf"$R^2=\mathrm{{n/a}},\ g_{{\mathrm{{k}}}}=\mathrm{{n/a}}$"
         )
     else:
         gk_t, r2_t, x_line_t, y_line_t, n_t = fit_transient
         summary = OverlayFitSummary(
-            up=summary.up,
             transient_gk=gk_t,
             transient_r2=r2_t,
             dynamic_gk=summary.dynamic_gk,
             dynamic_r2=summary.dynamic_r2,
         )
         print(
-            f"Overlay transient fit (u_dp={up_value:.2f}): "
+            f"Overlay transient fit ({sim_label}): "
             f"n={n_t}, g_k={gk_t:.3f}, R^2={r2_t:.3f}"
         )
         label_transient = (
-            rf"Transient sim ($u_{{\mathrm{{dp}}}}={up_value:.2f}$)"
+            rf"Transient sim ({sim_label})"
             + "\n"
             + rf"$R^2={r2_t:.2f},\ g_{{\mathrm{{k}}}}={gk_t:.2f}$"
         )
     fit_dynamic = _fit_line(x_dynamic, y_dynamic)
     if fit_dynamic is None:
         label_dynamic = (
-            rf"Dynamic sim ($u_{{\mathrm{{dp}}}}={up_value:.2f}$)"
+            rf"Dynamic sim ({sim_label})"
             + "\n"
             + rf"$R^2=\mathrm{{n/a}},\ g_{{\mathrm{{k}}}}=\mathrm{{n/a}}$"
         )
     else:
         gk_d, r2_d, x_line_d, y_line_d, n_d = fit_dynamic
         summary = OverlayFitSummary(
-            up=summary.up,
             transient_gk=summary.transient_gk,
             transient_r2=summary.transient_r2,
             dynamic_gk=gk_d,
             dynamic_r2=r2_d,
         )
         print(
-            f"Overlay dynamic fit (u_dp={up_value:.2f}): "
+            f"Overlay dynamic fit ({sim_label}): "
             f"n={n_d}, g_k={gk_d:.3f}, R^2={r2_d:.3f}"
         )
         label_dynamic = (
-            rf"Dynamic sim ($u_{{\mathrm{{dp}}}}={up_value:.2f}$)"
+            rf"Dynamic sim ({sim_label})"
             + "\n"
             + rf"$R^2={r2_d:.2f},\ g_{{\mathrm{{k}}}}={gk_d:.2f}$"
         )
@@ -797,7 +820,22 @@ def main() -> None:
     ]
 
     datasets = [load_filtered_dataset(cfg) for cfg in datasets_cfg]
-    sim_varying_df = load_simulation_varying_dataset()
+    base = Path(__file__).resolve().parents[1] / "data"
+    # Edit these candidate lists to choose which simulation CSVs are used per panel.
+    candidates_2019 = [
+        base / "circles_batch_analysis_2019_5March.csv",
+        # base / "circles_batch_analysis_2019.csv",
+        base / "circles_batch_analysis.csv",
+    ]
+    candidates_2025 = [
+        base / "circles_batch_analysis_2025_5March.csv",
+        # base / "circles_batch_analysis_2025_3March.csv",
+        # base / "circles_batch_analysis_2025_3March_.csv",
+    ]
+    sim_datasets = [
+        load_simulation_dataset(candidates_2019, dataset_label="2019"),
+        load_simulation_dataset(candidates_2025, dataset_label="2025"),
+    ]
 
     heading_tick_deg = np.arange(45.0, 315.0 + 1e-9, 45.0)
     heading_tick_labels = [rf"{int(v):d}$^{{\circ}}$" for v in heading_tick_deg]
@@ -813,18 +851,15 @@ def main() -> None:
             plot_heading_binned_panel(ax, df, cfg.title, heading_norm, cmap)
         )
 
-    overlay_up_values = [0.25, 0.42]
     sim_overlay_summaries: list[OverlayFitSummary] = []
     sim_case_limits: list[tuple[float, float]] = []
-    for ax, up_value in zip(axes, overlay_up_values):
+    sim_labels = ["2019", "2025"]
+    for ax, sim_df, sim_label in zip(axes, sim_datasets, sim_labels):
         _overlay_entries, overlay_summary, sim_x_max, sim_y_max = (
-            overlay_simulation_case(ax, sim_varying_df, up_value)
+            overlay_simulation_case(ax, sim_df, sim_label)
         )
         sim_overlay_summaries.append(overlay_summary)
         sim_case_limits.append((sim_x_max, sim_y_max))
-
-    for ax, cfg, overlay_summary in zip(axes, datasets_cfg, sim_overlay_summaries):
-        ax.set_title(rf"{cfg.title} ($u_{{\mathrm{{dp}}}}={overlay_summary.up:.2f}$)")
 
     axes[0].set_ylabel(r"$|\dot{\psi}|$ ($\mathrm{rad\,s^{-1}}$)")
     axes[1].set_ylabel("")
@@ -973,12 +1008,6 @@ def main() -> None:
         )
         if ax_idx == 0:
             ax.add_artist(combined_legend)
-
-    y_lim = 2.25
-    x_lim = 8
-    for ax in axes:
-        ax.set_xlim(0.5, x_lim)
-        ax.set_ylim(0.0, y_lim)
 
     fig.tight_layout()
     output_path = (
