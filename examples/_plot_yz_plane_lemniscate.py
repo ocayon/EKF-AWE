@@ -1,10 +1,11 @@
 """
 Plot kite position in the Y-Z plane for two v3 flights loaded from EKF .h5 files.
 
-Creates a 1x2 scatter figure (2019 and 2025), with marker color mapped to kite
-speed and one shared colorbar.
+Creates a 1x2 scatter figure (2019 and 2025), with marker color mapped to a
+selected scalar signal and one shared colorbar.
 """
 
+import argparse
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -15,6 +16,47 @@ from matplotlib.colors import Normalize
 
 from awes_ekf.load_data.read_data import read_results
 from awes_ekf.plotting.color_palette import set_plot_style
+
+
+def resolve_color_settings(color_by: str | bool) -> tuple[str, str, float, str]:
+    """Map color selector input to column, colorbar label, display scale and unit."""
+    if isinstance(color_by, bool):
+        key = "tether_force_kite" if color_by else "kite_speed"
+    else:
+        key = color_by.strip().lower()
+
+    aliases = {
+        "kite_speed": "kite_speed",
+        "v_k": "kite_speed",
+        "vk": "kite_speed",
+        "speed": "kite_speed",
+        "tether_force_kite": "tether_force_kite",
+        "tether_force": "tether_force_kite",
+        "force": "tether_force_kite",
+        "f_tether": "tether_force_kite",
+    }
+    labels = {
+        "kite_speed": r"$v_\mathrm{k}$ (ms$^{-1}$)",
+        "tether_force_kite": r"$F_\mathrm{tether,k}$ (kN)",
+    }
+    scales = {
+        "kite_speed": 1.0,
+        "tether_force_kite": 1e-3,  # N -> kN
+    }
+    units = {
+        "kite_speed": "m/s",
+        "tether_force_kite": "kN",
+    }
+
+    if key not in aliases:
+        allowed = ", ".join(sorted(aliases))
+        raise ValueError(
+            f"Unsupported color_by='{color_by}'. Use one of: {allowed}, "
+            "or pass bool (True=tether_force_kite, False=kite_speed)."
+        )
+
+    column = aliases[key]
+    return column, labels[column], scales[column], units[column]
 
 
 def load_and_process_data(
@@ -69,6 +111,11 @@ def load_and_process_data(
             "or 'kite_apparent_windspeed'."
         )
 
+    if "tether_force_kite" in downsampled_results_sorted.columns:
+        downsampled_sorted["tether_force_kite"] = downsampled_results_sorted[
+            "tether_force_kite"
+        ].to_numpy(dtype=float)
+
     if "wind_direction" in downsampled_results_sorted.columns:
         wind_dir = downsampled_results_sorted["wind_direction"].to_numpy(dtype=float)
     elif "ground_wind_direction" in downsampled_sorted.columns:
@@ -118,16 +165,18 @@ def scatter_yz(
     marker: str,
     marker_size: float,
     norm: Normalize,
+    color_column: str = "kite_speed",
+    color_scale: float = 1.0,
     y_column: str = "kite_position_y_wind",
     x_label: str = r"crosswind position $y_\perp$ (m)",
     cmap: str = "viridis",
     alpha: float = 0.5,
 ) -> plt.PathCollection:
-    """Scatter kite Y-Z positions with marker color based on kite speed."""
+    """Scatter kite Y-Z positions with marker color based on a selected signal."""
     scatter = ax.scatter(
         df[y_column],
         df["kite_position_z"],
-        c=df["kite_speed"],
+        c=df[color_column] * color_scale,
         cmap=cmap,
         norm=norm,
         s=marker_size,
@@ -169,10 +218,13 @@ def set_shared_limits(
     ax.set_ylim(y_limits)
 
 
-def main() -> None:
+def main(color_by: str | bool = "tether_force_kite") -> None:
     set_plot_style()
 
     repo_root = Path(__file__).resolve().parents[1]
+    color_column, colorbar_label, color_scale, color_unit = resolve_color_settings(
+        color_by
+    )
     df_2019 = load_and_process_data(
         year="2019",
         month="10",
@@ -198,9 +250,45 @@ def main() -> None:
     ax_2025 = fig.add_subplot(gs[0, 1], sharey=ax_2019)
     cax = fig.add_subplot(gs[0, 2])
 
-    speed_min = min(df_2019["kite_speed"].min(), df_2025["kite_speed"].min())
-    speed_max = max(df_2019["kite_speed"].max(), df_2025["kite_speed"].max())
-    norm = Normalize(vmin=speed_min, vmax=speed_max)
+    missing_years = []
+    if color_column not in df_2019.columns:
+        missing_years.append("2019")
+    if color_column not in df_2025.columns:
+        missing_years.append("2025")
+    if missing_years:
+        raise ValueError(
+            f"Column '{color_column}' not found for flight(s): {', '.join(missing_years)}"
+        )
+
+    print(f"Investigated variable: {color_column} [{color_unit}]")
+    for dataset_label, dataset_df in [
+        ("2019-10-08", df_2019),
+        ("2025-10-09", df_2025),
+    ]:
+        dataset_values = (
+            dataset_df[color_column].to_numpy(dtype=float) * color_scale
+        )
+        finite_values = dataset_values[np.isfinite(dataset_values)]
+        if finite_values.size == 0:
+            print(f"{dataset_label}: min=nan, max=nan [{color_unit}]")
+            continue
+        print(
+            f"{dataset_label}: min={float(np.nanmin(finite_values)):.3f}, "
+            f"max={float(np.nanmax(finite_values)):.3f} [{color_unit}]"
+        )
+
+    color_values = pd.concat(
+        [df_2019[color_column], df_2025[color_column]], ignore_index=True
+    ).to_numpy(dtype=float) * color_scale
+    if color_values.size == 0 or np.all(np.isnan(color_values)):
+        raise ValueError(f"No valid data available for color column '{color_column}'.")
+
+    color_min = float(np.nanmin(color_values))
+    color_max = float(np.nanmax(color_values))
+    if np.isclose(color_min, color_max):
+        color_min -= 1.0
+        color_max += 1.0
+    norm = Normalize(vmin=color_min, vmax=color_max)
 
     # Marker size 10 = 5x larger than previous size 2.
     marker_size = 18
@@ -211,6 +299,8 @@ def main() -> None:
         marker="o",
         marker_size=marker_size,
         norm=norm,
+        color_column=color_column,
+        color_scale=color_scale,
         alpha=0.7,  # 0.45,
     )
     scatter_yz(
@@ -220,6 +310,8 @@ def main() -> None:
         marker="o",
         marker_size=marker_size,
         norm=norm,
+        color_column=color_column,
+        color_scale=color_scale,
         alpha=0.6,  # 0.45,
     )
     ax_2019.text(
@@ -265,10 +357,10 @@ def main() -> None:
     # )
 
     # Use a clean scalar mappable so colorbar is fully opaque (independent of point alpha).
-    sm_speed = ScalarMappable(norm=norm, cmap="viridis")
-    sm_speed.set_array([])
-    cbar = fig.colorbar(sm_speed, cax=cax)
-    cbar.set_label(r"$v_\mathrm{k}$ (ms$^{-1}$)")  # , pad=6)
+    sm_color = ScalarMappable(norm=norm, cmap="viridis")
+    sm_color.set_array([])
+    cbar = fig.colorbar(sm_color, cax=cax)
+    cbar.set_label(colorbar_label)  # , pad=6)
 
     set_shared_limits(ax_2019, df_2019, df_2025, y_column="kite_position_y_wind")
     set_shared_limits(ax_2025, df_2019, df_2025, y_column="kite_position_y_wind")
@@ -295,4 +387,22 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(
+        description="Plot kite Y-Z plane with configurable color variable."
+    )
+    parser.add_argument(
+        "--color-by",
+        default="tether_force_kite",
+        help=(
+            "Color variable ('tether_force_kite' or 'kite_speed'; aliases: "
+            "'tether_force', 'v_k')."
+        ),
+    )
+    parser.add_argument(
+        "--use-tether-force",
+        action="store_true",
+        help="Boolean shortcut to color by tether_force_kite.",
+    )
+    args = parser.parse_args()
+    selected_color = True if args.use_tether_force else args.color_by
+    main(color_by=selected_color)

@@ -159,6 +159,21 @@ def get_multi_row_signals(
         if tether_force_series is not None and tether_reelout_speed_series is not None
         else None
     )
+    wing_lift_coeff_series = (
+        downsampled_results_sorted["wing_lift_coefficient"]
+        if "wing_lift_coefficient" in downsampled_results_sorted.columns
+        else None
+    )
+    wing_drag_coeff_series = (
+        downsampled_results_sorted["wing_drag_coefficient"]
+        if "wing_drag_coefficient" in downsampled_results_sorted.columns
+        else None
+    )
+    wing_lift_over_drag_series = (
+        wing_lift_coeff_series / wing_drag_coeff_series.replace(0.0, np.nan)
+        if wing_lift_coeff_series is not None and wing_drag_coeff_series is not None
+        else None
+    )
 
     signals = [
         (
@@ -214,6 +229,27 @@ def get_multi_row_signals(
             r"^\circ",
         ),
         (
+            "wing_lift_coefficient",
+            wing_lift_coeff_series,
+            r"$\mathrm{wing\_lift\_coefficient}\;(-)$",
+            r"-",
+        ),
+        (
+            "wing_drag_coefficient",
+            wing_drag_coeff_series,
+            r"$\mathrm{wing\_drag\_coefficient}\;(-)$",
+            r"-",
+        ),
+        (
+            "wing_lift_over_drag",
+            wing_lift_over_drag_series,
+            (
+                r"$\mathrm{wing\_lift\_coefficient}"
+                r"/\mathrm{wing\_drag\_coefficient}\;(-)$"
+            ),
+            r"-",
+        ),
+        (
             "kite_apparent_windspeed",
             (
                 downsampled_results_sorted["kite_apparent_windspeed"]
@@ -234,6 +270,26 @@ def get_multi_row_signals(
             r"\mathrm{m}",
         ),
         (
+            "tether_force_kite",
+            (
+                downsampled_results_sorted["tether_force_kite"]
+                if "tether_force_kite" in downsampled_results_sorted.columns
+                else None
+            ),
+            r"$\mathrm{tether\_force\_kite}\;(\mathrm{N})$",
+            r"\mathrm{N}",
+        ),
+        # (
+        #     "kite_thrust_force",
+        #     (
+        #         downsampled_results_sorted["kite_thrust_force"]
+        #         if "kite_thrust_force" in downsampled_results_sorted.columns
+        #         else None
+        #     ),
+        #     r"$\mathrm{kite\_thrust\_force}\;(\mathrm{N})$",
+        #     r"\mathrm{N}",
+        # ),
+        (
             "kcu_actual_depower",
             (
                 downsampled_sorted["kcu_actual_depower"]
@@ -242,6 +298,16 @@ def get_multi_row_signals(
             ),
             r"$\mathrm{kcu\_actual\_depower}$",
             r"",
+        ),
+        (
+            "kcu_actual_depower_raw_deg",
+            (
+                downsampled_sorted["kcu_actual_depower_raw_deg"]
+                if "kcu_actual_depower_raw_deg" in downsampled_sorted.columns
+                else None
+            ),
+            r"$\mathrm{kcu\_actual\_depower\_raw}\;(^\circ)$",
+            r"^\circ",
         ),
         (
             "kcu_actual_steering",
@@ -276,96 +342,125 @@ def plot_multi_row_comparison(
     signals_2019 = get_multi_row_signals(data_2019, results_sorted_2019, sorted_2019)
     signals_2025 = get_multi_row_signals(data_2025, results_sorted_2025, sorted_2025)
 
-    # Use signals that exist in both years
-    signal_names_2019 = {s[0] for s in signals_2019}
-    signal_names_2025 = {s[0] for s in signals_2025}
-    common_names = signal_names_2019 & signal_names_2025
+    signals_by_name_2019 = {s[0]: s for s in signals_2019}
+    signals_by_name_2025 = {s[0]: s for s in signals_2025}
 
-    signals_2019 = [s for s in signals_2019 if s[0] in common_names]
-    signals_2025 = [s for s in signals_2025 if s[0] in common_names]
+    signal_order = [s[0] for s in signals_2019]
+    signal_order.extend(
+        [s[0] for s in signals_2025 if s[0] not in signals_by_name_2019]
+    )
 
-    n_rows = len(signals_2019)
+    n_rows = len(signal_order)
+    if n_rows == 0:
+        print("Skipping all-data comparison: no plottable signals.")
+        return
+
     fig, axes = plt.subplots(n_rows, 2, figsize=(12, 3 * n_rows), sharex=False)
 
     if n_rows == 1:
         axes = axes.reshape(1, -1)
 
-    for row_idx, (sig_2019, sig_2025) in enumerate(zip(signals_2019, signals_2025)):
-        name_19, series_19, label_19, unit_19 = sig_2019
-        name_25, series_25, label_25, unit_25 = sig_2025
+    for row_idx, signal_name in enumerate(signal_order):
+        sig_2019 = signals_by_name_2019.get(signal_name)
+        sig_2025 = signals_by_name_2025.get(signal_name)
+        fallback_label = sig_2019[2] if sig_2019 is not None else sig_2025[2]
 
         # 2019 column (left)
         ax_left = axes[row_idx, 0]
-        mean_val = float(series_19.mean())
-        min_val = float(series_19.min())
-        max_val = float(series_19.max())
+        if sig_2019 is not None:
+            _, series_19, label_19, unit_19 = sig_2019
+            mean_val = float(series_19.mean())
+            min_val = float(series_19.min())
+            max_val = float(series_19.max())
 
-        ax_left.plot(
-            sorted_2019["time"],
-            series_19,
-            color=colors[0],
-            marker=".",
-            linestyle="None",
-            alpha=0.6,
-            label=label_19,
-        )
-        ax_left.axhline(
-            mean_val,
-            color=colors[1],
-            linestyle="--",
-            label=rf"$\mathrm{{mean}} = {mean_val:.3f}\,{unit_19}$",
-        )
-        ax_left.axhline(
-            min_val,
-            color=colors[2],
-            linestyle=":",
-            label=rf"$\mathrm{{min}} = {min_val:.3f}\,{unit_19}$",
-        )
-        ax_left.axhline(
-            max_val,
-            color=colors[3],
-            linestyle=":",
-            label=rf"$\mathrm{{max}} = {max_val:.3f}\,{unit_19}$",
-        )
-        ax_left.set_ylabel(label_19)
-        ax_left.legend(frameon=True, loc="upper left", framealpha=1.0, fontsize=8)
+            ax_left.plot(
+                sorted_2019["time"],
+                series_19,
+                color=colors[0],
+                marker=".",
+                linestyle="None",
+                alpha=0.6,
+                label=label_19,
+            )
+            ax_left.axhline(
+                mean_val,
+                color=colors[1],
+                linestyle="--",
+                label=rf"$\mathrm{{mean}} = {mean_val:.3f}\,{unit_19}$",
+            )
+            ax_left.axhline(
+                min_val,
+                color=colors[2],
+                linestyle=":",
+                label=rf"$\mathrm{{min}} = {min_val:.3f}\,{unit_19}$",
+            )
+            ax_left.axhline(
+                max_val,
+                color=colors[3],
+                linestyle=":",
+                label=rf"$\mathrm{{max}} = {max_val:.3f}\,{unit_19}$",
+            )
+            ax_left.set_ylabel(label_19)
+            ax_left.legend(frameon=True, loc="upper left", framealpha=1.0, fontsize=8)
+        else:
+            ax_left.set_ylabel(fallback_label)
+            ax_left.text(
+                0.5,
+                0.5,
+                "Signal unavailable",
+                transform=ax_left.transAxes,
+                ha="center",
+                va="center",
+            )
         ax_left.set_title("2019" if row_idx == 0 else "")
 
         # 2025 column (right)
         ax_right = axes[row_idx, 1]
-        mean_val = float(series_25.mean())
-        min_val = float(series_25.min())
-        max_val = float(series_25.max())
+        if sig_2025 is not None:
+            _, series_25, label_25, unit_25 = sig_2025
+            mean_val = float(series_25.mean())
+            min_val = float(series_25.min())
+            max_val = float(series_25.max())
 
-        ax_right.plot(
-            sorted_2025["time"],
-            series_25,
-            color=colors[0],
-            marker=".",
-            linestyle="None",
-            alpha=0.6,
-            label=label_25,
-        )
-        ax_right.axhline(
-            mean_val,
-            color=colors[1],
-            linestyle="--",
-            label=rf"$\mathrm{{mean}} = {mean_val:.3f}\,{unit_25}$",
-        )
-        ax_right.axhline(
-            min_val,
-            color=colors[2],
-            linestyle=":",
-            label=rf"$\mathrm{{min}} = {min_val:.3f}\,{unit_25}$",
-        )
-        ax_right.axhline(
-            max_val,
-            color=colors[3],
-            linestyle=":",
-            label=rf"$\mathrm{{max}} = {max_val:.3f}\,{unit_25}$",
-        )
-        ax_right.set_ylabel(label_25)
-        ax_right.legend(frameon=True, loc="upper left", framealpha=1.0, fontsize=8)
+            ax_right.plot(
+                sorted_2025["time"],
+                series_25,
+                color=colors[0],
+                marker=".",
+                linestyle="None",
+                alpha=0.6,
+                label=label_25,
+            )
+            ax_right.axhline(
+                mean_val,
+                color=colors[1],
+                linestyle="--",
+                label=rf"$\mathrm{{mean}} = {mean_val:.3f}\,{unit_25}$",
+            )
+            ax_right.axhline(
+                min_val,
+                color=colors[2],
+                linestyle=":",
+                label=rf"$\mathrm{{min}} = {min_val:.3f}\,{unit_25}$",
+            )
+            ax_right.axhline(
+                max_val,
+                color=colors[3],
+                linestyle=":",
+                label=rf"$\mathrm{{max}} = {max_val:.3f}\,{unit_25}$",
+            )
+            ax_right.set_ylabel(label_25)
+            ax_right.legend(frameon=True, loc="upper left", framealpha=1.0, fontsize=8)
+        else:
+            ax_right.set_ylabel(fallback_label)
+            ax_right.text(
+                0.5,
+                0.5,
+                "Signal unavailable",
+                transform=ax_right.transAxes,
+                ha="center",
+                va="center",
+            )
         ax_right.set_title("2025" if row_idx == 0 else "")
 
     axes[-1, 0].set_xlabel("time (s)")
@@ -406,32 +501,28 @@ def plot_turn_comparison(
     signals_2019 = get_multi_row_signals(data_2019, results_sorted_2019, sorted_2019)
     signals_2025 = get_multi_row_signals(data_2025, results_sorted_2025, sorted_2025)
 
-    signals_2019_turn = [
-        (name, series.loc[mask_turn_19], label, unit)
-        for (name, series, label, unit) in signals_2019
-    ]
-    signals_2025_turn = [
-        (name, series.loc[mask_turn_25], label, unit)
-        for (name, series, label, unit) in signals_2025
-    ]
+    signals_2019_turn = {}
+    for name, series, label, unit in signals_2019:
+        series_turn = series.loc[mask_turn_19]
+        if not series_turn.empty:
+            signals_2019_turn[name] = (name, series_turn, label, unit)
 
-    # Filter out empty series
-    signals_2019_turn = [
-        s for s in signals_2019_turn if s[1] is not None and not s[1].empty
-    ]
-    signals_2025_turn = [
-        s for s in signals_2025_turn if s[1] is not None and not s[1].empty
-    ]
+    signals_2025_turn = {}
+    for name, series, label, unit in signals_2025:
+        series_turn = series.loc[mask_turn_25]
+        if not series_turn.empty:
+            signals_2025_turn[name] = (name, series_turn, label, unit)
 
-    # Use signals that exist in both
-    signal_names_19 = {s[0] for s in signals_2019_turn}
-    signal_names_25 = {s[0] for s in signals_2025_turn}
-    common_names = signal_names_19 & signal_names_25
+    signal_order = list(signals_2019_turn.keys())
+    signal_order.extend(
+        [name for name in signals_2025_turn if name not in signals_2019_turn]
+    )
 
-    signals_2019_turn = [s for s in signals_2019_turn if s[0] in common_names]
-    signals_2025_turn = [s for s in signals_2025_turn if s[0] in common_names]
+    n_rows = len(signal_order)
+    if n_rows == 0:
+        print("Skipping turn comparison: no plottable turn signals.")
+        return
 
-    n_rows = len(signals_2019_turn)
     fig, axes = plt.subplots(n_rows, 2, figsize=(12, 3 * n_rows), sharex=False)
 
     if n_rows == 1:
@@ -440,15 +531,15 @@ def plot_turn_comparison(
     time_turn_2019 = sorted_2019.loc[mask_turn_19, "time"]
     time_turn_2025 = sorted_2025.loc[mask_turn_25, "time"]
 
-    for row_idx, (sig_2019, sig_2025) in enumerate(
-        zip(signals_2019_turn, signals_2025_turn)
-    ):
-        name_19, series_19, label_19, unit_19 = sig_2019
-        name_25, series_25, label_25, unit_25 = sig_2025
+    for row_idx, signal_name in enumerate(signal_order):
+        sig_2019 = signals_2019_turn.get(signal_name)
+        sig_2025 = signals_2025_turn.get(signal_name)
+        fallback_label = sig_2019[2] if sig_2019 is not None else sig_2025[2]
 
         # 2019 column (left)
         ax_left = axes[row_idx, 0]
-        if len(series_19) > 0:
+        if sig_2019 is not None:
+            _, series_19, label_19, unit_19 = sig_2019
             mean_val = float(series_19.mean())
             min_val = float(series_19.min())
             max_val = float(series_19.max())
@@ -480,13 +571,24 @@ def plot_turn_comparison(
                 linestyle=":",
                 label=rf"$\mathrm{{max}} = {max_val:.3f}\,{unit_19}$",
             )
-        ax_left.set_ylabel(label_19)
-        ax_left.legend(frameon=True, loc="upper left", framealpha=1.0, fontsize=8)
+            ax_left.set_ylabel(label_19)
+            ax_left.legend(frameon=True, loc="upper left", framealpha=1.0, fontsize=8)
+        else:
+            ax_left.set_ylabel(fallback_label)
+            ax_left.text(
+                0.5,
+                0.5,
+                "Signal unavailable",
+                transform=ax_left.transAxes,
+                ha="center",
+                va="center",
+            )
         ax_left.set_title("2019 (Left + Right Turns)" if row_idx == 0 else "")
 
         # 2025 column (right)
         ax_right = axes[row_idx, 1]
-        if len(series_25) > 0:
+        if sig_2025 is not None:
+            _, series_25, label_25, unit_25 = sig_2025
             mean_val = float(series_25.mean())
             min_val = float(series_25.min())
             max_val = float(series_25.max())
@@ -518,8 +620,18 @@ def plot_turn_comparison(
                 linestyle=":",
                 label=rf"$\mathrm{{max}} = {max_val:.3f}\,{unit_25}$",
             )
-        ax_right.set_ylabel(label_25)
-        ax_right.legend(frameon=True, loc="upper left", framealpha=1.0, fontsize=8)
+            ax_right.set_ylabel(label_25)
+            ax_right.legend(frameon=True, loc="upper left", framealpha=1.0, fontsize=8)
+        else:
+            ax_right.set_ylabel(fallback_label)
+            ax_right.text(
+                0.5,
+                0.5,
+                "Signal unavailable",
+                transform=ax_right.transAxes,
+                ha="center",
+                va="center",
+            )
         ax_right.set_title("2025 (Left + Right Turns)" if row_idx == 0 else "")
 
     axes[-1, 0].set_xlabel("time (s)")
@@ -546,7 +658,9 @@ def plot_tether_reelout_speed_comparison(
     )
 
     if reelout_2019 is None or reelout_2025 is None:
-        print("Skipping tether reelout speed plot: missing reelout speed in one dataset.")
+        print(
+            "Skipping tether reelout speed plot: missing reelout speed in one dataset."
+        )
         return
 
     fig, axes = plt.subplots(1, 2, figsize=(12, 3.5), sharey=True)
@@ -614,12 +728,18 @@ def main():
         day="08",
         kite_model="v3",
         addition="_t26",
-        time_range=(2190, 2255),  # (1800.0, 9986.2),
+        time_range=(2190, 2255),  # (2302, 2306),  # (2190, 2255),  # (1800.0, 9986.2),
         downsample_frac=1,
     )
 
     # Convert 2019 depower to 2025-equivalent up_data using paper physics
     if "kcu_actual_depower" in sorted_19.columns:
+        sorted_19["kcu_actual_depower_raw_deg"] = sorted_19["kcu_actual_depower"].copy()
+        print(
+            f"2019 raw kcu_actual_depower (deg): "
+            f"min={sorted_19['kcu_actual_depower_raw_deg'].min():.4f}, "
+            f"max={sorted_19['kcu_actual_depower_raw_deg'].max():.4f}"
+        )
         sorted_19["kcu_actual_depower"] = convert_2019_depower_to_2025_updata(
             sorted_19["kcu_actual_depower"]
         )
