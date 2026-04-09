@@ -322,26 +322,55 @@ def calculate_reference_frame_euler(
         tuple: Transformed unit vectors along the x, y, and z axes in Earth coordinates.
     """
 
-    # Convert Euler angles to a quaternion
-    if eulerFrame == "NED":
-        # NED uses a ZYX rotation sequence
-        quaternion = R.from_euler("xyz", [roll, pitch, yaw])
-    elif eulerFrame == "ENU":
-        # ENU uses a ZYX rotation sequence as well but the interpretation of angles is different
-        quaternion = R.from_euler("xyz", [roll, pitch, yaw])
+    is_symbolic = any(isinstance(v, (ca.SX, ca.MX)) for v in (roll, pitch, yaw))
 
-    # Convert quaternion to a rotation matrix
-    rotation_matrix = quaternion.as_matrix()
+    if is_symbolic:
+        # Build RX, RY, RZ using CasADi so the result stays symbolic
+        c_r, s_r = ca.cos(roll), ca.sin(roll)
+        c_p, s_p = ca.cos(pitch), ca.sin(pitch)
+        c_y, s_y = ca.cos(yaw), ca.sin(yaw)
+
+        Rx_sym = ca.vertcat(
+            ca.horzcat(1, 0, 0),
+            ca.horzcat(0, c_r, -s_r),
+            ca.horzcat(0, s_r, c_r),
+        )
+
+        Ry_sym = ca.vertcat(
+            ca.horzcat(c_p, 0, s_p),
+            ca.horzcat(0, 1, 0),
+            ca.horzcat(-s_p, 0, c_p),
+        )
+
+        Rz_sym = ca.vertcat(
+            ca.horzcat(c_y, -s_y, 0),
+            ca.horzcat(s_y, c_y, 0),
+            ca.horzcat(0, 0, 1),
+        )
+
+        rotation_matrix = ca.mtimes(Rz_sym, ca.mtimes(Ry_sym, Rx_sym))
+    else:
+        # Numeric path via SciPy
+        quaternion = R.from_euler("xyz", [roll, pitch, yaw])
+        rotation_matrix = quaternion.as_matrix()
 
     # If converting from one frame to another, apply the appropriate rotation
     if eulerFrame != outputFrame:
         if outputFrame == "ENU" and eulerFrame == "NED":
-            # Convert NED to ENU rotation matrix
-            rotation_matrix = rotate_NED2ENU(rotation_matrix)
+            if is_symbolic:
+                rotation_matrix = ca.mtimes(
+                    ca.DM([[0, 1, 0], [1, 0, 0], [0, 0, -1]]).T, rotation_matrix
+                )
+            else:
+                rotation_matrix = rotate_NED2ENU(rotation_matrix)
 
         elif outputFrame == "NED" and eulerFrame == "ENU":
-            # Convert ENU to NED rotation matrix
-            rotation_matrix = rotate_ENU2NED(rotation_matrix)
+            if is_symbolic:
+                rotation_matrix = ca.mtimes(
+                    ca.DM([[0, 1, 0], [1, 0, 0], [0, 0, -1]]), rotation_matrix
+                )
+            else:
+                rotation_matrix = rotate_ENU2NED(rotation_matrix)
 
     return rotation_matrix
 
@@ -382,6 +411,10 @@ def calculate_steering_law(results, flight_data):
     return sideforce_coeff, coeffs
 
 
+import numpy as np
+from scipy.optimize import least_squares
+
+
 def calculate_turn_rate_law(
     results,
     flight_data,
@@ -405,14 +438,14 @@ def calculate_turn_rate_law(
 
     yaw_rate = flight_data["kite_yaw_rate"]
     radius = results["radius_turn"]
-
+    beta = results["kite_elevation"]
     if model == "simple":
         c1 = us * va
         A = np.vstack([c1]).T
         W = eye(len(us))
     elif model == "simple_weight":
         c1 = us * va
-        beta = results["kite_elevation"]
+
         c2 = np.sin(yaw) * np.cos(beta) / va
         A = np.vstack([c1, c2]).T
         W = eye(len(us))
@@ -436,6 +469,55 @@ def calculate_turn_rate_law(
     yaw_rate = A @ coeffs
 
     return yaw_rate
+
+
+def predict_yaw_rate_rational(us, va, mass, k1, vk, k2, k3, beta, yaw):
+    denom = mass * vk + k2 * va
+    # avoid divide-by-zero (also handled better via bounds)
+    denom = np.maximum(denom, 1e-6)
+    return (k1 * va**2 * (us - k3) + mass * 9.81 * np.cos(beta) * np.sin(yaw)) / denom
+
+
+def fit_rational_law(
+    yaw_rate_meas, us, va, vk, mass, beta, yaw, weights=None, x0=(0, 0, 0)
+):
+    # yaw_rate_meas = np.asarray(yaw_rate_meas)
+    # us = np.asarray(us)
+    # va = np.asarray(va)
+
+    if weights is None:
+        w = np.ones_like(yaw_rate_meas)
+    else:
+        w = np.asarray(weights)
+
+    def residuals(x):
+        k1, k2, k3 = x
+        yhat = predict_yaw_rate_rational(us, va, mass, k1, vk, k2, k3, beta, yaw)
+        return np.sqrt(w) * (yhat - yaw_rate_meas)
+
+    # Bounds example: vk >= 1e-3; k2 >= 0 to keep denom positive if va>=0
+    # Adjust if you expect negative k2.
+    lb = (-100000, -100000, -1)
+    ub = (100000, 100000, 1)
+
+    res = least_squares(residuals, x0=x0, bounds=(lb, ub))
+    k1, k2, k3 = res.x
+    yhat = predict_yaw_rate_rational(us, va, mass, k1, vk, k2, k3, beta, yaw)
+
+    mse = np.mean((yhat - yaw_rate_meas) ** 2)
+    rmse = np.sqrt(mse)
+
+    print(
+        f"Fitted parameters: k1={k1:.4f}, k2={k2:.4f}, k3={k3:.4f}, RMSE={rmse:.4f}, MSE={mse:.4f}"
+    )
+    return res.x, res
+
+
+# Usage inside your function:
+# us = flight_data["kcu_actual_steering"] / 100
+# va = results["kite_apparent_windspeed"].to_numpy()
+# coeffs, res = fit_rational_law(yaw_rate, us, va, mass)
+# yaw_rate_fit = predict_yaw_rate_rational(us, va, mass, *coeffs)
 
 
 def find_time_delay(signal_1, signal_2):
