@@ -54,29 +54,12 @@ class OverlayFitSummary:
 
 
 def configure_typography(fig_width: float, fig_height: float) -> dict[str, float]:
-    """Scale text sizes from figure size while keeping the active font family."""
+    """Return scaled sizes for elements styled explicitly (legend/color wheel)."""
     base_size = float(np.clip(0.75 * min(fig_width, fig_height) + 5.0, 7.0, 12.5))
-    sizes = {
-        "base": base_size,
-        "title": base_size + 1.2,
-        "label": base_size + 0.7,
-        "tick": base_size - 0.2,
-        "legend": base_size - 0.3,
+    return {
+        "tick": base_size - 0.2,  # used by heading color wheel ticks
+        "legend": base_size - 0.3,  # used by panel legends
     }
-
-    plt.rcParams.update(
-        {
-            "font.size": sizes["base"],
-            "axes.titlesize": sizes["title"],
-            "axes.labelsize": sizes["label"],
-            "xtick.labelsize": sizes["tick"],
-            "ytick.labelsize": sizes["tick"],
-            "legend.fontsize": sizes["legend"],
-            "legend.title_fontsize": sizes["legend"],
-            "figure.titlesize": sizes["title"],
-        }
-    )
-    return sizes
 
 
 def read_simulation_csv(path: Path) -> pd.DataFrame:
@@ -335,10 +318,12 @@ def format_compact_latex_legend(
     """Create a compact one-line LaTeX legend label with aligned fields."""
     return (
         rf"\makebox[{title_width_cm:.2f}cm][l]{{{title}}}"
+        f"\n"
         rf"\makebox[{metric_width_cm:.2f}cm][l]{{$ {metric_1_tex} $}}"
         rf"$=$"
         rf"\makebox[{value_1_width_cm:.2f}cm][l]{{$ {metric_1_value_tex} $}}"
         rf"$,\ $"
+        f"\n"
         rf"\makebox[{metric_width_cm:.2f}cm][l]{{$ {metric_2_tex} $}}"
         rf"$=$"
         rf"\makebox[{value_2_width_cm:.2f}cm][l]{{$ {metric_2_value_tex} $}}"
@@ -354,8 +339,24 @@ def plot_heading_binned_panel(
 ) -> list[tuple[str, str, float, str]]:
     """Scatter data and overlay 2 linear fits + 2D-based uncertainty bands."""
     fit_legend_entries: list[tuple[str, str, float, str]] = []
+
+    def add_panel_label() -> None:
+        label_text = (
+            rf"\textbf{{{title}}}" if plt.rcParams.get("text.usetex", False) else title
+        )
+        ax.text(
+            0.98,
+            0.98,
+            label_text,
+            transform=ax.transAxes,
+            ha="right",
+            va="top",
+            fontweight="bold",
+            # fontsize=8,
+        )
+
     if df.empty:
-        ax.set_title(title)
+        add_panel_label()
         ax.text(0.5, 0.5, "No data", ha="center", va="center", transform=ax.transAxes)
         return fit_legend_entries
 
@@ -408,13 +409,13 @@ def plot_heading_binned_panel(
         (
             heading_orient >= 0.0,
             "-",
-            "Exp. fit upward",
+            "Upward",
             "upward",
         ),
         (
             heading_orient < 0.0,
             "--",
-            "Exp. fit downward",
+            "Downward",
             "downward",
         ),
     ]
@@ -548,7 +549,7 @@ def plot_heading_binned_panel(
 
     # Uncertainty-band plotting intentionally disabled.
 
-    ax.set_title(title)
+    add_panel_label()
     ax.set_xlabel(r"$|u_\mathrm{s}v_\mathrm{a}|$ ($\mathrm{m\,s^{-1}}$)")
     ax.grid(True, alpha=0.25)
 
@@ -754,8 +755,8 @@ def add_heading_color_wheel(
     bbox = anchor_ax.get_position()
     wheel_w = 0.3 * bbox.width
     wheel_h = 0.3 * bbox.height
-    wheel_x = bbox.x0 - 0.05 * bbox.width
-    wheel_y = bbox.y0 + 0.28 * bbox.height
+    wheel_x = bbox.x0 + 0.05 * bbox.width
+    wheel_y = bbox.y0 + 0.7 * bbox.height
     wheel_ax = fig.add_axes([wheel_x, wheel_y, wheel_w, wheel_h], projection="polar")
     n_segments = int(heading_norm.vmax - heading_norm.vmin)
     heading_vals_deg = np.linspace(
@@ -790,7 +791,8 @@ def add_heading_color_wheel(
 
 def main() -> None:
     set_plot_style()
-    fig_width, fig_height = 12.4, 4.0
+    factor = 2.0
+    fig_width, fig_height = 8.8 * factor, 3.3 * factor
     font_sizes = configure_typography(fig_width, fig_height)
 
     datasets_cfg = [
@@ -823,12 +825,12 @@ def main() -> None:
     base = Path(__file__).resolve().parents[1] / "data"
     # Edit these candidate lists to choose which simulation CSVs are used per panel.
     candidates_2019 = [
-        base / "circles_batch_analysis_2019_5March.csv",
+        # base / "circles_batch_analysis_2019_5March.csv",
         # base / "circles_batch_analysis_2019.csv",
-        base / "circles_batch_analysis.csv",
+        # base / "circles_batch_analysis.csv",
     ]
     candidates_2025 = [
-        base / "circles_batch_analysis_2025_5March.csv",
+        # base / "circles_batch_analysis_2025_5March.csv",
         # base / "circles_batch_analysis_2025_3March.csv",
         # base / "circles_batch_analysis_2025_3March_.csv",
     ]
@@ -842,7 +844,7 @@ def main() -> None:
     cmap = plt.get_cmap("viridis")
     heading_norm = Normalize(vmin=45.0, vmax=315.0)
 
-    fig, axes = plt.subplots(1, 2, figsize=(8, 3.4), sharey=True)
+    fig, axes = plt.subplots(1, 2, figsize=(8.8, 3.3), sharey=True)
     fig.subplots_adjust(bottom=0.3, wspace=0.14)
 
     fit_legend_entries_per_ax: list[list[tuple[str, str, float, str]]] = []
@@ -877,11 +879,11 @@ def main() -> None:
     y_abs = np.nanmax(np.abs(all_y)) if all_y.size > 0 else 1.0
     y_lim = max(0.25, 1.05 * max(y_abs, sim_y_abs))
     for ax in axes:
-        ax.set_ylim(0.0, y_lim)
+        ax.set_ylim(0.0, 2)
 
     add_heading_color_wheel(
         fig,
-        anchor_ax=axes[0],
+        anchor_ax=axes[1],
         heading_tick_deg=heading_tick_deg,
         heading_tick_labels=heading_tick_labels,
         heading_norm=heading_norm,
@@ -995,16 +997,39 @@ def main() -> None:
                 combined_handles.append(handle)
 
         combined_handles.extend(remaining_fit_handles)
-        combined_handles.extend(remaining_sim_handles)
+        # combined_handles.extend(remaining_sim_handles)
 
+        # Force visible vertical separation between legend entries by inserting
+        # explicit spacer rows instead of relying only on labelspacing.
+        spacer_label = (
+            r"$\vphantom{\int}$" if plt.rcParams.get("text.usetex", False) else " "
+        )
+        spaced_handles = []
+        for idx, handle in enumerate(combined_handles):
+            spaced_handles.append(handle)
+            if idx < len(combined_handles) - 1:
+                spaced_handles.append(
+                    Line2D(
+                        [0],
+                        [0],
+                        linestyle="None",
+                        marker="",
+                        linewidth=0.0,
+                        label=spacer_label,
+                    )
+                )
+
+        legend_loc = "lower right" if ax_idx == 1 else "upper left"
         combined_legend = ax.legend(
-            handles=combined_handles,
-            loc="upper left",
+            handles=spaced_handles,
+            loc=legend_loc,
             fontsize=font_sizes["legend"],
             frameon=True,
             handlelength=1.4,
             borderpad=0.3,
-            labelspacing=0.3,
+            labelspacing=0.2,
+            handletextpad=0.6,
+            handleheight=1.2,
         )
         if ax_idx == 0:
             ax.add_artist(combined_legend)

@@ -37,7 +37,7 @@ def resolve_color_settings(color_by: str | bool) -> tuple[str, str, float, str]:
     }
     labels = {
         "kite_speed": r"$v_\mathrm{k}$ (ms$^{-1}$)",
-        "tether_force_kite": r"$F_\mathrm{tether,k}$ (kN)",
+        "tether_force_kite": r"$F_\mathrm{t,KCU}$ (kN)",
     }
     scales = {
         "kite_speed": 1.0,
@@ -244,7 +244,7 @@ def main(color_by: str | bool = "tether_force_kite") -> None:
         downsample_frac=1.0,
     )
 
-    fig = plt.figure(figsize=(10, 4), constrained_layout=True)
+    fig = plt.figure(figsize=(8, 3), constrained_layout=True)
     gs = fig.add_gridspec(1, 3, width_ratios=[1.0, 1.0, 0.08], wspace=0.02)
     ax_2019 = fig.add_subplot(gs[0, 0])
     ax_2025 = fig.add_subplot(gs[0, 1], sharey=ax_2019)
@@ -265,9 +265,7 @@ def main(color_by: str | bool = "tether_force_kite") -> None:
         ("2019-10-08", df_2019),
         ("2025-10-09", df_2025),
     ]:
-        dataset_values = (
-            dataset_df[color_column].to_numpy(dtype=float) * color_scale
-        )
+        dataset_values = dataset_df[color_column].to_numpy(dtype=float) * color_scale
         finite_values = dataset_values[np.isfinite(dataset_values)]
         if finite_values.size == 0:
             print(f"{dataset_label}: min=nan, max=nan [{color_unit}]")
@@ -277,9 +275,12 @@ def main(color_by: str | bool = "tether_force_kite") -> None:
             f"max={float(np.nanmax(finite_values)):.3f} [{color_unit}]"
         )
 
-    color_values = pd.concat(
-        [df_2019[color_column], df_2025[color_column]], ignore_index=True
-    ).to_numpy(dtype=float) * color_scale
+    color_values = (
+        pd.concat(
+            [df_2019[color_column], df_2025[color_column]], ignore_index=True
+        ).to_numpy(dtype=float)
+        * color_scale
+    )
     if color_values.size == 0 or np.all(np.isnan(color_values)):
         raise ValueError(f"No valid data available for color column '{color_column}'.")
 
@@ -314,23 +315,35 @@ def main(color_by: str | bool = "tether_force_kite") -> None:
         color_scale=color_scale,
         alpha=0.6,  # 0.45,
     )
+    label_2019 = (
+        r"\textbf{2019-10-08}"
+        if plt.rcParams.get("text.usetex", False)
+        else "2019-10-08"
+    )
+    label_2025 = (
+        r"\textbf{2025-10-09}"
+        if plt.rcParams.get("text.usetex", False)
+        else "2025-10-09"
+    )
     ax_2019.text(
         0.02,
         0.98,
-        f"2019-10-08",
+        label_2019,
         transform=ax_2019.transAxes,
         ha="left",
         va="top",
-        fontsize=12,
+        fontweight="bold",
+        # fontsize=12,
     )
     ax_2025.text(
         0.02,
         0.98,
-        f"2025-10-09",
+        label_2025,
         transform=ax_2025.transAxes,
         ha="left",
         va="top",
-        fontsize=12,
+        fontweight="bold",
+        # fontsize=12,
     )
     # ax_2019.set_title("2019-10-08")
     # ax_2025.set_title("2025-10-09")
@@ -374,9 +387,9 @@ def main(color_by: str | bool = "tether_force_kite") -> None:
     pos_2019 = ax_2019.get_position()
     pos_2025 = ax_2025.get_position()
     pos_cax = cax.get_position()
-    y0 = min(pos_2019.y0, pos_2025.y0) + 0.021
-    y1 = max(pos_2019.y1, pos_2025.y1)
-    cax.set_position([pos_cax.x0 + 0.05, y0, pos_cax.width - 0.01, y1 - y0])
+    y0 = min(pos_2019.y0, pos_2025.y0) - 0.03
+    y1 = max(pos_2019.y1, pos_2025.y1) + 0.025
+    cax.set_position([pos_cax.x0 + 0.062, y0, pos_cax.width - 0.01, y1 - y0])
 
     output_path = repo_root / "results/plots_paper/yz_plane_lemniscate.pdf"
     output_path.parent.mkdir(parents=True, exist_ok=True)

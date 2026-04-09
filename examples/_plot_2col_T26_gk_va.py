@@ -1,19 +1,15 @@
 """
-Plot 1x3 panels versus depower (u_dp).
+Plot 1x2 panels of experimental T26 statistics versus depower (u_dp).
 
 Panels:
 - g_k vs u_dp
 - v_a vs u_dp
-- turn radius vs u_dp
 
-For g_k and v_a:
+For each panel:
+- Experimental points from the selected .h5 time windows are shown.
 - Four bands are shown: (2019, up/down) and (2025, up/down).
 - Up/down splitting follows heading orientation (mirrored left/right).
-- VW8 varying-us points are overlaid.
-
-For turn radius:
-- Experimental bands are shown for (2019/2025, up/down).
-- Two simulation lines are shown for u_s = 0.10 and u_s = 0.15.
+- VW8 varying-us points are overlaid as crosses.
 """
 
 from dataclasses import dataclass
@@ -61,7 +57,6 @@ FIXED_BAND_X_RANGES = {
     "2019": (0.15, 0.4),
     "2025": (0.4, 0.45),
 }
-TURN_RADIUS_US_MIN = 0.05
 
 
 class TwoLayerBandHandler(HandlerPatch):
@@ -219,8 +214,6 @@ def load_experimental_dataset(cfg: FlightConfig) -> pd.DataFrame:
         raise ValueError(f"Missing kite_heading column in {cfg.title}")
     if "kite_apparent_windspeed" not in results.columns:
         raise ValueError(f"Missing kite_apparent_windspeed in results for {cfg.title}")
-    if "radius_turn" not in results.columns:
-        raise ValueError(f"Missing radius_turn in results for {cfg.title}")
 
     u_dp = flight_data["kcu_actual_depower"].to_numpy(dtype=float)
     if cfg.year == "2019":
@@ -233,9 +226,6 @@ def load_experimental_dataset(cfg: FlightConfig) -> pd.DataFrame:
     steering = flight_data["kcu_actual_steering"].to_numpy(dtype=float)
     us_signed = steering / 100.0
     v_a = results["kite_apparent_windspeed"].to_numpy(dtype=float)
-    # Use magnitude for direct comparison to positive simulation turn-radius curves.
-    turn_radius = np.abs(results["radius_turn"].to_numpy(dtype=float))
-    turn_radius_valid = np.abs(us_signed) > TURN_RADIUS_US_MIN
     alpha = _first_available_alpha(results)
     yaw_rate_rad = flight_data[yaw_rate_col].to_numpy(dtype=float)
     x_gk = -us_signed * v_a
@@ -248,7 +238,6 @@ def load_experimental_dataset(cfg: FlightConfig) -> pd.DataFrame:
         np.isfinite(u_dp)
         & np.isfinite(us_signed)
         & np.isfinite(v_a)
-        & np.isfinite(turn_radius)
         & np.isfinite(alpha)
         & np.isfinite(yaw_rate_rad)
         & np.isfinite(x_gk)
@@ -273,8 +262,6 @@ def load_experimental_dataset(cfg: FlightConfig) -> pd.DataFrame:
             "u_dp": u_dp[finite],
             "us_signed": us_signed[finite],
             "v_a": v_a[finite],
-            "turn_radius": turn_radius[finite],
-            "turn_radius_valid": turn_radius_valid[finite],
             "alpha": alpha[finite],
             "yaw_rate_rad": yaw_rate_rad[finite],
             "x_gk": x_gk[finite],
@@ -284,7 +271,7 @@ def load_experimental_dataset(cfg: FlightConfig) -> pd.DataFrame:
     ).reset_index(drop=True)
 
     # Point-wise gain proxy for scatter visualization in panel 1.
-    turn_mask = np.abs(df["us_signed"].to_numpy(dtype=float)) > TURN_RADIUS_US_MIN
+    turn_mask = np.abs(df["us_signed"].to_numpy(dtype=float)) > 0.05
     x_nonzero = np.abs(df["x_gk"].to_numpy(dtype=float)) > 1e-6
     gk_inst = np.full(len(df), np.nan, dtype=float)
     valid_inst = turn_mask & x_nonzero
@@ -297,13 +284,8 @@ def load_experimental_dataset(cfg: FlightConfig) -> pd.DataFrame:
 
 
 def compute_bands(df: pd.DataFrame, year: str) -> dict[str, list[Band]]:
-    """Compute up/down bands for g_k, v_a, alpha, and turn radius."""
-    bands: dict[str, list[Band]] = {
-        "g_k": [],
-        "v_a": [],
-        "alpha": [],
-        "turn_radius": [],
-    }
+    """Compute up/down bands for g_k, v_a, alpha."""
+    bands: dict[str, list[Band]] = {"g_k": [], "v_a": [], "alpha": []}
     directions = ("upward", "downward")
     x_min_fixed, x_max_fixed = FIXED_BAND_X_RANGES.get(
         year,
@@ -318,24 +300,10 @@ def compute_bands(df: pd.DataFrame, year: str) -> dict[str, list[Band]]:
         if not np.any(dir_mask):
             continue
 
-        for metric in ("v_a", "alpha", "turn_radius"):
-            if metric == "turn_radius":
-                valid_turn = df["turn_radius_valid"].to_numpy(dtype=bool)
-                y = df.loc[dir_mask & valid_turn, metric].to_numpy(dtype=float)
-                y = y[np.isfinite(y)]
-                if y.size == 0:
-                    continue
-                y_min, y_max = np.nanpercentile(y, [5, 95])
-                y_min = float(y_min)
-                y_max = float(y_max)
-            else:
-                y = df.loc[dir_mask, metric].to_numpy(dtype=float)
-                y_min = float(np.nanmin(y))
-                y_max = float(np.nanmax(y))
-            if abs(y_max - y_min) < 1e-9:
-                pad = max(0.05, 0.02 * abs(y_min))
-                y_min -= pad
-                y_max += pad
+        for metric in ("v_a", "alpha"):
+            y = df.loc[dir_mask, metric].to_numpy(dtype=float)
+            y_min = float(np.nanmin(y))
+            y_max = float(np.nanmax(y))
             bands[metric].append(
                 Band(
                     year=year,
@@ -348,12 +316,8 @@ def compute_bands(df: pd.DataFrame, year: str) -> dict[str, list[Band]]:
             )
 
         # g_k band from left/right turn fits in this direction.
-        left_mask = dir_mask & (
-            df["us_signed"].to_numpy(dtype=float) < -TURN_RADIUS_US_MIN
-        )
-        right_mask = dir_mask & (
-            df["us_signed"].to_numpy(dtype=float) > TURN_RADIUS_US_MIN
-        )
+        left_mask = dir_mask & (df["us_signed"].to_numpy(dtype=float) < -0.05)
+        right_mask = dir_mask & (df["us_signed"].to_numpy(dtype=float) > 0.05)
 
         left_fit = _fit_gk_slope(df, left_mask)
         right_fit = _fit_gk_slope(df, right_mask)
@@ -598,55 +562,6 @@ def load_vw8_transient_average_points(
     return points, uncertainty
 
 
-def load_vw8_turn_radius_lines(
-    csv_path: Path,
-    us_levels: tuple[float, ...] = (0.10, 0.15),
-    us_tol: float = 1e-6,
-) -> dict[float, tuple[np.ndarray, np.ndarray]]:
-    """Load turn-radius lines (x=u_dp, y=turn_radius) for selected u_s values."""
-    empty = {
-        float(us_level): (np.array([], dtype=float), np.array([], dtype=float))
-        for us_level in us_levels
-    }
-    if not csv_path.is_file():
-        print(f"VW8 CSV not found: {csv_path}")
-        return empty
-
-    df = _read_csv_with_header_width(csv_path)
-    required = ["up", "us", "turn_radius"]
-    missing = [c for c in required if c not in df.columns]
-    if missing:
-        raise ValueError(f"Missing required columns in {csv_path}: {missing}")
-
-    u_dp = np.abs(pd.to_numeric(df["up"], errors="coerce").to_numpy(dtype=float))
-    us = pd.to_numeric(df["us"], errors="coerce").to_numpy(dtype=float)
-    turn_radius = pd.to_numeric(df["turn_radius"], errors="coerce").to_numpy(
-        dtype=float
-    )
-
-    lines = dict(empty)
-    finite = np.isfinite(u_dp) & np.isfinite(us) & np.isfinite(turn_radius)
-    for us_level in us_levels:
-        us_target = float(us_level)
-        mask = finite & np.isclose(us, us_target, atol=us_tol, rtol=0.0)
-        if not np.any(mask):
-            print(f"No turn-radius points found for u_s={us_target:.2f}")
-            continue
-
-        grouped = (
-            pd.DataFrame({"u_dp": u_dp[mask], "turn_radius": turn_radius[mask]})
-            .groupby("u_dp", as_index=False)["turn_radius"]
-            .mean()
-            .sort_values("u_dp")
-        )
-        x_vals = grouped["u_dp"].to_numpy(dtype=float)
-        y_vals = grouped["turn_radius"].to_numpy(dtype=float)
-        lines[us_target] = (x_vals, y_vals)
-        print(f"Loaded turn-radius line for u_s={us_target:.2f}: n={len(grouped)}")
-
-    return lines
-
-
 def _panel_ylim(
     datasets: list[pd.DataFrame],
     all_bands: list[dict[str, list[Band]]],
@@ -668,17 +583,6 @@ def _panel_ylim(
             vals = vals[np.isfinite(vals)]
             if vals.size:
                 p_low, p_high = np.nanpercentile(vals, [1, 99])
-                y_vals.extend([float(p_low), float(p_high)])
-        elif metric == "turn_radius":
-            valid_turn = (
-                df["turn_radius_valid"].to_numpy(dtype=bool)
-                if "turn_radius_valid" in df.columns
-                else np.ones(len(df), dtype=bool)
-            )
-            vals = df.loc[valid_turn, "turn_radius"].to_numpy(dtype=float)
-            vals = vals[np.isfinite(vals)]
-            if vals.size:
-                p_low, p_high = np.nanpercentile(vals, [5, 95])
                 y_vals.extend([float(p_low), float(p_high)])
         else:
             vals = df[metric].to_numpy(dtype=float)
@@ -751,30 +655,6 @@ def _panel_ylim(
     return y_min - pad, y_max + pad
 
 
-def _turn_radius_ylim(
-    datasets: list[pd.DataFrame],
-    all_bands: list[dict[str, list[Band]]],
-    lines_by_us: dict[float, tuple[np.ndarray, np.ndarray]],
-) -> tuple[float, float]:
-    """Get y-limits for turn-radius panel from experimental bands and sim lines."""
-    y_exp_min, y_exp_max = _panel_ylim(datasets, all_bands, "turn_radius")
-    y_vals: list[float] = [y_exp_min, y_exp_max]
-    for _, (_, y_line) in lines_by_us.items():
-        y_finite = y_line[np.isfinite(y_line)]
-        if y_finite.size:
-            y_vals.extend([float(np.nanmin(y_finite)), float(np.nanmax(y_finite))])
-
-    if not y_vals:
-        return 0.0, 1.0
-
-    y_min = min(y_vals)
-    y_max = max(y_vals)
-    if y_max <= y_min:
-        y_max = y_min + max(1.0, 0.05 * abs(y_min))
-    pad = 0.08 * (y_max - y_min)
-    return y_min - pad, y_max + pad
-
-
 def _plot_metric_panel(
     ax: plt.Axes,
     metric: str,
@@ -795,15 +675,15 @@ def _plot_metric_panel(
     """Plot one metric panel using bands (no experimental scatter points)."""
 
     for year_band in bands:
-        # Draw upward first so downward (hatched) remains visible on top.
+        # Draw downward first so upward (hatched) remains visible on top.
         bands_ordered = sorted(
             year_band[metric],
-            key=lambda b: 0 if b.direction == "upward" else 1,
+            key=lambda b: 0 if b.direction == "downward" else 1,
         )
         for band in bands_ordered:
             color = year_colors[band.year]
             line_style = "-" if band.direction == "upward" else "--"
-            hatch = "///" if band.direction == "downward" else None
+            hatch = "///" if band.direction == "upward" else None
             x_band = np.array([band.x_min, band.x_max], dtype=float)
             ax.fill_between(
                 x_band,
@@ -919,70 +799,6 @@ def _plot_metric_panel(
     ax.grid(True, alpha=0.25)
 
 
-def _plot_turn_radius_panel(
-    ax: plt.Axes,
-    datasets: list[pd.DataFrame],
-    years: list[str],
-    bands: list[dict[str, list[Band]]],
-    year_colors: dict[str, str],
-    lines_by_us: dict[float, tuple[np.ndarray, np.ndarray]],
-) -> None:
-    """Plot experimental turn-radius bands and simulation steering lines."""
-    _plot_metric_panel(
-        ax,
-        metric="turn_radius",
-        ylabel=r"$R_\mathrm{turn}$ (m)",
-        datasets=datasets,
-        years=years,
-        bands=bands,
-        year_colors=year_colors,
-    )
-
-    style_map = {
-        0.10: {"color": "black", "marker": "o", "label": r"$u_\mathrm{s}=0.10$"},
-        0.15: {"color": "black", "marker": "^", "label": r"$u_\mathrm{s}=0.15$"},
-        0.20: {"color": "black", "marker": "*", "label": r"$u_\mathrm{s}=0.20$"},
-    }
-
-    plotted_any = False
-    for us_level in sorted(lines_by_us):
-        x_vals, y_vals = lines_by_us[us_level]
-        finite = np.isfinite(x_vals) & np.isfinite(y_vals)
-        if not np.any(finite):
-            continue
-
-        style = style_map.get(
-            round(float(us_level), 2),
-            {
-                "color": "black",
-                "marker": "d",
-                "label": rf"$u_\mathrm{{s}}={us_level:.2f}$",
-            },
-        )
-        ax.plot(
-            x_vals[finite],
-            y_vals[finite],
-            marker=style["marker"],
-            linestyle="-",
-            color=style["color"],
-            linewidth=1.6,
-            markersize=4.8,
-            label=style["label"],
-            zorder=4,
-        )
-        plotted_any = True
-
-    if plotted_any:
-        ax.legend(
-            loc="upper left",
-            frameon=True,
-            framealpha=1.0,
-            borderpad=0.3,
-            labelspacing=0.35,
-            handlelength=1.5,
-        )
-
-
 def main(plot_transient: bool = False) -> None:
     set_plot_style()
     plt.rcParams["hatch.linewidth"] = 1.4
@@ -1020,11 +836,8 @@ def main(plot_transient: bool = False) -> None:
         compute_bands(datasets[0], cfg_2019.year),
         compute_bands(datasets[1], cfg_2025.year),
     ]
-    csv_path = Path("./data/vw8_lt270_circles_combined_all.csv")
-    vw8_overlay, vw8_overlay_uncertainty = load_vw8_varying_us_points(csv_path)
-    vw8_turn_radius_lines = load_vw8_turn_radius_lines(
-        csv_path,
-        us_levels=(0.10, 0.15, 0.20),
+    vw8_overlay, vw8_overlay_uncertainty = load_vw8_varying_us_points(
+        Path("./data/vw8_lt270_circles_combined_all.csv")
     )
     transient_overlay: dict[str, tuple[np.ndarray, np.ndarray]] | None = None
     transient_overlay_uncertainty: (
@@ -1032,12 +845,14 @@ def main(plot_transient: bool = False) -> None:
     ) = None
     if plot_transient:
         transient_overlay, transient_overlay_uncertainty = (
-            load_vw8_transient_average_points(csv_path)
+            load_vw8_transient_average_points(
+                Path("./data/vw8_lt270_circles_combined_all.csv")
+            )
         )
 
     year_colors = {"2019": "#1f77b4", "2025": "#d62728"}
 
-    fig, axes = plt.subplots(1, 3, figsize=(9, 2.8))
+    fig, axes = plt.subplots(1, 2, figsize=(8.8, 3.3))
 
     _plot_metric_panel(
         axes[0],
@@ -1066,18 +881,10 @@ def main(plot_transient: bool = False) -> None:
         transient_points=transient_overlay,
         transient_uncertainty=transient_overlay_uncertainty,
     )
-    _plot_turn_radius_panel(
-        axes[2],
-        datasets=datasets,
-        years=years,
-        bands=bands,
-        year_colors=year_colors,
-        lines_by_us=vw8_turn_radius_lines,
-    )
 
     # Fixed x-limits requested for all panels.
     for ax in axes:
-        ax.set_xlim(0.16, 0.44)
+        ax.set_xlim(0.15, 0.45)
 
     y0 = _panel_ylim(
         datasets,
@@ -1099,25 +906,24 @@ def main(plot_transient: bool = False) -> None:
     )
     axes[0].set_ylim(*y0)
     axes[1].set_ylim(*y1)
-    axes[2].set_ylim(0, 120)
 
-    down_2019_handle = Patch(label=r"2019 downward $g_\mathrm{k,l-r}$")
-    down_2025_handle = Patch(label=r"2025 downward $g_\mathrm{k,l-r}$")
+    up_2019_handle = Patch(label=r"2019 upward $g_\mathrm{k,l-r}$")
+    up_2025_handle = Patch(label=r"2025 upward $g_\mathrm{k,l-r}$")
     legend_handles = [
+        up_2019_handle,
         Patch(
             facecolor=to_rgba(year_colors["2019"], alpha=0.12),
             edgecolor="none",
             linewidth=0.0,
-            label=r"2019 upward $g_\mathrm{k,l-r}$",
+            label=r"2019 downward $g_\mathrm{k,l-r}$",
         ),
-        down_2019_handle,
+        up_2025_handle,
         Patch(
             facecolor=to_rgba(year_colors["2025"], alpha=0.12),
             edgecolor="none",
             linewidth=0.0,
-            label=r"2025 upward $g_\mathrm{k,l-r}$",
+            label=r"2025 downward $g_\mathrm{k,l-r}$",
         ),
-        down_2025_handle,
         Line2D(
             [0],
             [0],
@@ -1152,8 +958,8 @@ def main(plot_transient: bool = False) -> None:
             )
         )
     handler_map = {
-        down_2019_handle: TwoLayerBandHandler(year_colors["2019"]),
-        down_2025_handle: TwoLayerBandHandler(year_colors["2025"]),
+        up_2019_handle: TwoLayerBandHandler(year_colors["2019"]),
+        up_2025_handle: TwoLayerBandHandler(year_colors["2025"]),
     }
     axes[0].legend(
         handles=legend_handles,
@@ -1162,15 +968,14 @@ def main(plot_transient: bool = False) -> None:
         ncol=1,
         frameon=True,
         framealpha=1,
-        handlelength=1.0,
-        handleheight=1.0,
-        # borderpad=0.05,
-        labelspacing=0.3,
-        fontsize=11,
+        handlelength=1.4,
+        handleheight=1.1,
+        borderpad=0.3,
+        labelspacing=0.35,
         # bbox_to_anchor=(0.9, 0.9),
     )
 
-    axes[0].set_ylim(0, 0.9)
+    axes[0].set_ylim(0, 0.8)
     axes[1].set_ylim(0, 50)
     fig.tight_layout()
 
