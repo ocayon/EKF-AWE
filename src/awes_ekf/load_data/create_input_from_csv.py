@@ -249,9 +249,9 @@ def find_initial_state_vector(
     ekf_input,
     simConfig,
     wind_velocity=np.array([1e-3, 8, 0]),
-    CL=None,
-    CD=None,
-    CS=None,
+    CL=1,
+    CD=0.15,
+    CS=0,
 ):
     tether_input = TetherInput(
         kite_position=ekf_input.kite_position,
