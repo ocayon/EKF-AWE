@@ -170,7 +170,7 @@ def create_ekf_output(x, u, ekf_input, tether, kite, simConfig):
         )
         airflow_angles = calculate_airflow_angles(dcm, vw - v_kite)
     else:
-        airflow_angles = calculate_airflow_angles(dcm_b2vel, vw - v_kite)
+        airflow_angles = calculate_airflow_angles(dcm_b2w, vw - v_kite)
 
     # Unpack position and velocity vectors
     kite_position_x, kite_position_y, kite_position_z = r_kite
