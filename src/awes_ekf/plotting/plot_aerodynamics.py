@@ -19,8 +19,8 @@ def plot_aerodynamics(results, flight_data, config_data):
         results, flight_data, date=date, model=config_data["kite"]["model_name"]
     )
 
-    # if "kcu_actual_steering" in flight_data.columns:
-    #     plot_identify_turn_dynamics(results, flight_data, config_data)
+    if "kcu_actual_steering" in flight_data.columns:
+        plot_identify_turn_dynamics(results, flight_data, config_data)
     try:
         CL_mean_powered = results["wing_lift_coefficient"][
             flight_data["powered"] == "powered"
@@ -31,11 +31,17 @@ def plot_aerodynamics(results, flight_data, config_data):
         print(f"Mean CL powered: {CL_mean_powered:.2f}")
         print(f"Mean CD powered: {CD_mean_powered:.2f}")
 
-        # for col in results.columns:
-        #     if "drag_coefficient" in col:
-        #         print(f"Mean {col} powered: {results[col][flight_data['powered'] == 'powered'].mean():.2f}")
-        # CD_mean_powered_sys = np.mean(results["wing_drag_coefficient"][flight_data["powered"] == "powered"] + results["kcu_drag_coefficient"][flight_data["powered"] == "powered"]+ results["bridle_drag_coefficient"][flight_data["powered"] == "powered"])
-        # print(f"Mean CD powered system: {CD_mean_powered_sys:.2f}")
+        for col in results.columns:
+            if "drag_coefficient" in col:
+                print(
+                    f"Mean {col} powered: {results[col][flight_data['powered'] == 'powered'].mean():.2f}"
+                )
+        CD_mean_powered_sys = np.mean(
+            results["wing_drag_coefficient"][flight_data["powered"] == "depowered"]
+            + results["kcu_drag_coefficient"][flight_data["powered"] == "depowered"]
+            + results["bridles_drag_coefficient"][flight_data["powered"] == "depowered"]
+        )
+        print(f"Mean CD powered system: {CD_mean_powered_sys:.2f}")
         print(f"Mean CL/CD powered: {CL_mean_powered/CD_mean_powered:.2f}")
 
         std_CL_powered = results["wing_lift_coefficient"][
@@ -71,6 +77,71 @@ def plot_aerodynamics(results, flight_data, config_data):
         ].std()
         print(f"Mean AoA powered: {mean_aoa_powered:.2f} ± {std_aoa_powered:.2f}")
         print(f"Mean AoA depowered: {mean_aoa_depowered:.2f} ± {std_aoa_depowered:.2f}")
+
+        print(
+            "Max aerodynamic roll (powered): {:.2f} deg".format(
+                max(
+                    np.degrees(
+                        np.arctan2(
+                            results["wing_sideforce_coefficient"][
+                                flight_data["powered"] == "powered"
+                            ],
+                            results["wing_lift_coefficient"][
+                                flight_data["powered"] == "powered"
+                            ],
+                        )
+                    )
+                )
+            )
+        )
+        print(
+            "Max aerodynamic roll (depowered): {:.2f} deg".format(
+                max(
+                    np.degrees(
+                        np.arctan2(
+                            results["wing_sideforce_coefficient"][
+                                flight_data["powered"] == "depowered"
+                            ],
+                            results["wing_lift_coefficient"][
+                                flight_data["powered"] == "depowered"
+                            ],
+                        )
+                    )
+                )
+            )
+        )
+        print(
+            "Min aerodynamic roll (powered): {:.2f} deg".format(
+                min(
+                    np.degrees(
+                        np.arctan2(
+                            results["wing_sideforce_coefficient"][
+                                flight_data["powered"] == "powered"
+                            ],
+                            results["wing_lift_coefficient"][
+                                flight_data["powered"] == "powered"
+                            ],
+                        )
+                    )
+                )
+            )
+        )
+        print(
+            "Min aerodynamic roll (depowered): {:.2f} deg".format(
+                min(
+                    np.degrees(
+                        np.arctan2(
+                            results["wing_sideforce_coefficient"][
+                                flight_data["powered"] == "depowered"
+                            ],
+                            results["wing_lift_coefficient"][
+                                flight_data["powered"] == "depowered"
+                            ],
+                        )
+                    )
+                )
+            )
+        )
 
     except KeyError as e:
         print(f"KeyError: {e}. Some aerodynamic coefficients may not be available.")
@@ -110,9 +181,12 @@ def plot_identify_turn_dynamics(results, flight_data, config_data):
         time_delay = signal_delay * ts
     print("Time delay turn rate:", time_delay)
 
-    # Calculate time delay between sideforce and steering input
+    # Calculate time delay between aero roll and steering input
     signal_delay, _ = find_time_delay(
-        results["wing_sideforce_coefficient"], flight_data["kcu_actual_steering"]
+        np.arctan2(
+            results["wing_sideforce_coefficient"], results["wing_lift_coefficient"]
+        ),
+        flight_data["kcu_actual_steering"],
     )
     flight_data["kcu_actual_steering_delay"] = np.roll(
         flight_data["kcu_actual_steering"], int(signal_delay)
@@ -193,7 +267,12 @@ def plot_identify_turn_dynamics(results, flight_data, config_data):
             else flight_data["kcu_actual_steering_delay"] > 0
         )
         x = np.array(flight_data[mask]["kcu_actual_steering_delay"]) / 100
-        y = np.array(results[mask]["wing_sideforce_coefficient"])
+        y = np.array(
+            np.arctan2(
+                results[mask]["wing_sideforce_coefficient"],
+                results[mask]["wing_lift_coefficient"],
+            )
+        )
 
         # Construct A_matrix and fit parameters
         A_matrix = np.vstack([x, np.ones(len(x))]).T
@@ -201,7 +280,9 @@ def plot_identify_turn_dynamics(results, flight_data, config_data):
 
         # Set x_range for each condition
         x_range = (
-            np.linspace(-0.4, 0, 100) if condition == "<0" else np.linspace(0, 0.4, 100)
+            np.linspace(min(x), 0, 100)
+            if condition == "<0"
+            else np.linspace(0, max(x), 100)
         )
         fit_line = x_hat[0] * x_range + x_hat[1]
         upper_bound = fit_line + error
@@ -234,7 +315,7 @@ def plot_identify_turn_dynamics(results, flight_data, config_data):
 
         # Labels and legend
         plt.xlabel(r"$u_\mathrm{s}$")
-        plt.ylabel(r"$C_S$")
+        plt.ylabel(r"$\phi_\mathrm{aero}$")
         plt.legend()
         plt.tight_layout()
 
@@ -331,7 +412,7 @@ def plot_aerodynamic_coefficients(flight_data, results, config_data):
         )
 
     # Prepare the plot
-    fig, axs = plt.subplots(3, 1, figsize=(12, 8), sharex=True)
+    fig, axs = plt.subplots(4, 1, figsize=(12, 10), sharex=True)
 
     # Plot Lift Coefficient
     plot_time_series(
@@ -411,6 +492,34 @@ def plot_aerodynamic_coefficients(flight_data, results, config_data):
     axs[2].set_xlabel("Time [s]")
     axs[2].set_ylabel(r"$\alpha$ [$^\circ$]")
     axs[2].legend(frameon=True)
+
+    # Plot Aerodynamic Roll (arctan(CS/CL))
+    if "wing_sideforce_coefficient" in results.columns:
+        aerodynamic_roll = np.degrees(
+            np.arctan2(
+                results["wing_sideforce_coefficient"], results["wing_lift_coefficient"]
+            )
+        )
+        plot_time_series(
+            flight_data,
+            aerodynamic_roll,
+            axs[3],
+            ylabel=r"Roll [$^\circ$]",
+            plot_phase=True,
+        )
+        axs[3].set_xlabel("Time [s]")
+        axs[3].set_ylabel(r"Aerodynamic Roll [$^\circ$]")
+        axs[3].legend(frameon=True)
+    else:
+        axs[3].text(
+            0.5,
+            0.5,
+            "Sideforce coefficient not available",
+            ha="center",
+            va="center",
+            transform=axs[3].transAxes,
+        )
+        axs[3].set_ylabel(r"Aerodynamic Roll [$^\circ$]")
 
     # Adjust layout
     plt.tight_layout()
@@ -569,3 +678,29 @@ def plot_polars(results, flight_data, date="", model="", label="Wing"):
         header="aoa,cl,cd",
         comments="",
     )
+
+
+def plot_steering_vs_aero_roll(results, flight_data):
+    """Plot scatter of steering input vs sideforce coefficient."""
+    if "kcu_actual_steering" not in flight_data.columns:
+        print("kcu_actual_steering not found in flight_data")
+        return
+    if "wing_sideforce_coefficient" not in results.columns:
+        print("wing_sideforce_coefficient not found in results")
+        return
+
+    plt.figure(figsize=(10, 6))
+    plt.scatter(
+        flight_data["kcu_actual_steering"] / 100,
+        np.arctan2(
+            results["wing_sideforce_coefficient"], results["wing_lift_coefficient"]
+        ),
+        alpha=0.3,
+        color=colors[2],
+        s=20,
+    )
+    plt.xlabel(r"Steering Input $u_s$ [normalized]")
+    plt.ylabel(r"Sideforce Coefficient $C_S$")
+    plt.title(r"Steering Input vs Sideforce Coefficient")
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
