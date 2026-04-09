@@ -232,6 +232,14 @@ def process_data(config_data: dict, log_directory: Path) -> pd.DataFrame:
     flight_data["unix_time"] = log["time"]
     flight_data["date"] = log["date"]
 
+    for col in log.columns:
+        if "phase" in col:
+            print(f"{col}: {log[col].unique()}")
+    try:
+        flight_data["flight_phase_index"] = log["flight_phase_index"]
+    except KeyError:
+        flight_data["flight_phase_index"] = np.zeros(len(log))
+        print("Warning: 'flight_phase_index' not found in log. Defaulting to zeros.")
     # Tether azimuth and elevation
     try:
         flight_data["tether_azimuth_ground"] = -np.unwrap(
