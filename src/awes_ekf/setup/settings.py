@@ -65,6 +65,9 @@ class SimulationConfig:
         self.epsilon = float(kwargs.get("epsilon", 1e-6))
         self.max_iterations = kwargs.get("max_iterations", 200)
         self.log_profile = kwargs.get("log_profile", False)
+        self.initial_wind_velocity = np.array(
+            kwargs.get("initial_wind_velocity", [1e-3, 8, 0]), dtype=float
+        )
         self.tether_offset = kwargs.get("tether_offset", True)
         self.enforce_vertical_wind_to_0 = kwargs.get(
             "enforce_vertical_wind_to_0", False

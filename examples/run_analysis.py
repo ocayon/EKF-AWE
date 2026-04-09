@@ -173,7 +173,12 @@ class AnalyzeAweFromCsvLog:
         )
 
         # Find initial state vector
-        x0 = find_initial_state_vector(tether, ekf_input_list[0], simConfig)
+        x0 = find_initial_state_vector(
+            tether,
+            ekf_input_list[0],
+            simConfig,
+            wind_velocity=simConfig.initial_wind_velocity,
+        )
 
         ekf, ekf_input_list = initialize_ekf(
             ekf_input_list, simConfig, tuningParams, x0, kite, kcu, tether
