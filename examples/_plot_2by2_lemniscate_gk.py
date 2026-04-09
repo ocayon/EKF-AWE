@@ -18,7 +18,7 @@ from _plot_gk_3col_filter_heading import (
     load_filtered_dataset,
     plot_heading_binned_panel,
 )
-from _plot_yz_plane_lemniscate import (
+from examples.t26_plot_yz_plane_lemniscate import (
     load_and_process_data,
     scatter_yz,
     set_shared_limits,
