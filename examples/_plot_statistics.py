@@ -728,8 +728,10 @@ def main():
         day="08",
         kite_model="v3",
         addition="_t26",
-        time_range=(2190, 2255),  # (2302, 2306),  # (2190, 2255),  # (1800.0, 9986.2),
-        downsample_frac=1,
+        # time_range=(2190, 2255),  # (2302, 2306),  # (2190, 2255),  # (1800.0, 9986.2),
+        # downsample_frac=1,
+        time_range=(1800.0, 9986.2),
+        downsample_frac=0.1,
     )
 
     # Convert 2019 depower to 2025-equivalent up_data using paper physics
@@ -757,9 +759,11 @@ def main():
         day="09",
         kite_model="v3",
         addition="",
-        time_range=(700, 800),  # (400.0, 1000.0),
-        # time_range=(0, 2000),
-        downsample_frac=1,
+        # time_range=(700, 800),  # (400.0, 1000.0),
+        # # time_range=(0, 2000),
+        # downsample_frac=1,
+        time_range=(400.0, 1000.0),
+        downsample_frac=0.5,
     )
 
     # Create comparison plots
