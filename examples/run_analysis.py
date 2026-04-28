@@ -278,8 +278,8 @@ def main() -> None:
     from prompt_toolkit import prompt
     from prompt_toolkit.completion import PathCompleter
 
-        # Set up a PathCompleter to enable tab-completion for file paths
-        path_completer = PathCompleter(expanduser=False)  # Enables ~ expansion
+    # Set up a PathCompleter to enable tab-completion for file paths
+    path_completer = PathCompleter(expanduser=False)  # Enables ~ expansion
 
     # Prompt the user with tab-completion support for nested directories
     user_input = prompt(
