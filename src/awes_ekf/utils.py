@@ -69,6 +69,15 @@ def calculate_log_wind_velocity(uf, wdir, wvel_z, z):
     return vw
 
 
+def calculate_uf_from_wind_velocity(wvel, z):
+    """
+    Calculate the friction velocity (uf) from the wind velocity (vw) and height (z).
+
+    """
+    uf = wvel * kappa / np.log(z / z0)
+    return uf
+
+
 def project_onto_plane(
     vector: Union[ca.SX, np.ndarray], plane_normal: Union[ca.SX, np.ndarray]
 ) -> Union[ca.SX, np.ndarray]:
@@ -313,26 +322,55 @@ def calculate_reference_frame_euler(
         tuple: Transformed unit vectors along the x, y, and z axes in Earth coordinates.
     """
 
-    # Convert Euler angles to a quaternion
-    if eulerFrame == "NED":
-        # NED uses a ZYX rotation sequence
-        quaternion = R.from_euler("xyz", [roll, pitch, yaw])
-    elif eulerFrame == "ENU":
-        # ENU uses a ZYX rotation sequence as well but the interpretation of angles is different
-        quaternion = R.from_euler("xyz", [roll, pitch, yaw])
+    is_symbolic = any(isinstance(v, (ca.SX, ca.MX)) for v in (roll, pitch, yaw))
 
-    # Convert quaternion to a rotation matrix
-    rotation_matrix = quaternion.as_matrix()
+    if is_symbolic:
+        # Build RX, RY, RZ using CasADi so the result stays symbolic
+        c_r, s_r = ca.cos(roll), ca.sin(roll)
+        c_p, s_p = ca.cos(pitch), ca.sin(pitch)
+        c_y, s_y = ca.cos(yaw), ca.sin(yaw)
+
+        Rx_sym = ca.vertcat(
+            ca.horzcat(1, 0, 0),
+            ca.horzcat(0, c_r, -s_r),
+            ca.horzcat(0, s_r, c_r),
+        )
+
+        Ry_sym = ca.vertcat(
+            ca.horzcat(c_p, 0, s_p),
+            ca.horzcat(0, 1, 0),
+            ca.horzcat(-s_p, 0, c_p),
+        )
+
+        Rz_sym = ca.vertcat(
+            ca.horzcat(c_y, -s_y, 0),
+            ca.horzcat(s_y, c_y, 0),
+            ca.horzcat(0, 0, 1),
+        )
+
+        rotation_matrix = ca.mtimes(Rz_sym, ca.mtimes(Ry_sym, Rx_sym))
+    else:
+        # Numeric path via SciPy
+        quaternion = R.from_euler("xyz", [roll, pitch, yaw])
+        rotation_matrix = quaternion.as_matrix()
 
     # If converting from one frame to another, apply the appropriate rotation
     if eulerFrame != outputFrame:
         if outputFrame == "ENU" and eulerFrame == "NED":
-            # Convert NED to ENU rotation matrix
-            rotation_matrix = rotate_NED2ENU(rotation_matrix)
+            if is_symbolic:
+                rotation_matrix = ca.mtimes(
+                    ca.DM([[0, 1, 0], [1, 0, 0], [0, 0, -1]]).T, rotation_matrix
+                )
+            else:
+                rotation_matrix = rotate_NED2ENU(rotation_matrix)
 
         elif outputFrame == "NED" and eulerFrame == "ENU":
-            # Convert ENU to NED rotation matrix
-            rotation_matrix = rotate_ENU2NED(rotation_matrix)
+            if is_symbolic:
+                rotation_matrix = ca.mtimes(
+                    ca.DM([[0, 1, 0], [1, 0, 0], [0, 0, -1]]), rotation_matrix
+                )
+            else:
+                rotation_matrix = rotate_ENU2NED(rotation_matrix)
 
     return rotation_matrix
 
@@ -354,16 +392,11 @@ def calculate_weighted_least_squares(y, A, W=None):
         M = A.T @ A
         rhs = A.T @ y
     else:
-        M = A.T @ W @ A
-        rhs = A.T @ W @ y
-
-    # Use pseudo-inverse to avoid crashes on singular / ill-conditioned matrices.
-    return np.linalg.pinv(M) @ rhs
+        x_hat = np.linalg.inv(A.T @ W @ A) @ A.T @ W @ y
+    return x_hat
 
 
 def calculate_steering_law(results, flight_data):
-    """Estimate steering law coefficients with basic data sanity checks."""
-
     us = flight_data["kcu_actual_steering_delay"] / 100
     va = results["kite_apparent_windspeed"]
     yaw_rate = flight_data["kite_yaw_rate"]
@@ -396,98 +429,12 @@ def calculate_steering_law(results, flight_data):
     W = np.eye(len(us))
 
     coeffs = calculate_weighted_least_squares(sideforce_coeff, A, W)
-    sideforce_est = A @ coeffs
-
-    # Re-expand to full length, filling invalid rows with NaN for alignment.
-    sideforce_expanded = np.full_like(sideforce_coeff, np.nan, dtype=float)
-    sideforce_expanded[valid] = sideforce_est
-
-    return sideforce_expanded, coeffs
+    sideforce_coeff = A @ coeffs
+    return sideforce_coeff, coeffs
 
 
-# --- Tether length approximation utilities ---
-
-
-def _as_array(x):
-    """Helper: return numpy array or None if not provided."""
-    if x is None:
-        return None
-    return np.asarray(x)
-
-
-def estimate_tether_length(
-    kite_distance=None,
-    pos_east=None,
-    pos_north=None,
-    height=None,
-    elevation=None,
-    ground_tether_force=None,
-    tether_mass_per_m=None,
-    g: float = 9.81,
-):
-    """
-    Estimate tether length from available measurements with sensible fallbacks.
-
-    Priority of base straight-line estimate L0:
-      1) If `kite_distance` available: L0 = kite_distance
-      2) Else if ENU components available: L0 = sqrt(E^2 + N^2 + H^2)
-      3) Else if height and elevation available: L0 = height / sin(elevation)
-
-    Optional small-sag catenary correction (if mass and force provided):
-        ΔL ≈ (w^2 * L0^3) / (24 * H_h^2), where w = m*g (N/m) and
-        H_h ≈ max(ground_tether_force * cos(elevation), eps)
-
-    Parameters may be scalars or array-like and will be broadcast where possible.
-
-    Returns:
-        np.ndarray or float: Estimated tether length.
-    """
-
-    kd = _as_array(kite_distance)
-    e = _as_array(pos_east)
-    n = _as_array(pos_north)
-    h = _as_array(height)
-    el = _as_array(elevation)
-    gf = _as_array(ground_tether_force)
-
-    L0 = None
-
-    # 1) Use kite_distance if available
-    if kd is not None:
-        L0 = kd.astype(float)
-
-    # 2) Else compute from ENU components
-    if L0 is None and e is not None and n is not None and h is not None:
-        L0 = np.sqrt(e.astype(float) ** 2 + n.astype(float) ** 2 + h.astype(float) ** 2)
-
-    # 3) Else compute from elevation and height
-    if L0 is None and h is not None and el is not None:
-        # Protect against sin(el) ~ 0
-        s = np.sin(el.astype(float))
-        s = np.where(np.abs(s) < 1e-6, np.nan, s)
-        L0 = h.astype(float) / s
-
-    if L0 is None:
-        raise ValueError(
-            "Insufficient inputs: provide kite_distance or (pos_east,pos_north,height) or (height,elevation)."
-        )
-
-    # Optional catenary small-sag correction if mass per meter and force are provided
-    if tether_mass_per_m is not None and gf is not None:
-        w = float(tether_mass_per_m) * float(g)  # N/m
-        # Estimate horizontal tension component; if elevation unknown assume all in horizontal
-        if el is None:
-            H_h = np.maximum(gf.astype(float), 1e-3)
-        else:
-            H_h = np.maximum(gf.astype(float) * np.cos(el.astype(float)), 1e-3)
-        dL = (w**2) * (L0**3) / (24.0 * (H_h**2))
-        return L0 + dL
-
-    return L0
-
-    full_est = np.full(len(valid), np.nan)
-    full_est[valid] = sideforce_est
-    return full_est, coeffs
+import numpy as np
+from scipy.optimize import least_squares
 
 
 def calculate_turn_rate_law(
@@ -513,14 +460,14 @@ def calculate_turn_rate_law(
 
     yaw_rate = flight_data["kite_yaw_rate"]
     radius = results["radius_turn"]
-
+    beta = results["kite_elevation"]
     if model == "simple":
         c1 = us * va
         A = np.vstack([c1]).T
         W = eye(len(us))
     elif model == "simple_weight":
         c1 = us * va
-        beta = results["kite_elevation"]
+
         c2 = np.sin(yaw) * np.cos(beta) / va
         A = np.vstack([c1, c2]).T
         W = eye(len(us))
@@ -544,6 +491,55 @@ def calculate_turn_rate_law(
     yaw_rate = A @ coeffs
 
     return yaw_rate
+
+
+def predict_yaw_rate_rational(us, va, mass, k1, vk, k2, k3, beta, yaw):
+    denom = mass * vk + k2 * va
+    # avoid divide-by-zero (also handled better via bounds)
+    denom = np.maximum(denom, 1e-6)
+    return (k1 * va**2 * (us - k3) + mass * 9.81 * np.cos(beta) * np.sin(yaw)) / denom
+
+
+def fit_rational_law(
+    yaw_rate_meas, us, va, vk, mass, beta, yaw, weights=None, x0=(0, 0, 0)
+):
+    # yaw_rate_meas = np.asarray(yaw_rate_meas)
+    # us = np.asarray(us)
+    # va = np.asarray(va)
+
+    if weights is None:
+        w = np.ones_like(yaw_rate_meas)
+    else:
+        w = np.asarray(weights)
+
+    def residuals(x):
+        k1, k2, k3 = x
+        yhat = predict_yaw_rate_rational(us, va, mass, k1, vk, k2, k3, beta, yaw)
+        return np.sqrt(w) * (yhat - yaw_rate_meas)
+
+    # Bounds example: vk >= 1e-3; k2 >= 0 to keep denom positive if va>=0
+    # Adjust if you expect negative k2.
+    lb = (-100000, -100000, -1)
+    ub = (100000, 100000, 1)
+
+    res = least_squares(residuals, x0=x0, bounds=(lb, ub))
+    k1, k2, k3 = res.x
+    yhat = predict_yaw_rate_rational(us, va, mass, k1, vk, k2, k3, beta, yaw)
+
+    mse = np.mean((yhat - yaw_rate_meas) ** 2)
+    rmse = np.sqrt(mse)
+
+    print(
+        f"Fitted parameters: k1={k1:.4f}, k2={k2:.4f}, k3={k3:.4f}, RMSE={rmse:.4f}, MSE={mse:.4f}"
+    )
+    return res.x, res
+
+
+# Usage inside your function:
+# us = flight_data["kcu_actual_steering"] / 100
+# va = results["kite_apparent_windspeed"].to_numpy()
+# coeffs, res = fit_rational_law(yaw_rate, us, va, mass)
+# yaw_rate_fit = predict_yaw_rate_rational(us, va, mass, *coeffs)
 
 
 def find_time_delay(signal_1, signal_2):

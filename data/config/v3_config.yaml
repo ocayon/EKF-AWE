@@ -1,14 +1,10 @@
-year: '2019'                       # Year of the flight
-month: '10'                         # Month of the flight
-day: '08'                           # Day of the flight
-
 simulation_parameters:
   debug: false                      # Debug mode
-  n_tether_elements: 10                # Number of tether elements
   doIEKF: true                        # Use iterated extended Kalman filter
   epsilon: 1e-6                       # Tolerance for the IEKF
   max_iterations: 200                 # Maximum number of iterations for the IEKF
   log_profile: false                   # Model wind speed as logarithmic with height
+  initial_wind_velocity: [0.001, 8, 0] # Initial wind velocity [vx, vy, vz] for EKF state initialization
   enforce_vertical_wind_to_0: false    # Enforce the vertical wind speed to be zero (If apparent wind speed not measured, recommended to be true)
   model_yaw: false                   # Model the yaw angle in the state vector
 
@@ -17,20 +13,21 @@ simulation_parameters:
     kite_velocity: true                   # Kite velocity measurement
     kite_acceleration: true                   # Kite acceleration measurement
     tether_force: true               # Tether force measurement
-    tether_length: false              # Tether length measurement
+    tether_length: true              # Tether length measurement
     tether_elevation: false           # Tether elevation angle measurement
     tether_azimuth: false             # Tether azimuth angle measurement
     kcu_position: false                    # KCU position measurement
     kcu_velocity: false                    # KCU velocity measurement
     kcu_acceleration: false                    # KCU acceleration measurement
-    kite_apparent_windspeed: false         # Apparent wind speed measurement
+    kite_apparent_windspeed: true         # Apparent wind speed measurement
     bridle_angle_of_attack: false            # Angle of attack measurement
     bridle_angle_of_sideslip: false             # Sideslip angle measurement
     kite_yaw_angle: false                  # Yaw angle measurement
+    dynamic_depower: true                # Dynamic depower optionality
 
 kite:
   model_name: 'v3'                # Kite model
-  mass: 15                        # Mass of the kite in kg
+  mass: 11                        # Mass of the kite in kg
   area: 19.75                    # Area of the kite in m^2
   span: 10                      # Span of the kite in m
   sensor_ids:                     # Sensor IDs of the kite
@@ -39,14 +36,14 @@ kite:
 kcu:
   length: 1                     # Length of the KCU in m
   diameter: 0.48                      # Width of the KCU in m
-  mass: 27.6                       # Mass of the KCU in kg
+  mass: 23.25                      # Mass of the KCU in kg
   distance_kcu_kite: 11.5        # Distance from the KCU cg to the kite cg in m
   total_length_bridle_lines: 96  # Total length of the bridle lines in m
   diameter_bridle_lines: 0.0025    # Diameter of the bridle lines in m
 tether:
   material_name: 'Dyneema-SK78'   # Material name of the tether
   diameter: 0.01               # Diameter of the tether in m
-  n_elements: 5                # Number of tether elements
+  n_elements: 30                # Number of tether elements
 
 
 tuning_parameters:

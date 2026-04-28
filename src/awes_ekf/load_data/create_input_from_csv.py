@@ -129,6 +129,10 @@ def create_input_from_csv(
         steering_input = np.zeros(n_intervals)
 
     try:
+        kite_course = np.array(flight_data["kite_course"])
+    except KeyError:
+        kite_course = np.zeros(n_intervals)
+    try:
         bridle_angle_of_attack = np.array(flight_data["bridle_angle_of_attack"])
     except KeyError:
         if simConfig.obsData.bridle_angle_of_attack:
@@ -204,9 +208,14 @@ def create_input_from_csv(
     uf = init_wind_vel * kappa / np.log(10 / z0)
     wvel0 = uf / kappa * np.log(kite_position[0][2] / z0)
     if np.isnan(wvel0):
-        raise ValueError("Initial wind velocity is NaN")
+        wvel0 = 5  # Default value if initial wind velocity is NaN
+        # raise ValueError("Initial wind velocity is NaN")
 
     ekf_input_list = []
+    import matplotlib.pyplot as plt
+
+    delta_up = np.gradient(depower_input, flight_data["time"].values)
+
     for i in range(len(flight_data)):
         ekf_input_list.append(
             EKFInput(
@@ -227,6 +236,8 @@ def create_input_from_csv(
                 steering_input=steering_input[i],
                 kite_thrust_force=kite_thrust_force[i],
                 depower_input=depower_input[i],
+                kite_course=kite_course[i],
+                delta_up=delta_up[i],
             )
         )
 
@@ -237,22 +248,11 @@ def find_initial_state_vector(
     tether,
     ekf_input,
     simConfig,
-    wind_velocity=np.array([1e-3, 1e-3, 0]),
-    CL=None,
-    CD=None,
-    CS=None,
+    wind_velocity=np.array([1e-3, 8, 0]),
+    CL=1,
+    CD=0.15,
+    CS=0,
 ):
-    # Validate input data
-    if np.any(np.isnan(ekf_input.kite_position)) or np.any(
-        np.isnan(ekf_input.kite_velocity)
-    ):
-        raise ValueError("Invalid kite position or velocity data (contains NaN)")
-
-    # Ensure wind velocity has reasonable magnitude
-    wind_mag = np.linalg.norm(wind_velocity)
-    if wind_mag < 0.1:  # If wind is too small, use a minimum wind speed
-        wind_velocity = np.array([2.0, 0.0, 0.0])  # Default reasonable wind
-
     tether_input = TetherInput(
         kite_position=ekf_input.kite_position,
         kite_velocity=ekf_input.kite_velocity,
@@ -309,6 +309,9 @@ def find_initial_state_vector(
     if simConfig.obsData.tether_elevation:
         x0 = np.append(x0, 0)  # Initial tether elevation offset
     if simConfig.obsData.tether_azimuth:
+        x0 = np.append(x0, 0)
+    if simConfig.obsData.dynamic_depower:
+        x0 = np.append(x0, 0)
         x0 = np.append(x0, 0)
 
     return x0

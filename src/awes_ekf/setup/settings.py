@@ -7,7 +7,7 @@ import os
 rho = 1.225  # Air density [kg/m^3]
 kappa = 0.4  # Von Karman constant [-]
 g = 9.81  # Gravity acceleration [m/s^2]
-z0 = 0.1  # Surface roughness [m]
+z0 = 0.01  # Surface roughness [m]
 
 
 # Load the configuration file
@@ -65,6 +65,9 @@ class SimulationConfig:
         self.epsilon = float(kwargs.get("epsilon", 1e-6))
         self.max_iterations = kwargs.get("max_iterations", 200)
         self.log_profile = kwargs.get("log_profile", False)
+        self.initial_wind_velocity = np.array(
+            kwargs.get("initial_wind_velocity", [1e-3, 8, 0]), dtype=float
+        )
         self.tether_offset = kwargs.get("tether_offset", True)
         self.enforce_vertical_wind_to_0 = kwargs.get(
             "enforce_vertical_wind_to_0", False
@@ -154,6 +157,13 @@ class TuningParameters:
             self.stdv_dynamic_model = np.append(self.stdv_dynamic_model, 1e-6)
         if simConfig.obsData.tether_azimuth:
             self.stdv_dynamic_model = np.append(self.stdv_dynamic_model, 1e-6)
+        if simConfig.obsData.dynamic_depower:
+            self.stdv_dynamic_model = np.append(
+                self.stdv_dynamic_model, 1e-6
+            )  # Depower constant
+            self.stdv_dynamic_model = np.append(
+                self.stdv_dynamic_model, 1e-6
+            )  # Depower constant
         self.indices_measurements = [
             "x",
             "x",

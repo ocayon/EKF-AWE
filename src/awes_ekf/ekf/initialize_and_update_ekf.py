@@ -8,7 +8,10 @@ from awes_ekf.postprocess.postprocessing import find_offset
 import time
 import copy
 
-def initialize_ekf(ekf_input_list, simConfig, tuningParams, x0, kite, kcu, tether, find_offsets=True):
+
+def initialize_ekf(
+    ekf_input_list, simConfig, tuningParams, x0, kite, kcu, tether, find_offsets=True
+):
     """
     Initialize the Extended Kalman Filter with system components and models.
 
@@ -42,21 +45,26 @@ def initialize_ekf(ekf_input_list, simConfig, tuningParams, x0, kite, kcu, tethe
     # Initialize state vector
     ekf.x_k1_k1 = x0
 
-    #Copy ekf using deepcopy
+    # Copy ekf using deepcopy
     ekf_copy = copy.deepcopy(ekf)
     simConfig_copy = copy.deepcopy(simConfig)
     if find_offsets:
         offset_variables = ["kite_apparent_windspeed", "bridle_angle_of_attack"]
         # Find offsets
         for variable in simConfig_copy.obsData.__dict__.keys():
-            if variable in offset_variables and simConfig_copy.obsData.__dict__[variable]:
+            if (
+                variable in offset_variables
+                and simConfig_copy.obsData.__dict__[variable]
+            ):
                 print(f"Finding offset for {variable}")
                 ekf_output_list = []
                 offset_sim_length = int(6000)
                 ekf_output_list = []
                 simConfig_copy.obsData.__dict__[variable] = False
                 simConfig_copy.enforce_vertical_wind_to_0 = True
-                obs_model = ObservationModel(dyn_model.x, dyn_model.u, simConfig_copy, kite, tether, kcu)
+                obs_model = ObservationModel(
+                    dyn_model.x, dyn_model.u, simConfig_copy, kite, tether, kcu
+                )
                 tuningParams.update_observation_vector(simConfig_copy)
                 ekf_copy.stdv_measurements = tuningParams.stdv_measurements
                 ekf_copy.obs_model = obs_model
@@ -65,7 +73,12 @@ def initialize_ekf(ekf_input_list, simConfig, tuningParams, x0, kite, kcu, tethe
                 for k in range(offset_sim_length):
                     try:
                         ekf_copy, ekf_ouput = propagate_state_EKF(
-                            ekf_copy, ekf_input_list[k], simConfig_copy, tether, kite, kcu
+                            ekf_copy,
+                            ekf_input_list[k],
+                            simConfig_copy,
+                            tether,
+                            kite,
+                            kcu,
                         )
                     except Exception as e:
                         print(f"Error at timestep {k}: {e}")
@@ -79,26 +92,32 @@ def initialize_ekf(ekf_input_list, simConfig, tuningParams, x0, kite, kcu, tethe
                         mins += 1
                         print(
                             f"Real time: {mins} minutes.  Elapsed time: {elapsed_time:.2f} seconds"
-                        )   
+                        )
 
                 # Find offset
-                #TODO: Define universal namings and create timeseries class
+                # TODO: Define universal namings and create timeseries class
                 if variable == "bridle_angle_of_attack":
                     variable = "kite_angle_of_attack"
                 converged_idx = int(3000)
-                estimated_variable = np.array([ekf_output.__dict__[variable] for ekf_output in ekf_output_list])
-                measured_variable = np.array([ekf_input.__dict__[variable] for ekf_input in ekf_input_list[:offset_sim_length]])
-                offset = find_offset(estimated_variable[converged_idx::], measured_variable[converged_idx:len(ekf_input_list)], offset_range=[-15,15])
+                estimated_variable = np.array(
+                    [ekf_output.__dict__[variable] for ekf_output in ekf_output_list]
+                )
+                measured_variable = np.array(
+                    [
+                        ekf_input.__dict__[variable]
+                        for ekf_input in ekf_input_list[:offset_sim_length]
+                    ]
+                )
+                offset = find_offset(
+                    estimated_variable[converged_idx::],
+                    measured_variable[converged_idx : len(ekf_input_list)],
+                    offset_range=[-15, 15],
+                )
                 print(f"Offset for {variable}: {offset}")
 
                 # Update offset
                 for i in range(len(ekf_input_list)):
                     ekf_input_list[i].__dict__[variable] += offset
-                    
-
-
-                
-
 
     return ekf, ekf_input_list
 
@@ -136,10 +155,9 @@ def update_state_ekf_tether(ekf, tether, kite, kcu, ekf_input, simConfig):
     ekf_output = create_ekf_output(
         ekf.x_k1_k1, ekf.u, ekf_input, tether, kite, simConfig
     )
-    
+
     for key, value in ekf.debug_info.items():
         ekf_output.__dict__[key] = value
-
 
     return ekf, ekf_output
 
