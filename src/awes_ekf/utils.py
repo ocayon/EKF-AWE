@@ -391,8 +391,11 @@ def calculate_weighted_least_squares(y, A, W=None):
     if W is None:
         M = A.T @ A
         rhs = A.T @ y
+        x_hat = np.linalg.lstsq(M, rhs, rcond=None)[0]
     else:
-        x_hat = np.linalg.inv(A.T @ W @ A) @ A.T @ W @ y
+        M = A.T @ W @ A
+        rhs = A.T @ W @ y
+        x_hat = np.linalg.lstsq(M, rhs, rcond=None)[0]
     return x_hat
 
 
