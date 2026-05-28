@@ -223,7 +223,7 @@ def create_ekf_output(x, u, ekf_input, tether, kite, simConfig):
 
     # Optional yaw modeling
     if simConfig.model_yaw:
-        ekf_output.steering_law_coefficient = x[16]
+        ekf_output.steering_law_coefficient = x[state_index_map["k_yaw_rate"]]
 
     return ekf_output
 
