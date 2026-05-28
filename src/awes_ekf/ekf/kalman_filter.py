@@ -63,6 +63,7 @@ class ExtendedKalmanFilter:
 
     @stdv_dynamic_model.setter
     def stdv_dynamic_model(self, value):
+        self._stdv_dynamic_model = value
         self.Q = self.get_state_noise_covariance(value, self.simConfig)
         self.n = len(value)
         self.P_k1_k1 = np.eye(self.n) * 1**2
@@ -73,6 +74,7 @@ class ExtendedKalmanFilter:
 
     @stdv_measurements.setter
     def stdv_measurements(self, value):
+        self._stdv_measurements = value
         self.R = self.get_observation_noise_covariance(value)
 
     def predict(self, ts):
