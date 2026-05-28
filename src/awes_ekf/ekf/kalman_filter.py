@@ -38,6 +38,18 @@ class ExtendedKalmanFilter:
         self.P_k1_k1 = np.eye(self.n) * 1**2
         self.simConfig = simConfig
 
+        # Declare state/filter attributes used outside __init__
+        self.x_k1_k: np.ndarray = np.empty(0)
+        self.x_k1_k1: np.ndarray = np.empty(0)
+        self.u: np.ndarray = np.empty(0)
+        self.z: np.ndarray = np.empty(0)
+        self.Phi: np.ndarray = np.empty(0)
+        self.P_k1_k: np.ndarray = np.eye(self.n)
+        self.Fx: np.ndarray = np.empty(0)
+        self.Hx: np.ndarray = np.empty(0)
+        self.IEKF_itts: int = 0
+        self.debug_info: dict = {}
+
         self.kite = kite
         self.kcu = kcu
         self.tether = tether
@@ -89,7 +101,7 @@ class ExtendedKalmanFilter:
             self.Fx, np.zeros([nx, nx]), np.zeros(nx), np.zeros(nx)
         )  # If process noise input matrix wants to be added ->control.ss(self.Fx, self.G, np.zeros(nx), np.zeros(nx))
         sys_dt = control.sample_system(sys_ct, ts, method="zoh")
-        self.Phi = sys_dt.A
+        self.Phi = np.asarray(sys_dt.A)  # type: ignore[assignment]
         # self.Gamma = sys_dt.B
         # Calculate covariance prediction error
         self.P_k1_k = self.Phi @ self.P_k1_k1 @ self.Phi.T + self.Q
@@ -110,6 +122,14 @@ class ExtendedKalmanFilter:
 
         # Create a reduced version of z without None values
         z_valid = self.z[valid_indices]
+
+        K: np.ndarray = np.empty(0)
+        Hx: np.ndarray = np.empty(0)
+        R: np.ndarray = self.R
+        R_full: np.ndarray = self.R
+        z_k1_k: np.ndarray = np.empty(0)
+        P_zz: np.ndarray = np.empty(0)
+        Hx_full: np.ndarray = np.empty(0)
 
         if self.doIEKF == True:
 

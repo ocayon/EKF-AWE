@@ -24,7 +24,9 @@ def plot_mechanical_power(flight_data, results):
         flight_data (DataFrame): Data frame containing flight data, including time.
         results (DataFrame): Data frame with results, including mechanical power.
     """
-    fig, ax = plt.subplots(1, 1, figsize=(12, 5))
+    from matplotlib.axes import Axes
+    fig, _ax = plt.subplots(1, 1, figsize=(12, 5))
+    ax: Axes = _ax  # type: ignore[assignment]
 
     # Plot mechanical power
     plot_time_series(

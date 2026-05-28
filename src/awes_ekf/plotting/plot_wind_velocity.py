@@ -11,8 +11,8 @@ colors = get_color_list()
 
 def plot_wind_velocity(results, flight_data, config_data):
 
+    lidar_data = False
     for col in flight_data.columns:
-        lidar_data = False
         if "Wind_Speed_m_s" in col:
             lidar_data = True
             break

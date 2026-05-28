@@ -441,6 +441,8 @@ def calculate_turn_rate_law(
     yaw_rate = flight_data["kite_yaw_rate"]
     radius = results["radius_turn"]
     beta = results["kite_elevation"]
+    A = np.zeros((len(us), 1))
+    W = eye(len(us))
     if model == "simple":
         c1 = us * va
         A = np.vstack([c1]).T

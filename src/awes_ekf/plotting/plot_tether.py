@@ -1,5 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 from awes_ekf.plotting.color_palette import get_color_list, set_plot_style_no_latex
 from awes_ekf.plotting.plot_utils import plot_time_series
 
@@ -66,7 +68,8 @@ def plot_tether_force_frequency(flight_data, results):
     mask = freq > 0
 
     # Plotting
-    fig, ax = plt.subplots(figsize=(12, 5))
+    fig, _ax = plt.subplots(figsize=(12, 5))
+    ax: Axes = _ax  # type: ignore[assignment]
     ax.plot(
         freq[mask],
         tether_force_magnitude[mask],
@@ -94,7 +97,8 @@ def plot_kite_tether_angles(
         plot_phase_roll (bool): Whether to plot phase information for roll angle.
         plot_phase_pitch (bool): Whether to plot phase information for pitch angle.
     """
-    fig, ax = plt.subplots(1, 1, figsize=(12, 5))
+    fig, _ax2 = plt.subplots(1, 1, figsize=(12, 5))
+    ax: Axes = _ax2  # type: ignore[assignment]
 
     # Plot roll angle between kite and tether
     plot_time_series(
@@ -133,7 +137,8 @@ def plot_slack_tether_force(results, flight_data, kcu=None):
         "ground_tether_force"
     ]  # Replace with the appropriate tether force variable
 
-    fig, ax1 = plt.subplots(figsize=(9, 3))
+    fig, _ax1 = plt.subplots(figsize=(9, 3))
+    ax1: Axes = _ax1  # type: ignore[assignment]
 
     # Plotting Slack on the first axis
     ax1 = plot_time_series(
@@ -180,7 +185,7 @@ def plot_slack_tether_force(results, flight_data, kcu=None):
         frameon=True,
         # bbox_to_anchor=(0.075, 1)  # Adjust the x-coordinate to move the legend to the right
     )
-    fig.tight_layout()  # Adjust layout to prevent overlap
+    fig.tight_layout()  # type: ignore[union-attr]  # Adjust layout to prevent overlap
 
     # Title and Grid
     ax2.grid(True, linestyle="--", alpha=0.8)
