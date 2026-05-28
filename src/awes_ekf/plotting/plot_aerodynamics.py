@@ -322,7 +322,7 @@ def plot_identify_turn_dynamics(results, flight_data, config_data):
         plt.tight_layout()
 
     plt.figure(figsize=(6, 4))
-    plt.title(title)
+    # plt.title(title)
     # Call the function for each condition
     plot_fit(flight_data, results, condition="<0")
     plot_fit(flight_data, results, condition=">0")
@@ -717,6 +717,20 @@ def _rmse_turn(y_true, y_pred):
     return np.sqrt(np.mean((y_true[valid] - y_pred[valid]) ** 2))
 
 
+def _remove_outliers_turn(sig, size=21, threshold=3.0):
+    from scipy.ndimage import median_filter
+
+    med = median_filter(sig, size=size)
+    diff = np.abs(sig - med)
+    std = np.std(diff)
+    if std > 0:
+        mask = diff > threshold * std
+        out = sig.copy()
+        out[mask] = med[mask]
+        return out
+    return sig
+
+
 def _fit_simple_turn(chi_dot, us, va, asym_mode="fit", k_asym_fixed=0.0):
     """Eq. (41): chi_dot_b = gk * va * (us - k_asym)"""
     term1 = va * us
@@ -847,6 +861,104 @@ def _fit_full_rational_turn(
     return (k1, k2, k3, k4, k_asym), predict(k1, k2, k3, k4, k_asym)
 
 
+def _fit_full_rational_course_term_turn(
+    chi_dot,
+    us,
+    va,
+    v_tau,
+    chi,
+    beta,
+    mass=50.0,
+    g=9.81,
+    x0=None,
+    asym_mode="fit",
+    k_asym_fixed=0.0,
+    gravity_mode="fit",
+):
+    """Eq. (39): full rational with cos(chi)*cos(beta) and sin(beta) terms."""
+    with_asym = asym_mode == "fit"
+    with_gravity = gravity_mode == "fit"
+
+    x0_arr = list(x0) if x0 is not None else []
+    x0_arr += [0.0] * max(0, 7 - len(x0_arr))
+    k1_0, k2_0, k3_0, k4_0, k5_0, k6_0, ka_0 = x0_arr[:7]
+    if x0 is None:
+        k1_0, k2_0, k3_0, k4_0, k5_0, k6_0, ka_0 = 1.0, 8.0, 5.0, 1.0, 0.0, 0.0, 0.0
+
+    if with_gravity and with_asym:
+        x0_int = [k1_0, k2_0, k3_0, k4_0, k5_0, k6_0, ka_0]
+        bounds = (
+            [-1e2, -1e2, -1e2, -1e2, -1e2, -1e2, -0.1],
+            [1e2, 1e2, 1e2, 1e2, 1e2, 1e2, 0.1],
+        )
+    elif with_gravity and not with_asym:
+        x0_int = [k1_0, k2_0, k3_0, k4_0, k5_0, k6_0]
+        bounds = (
+            [-1e2, -1e2, -1e2, -1e2, -1e2, -1e2],
+            [1e2, 1e2, 1e2, 1e2, 1e2, 1e2],
+        )
+    elif not with_gravity and with_asym:
+        x0_int = [k1_0, k2_0, k4_0, k5_0, k6_0, ka_0]
+        bounds = (
+            [-1e2, -1e2, -1e2, -1e2, -1e2, -0.1],
+            [1e2, 1e2, 1e2, 1e2, 1e2, 0.1],
+        )
+    else:
+        x0_int = [k1_0, k2_0, k4_0, k5_0, k6_0]
+        bounds = ([-1e2, -1e2, -1e2, -1e2, -1e2], [1e2, 1e2, 1e2, 1e2, 1e2])
+
+    def predict(k1, k2, k3, k4, k5, k6, k_asym):
+        grav = k3 * mass * g * np.sin(chi) * np.cos(beta) if with_gravity else 0.0
+        course_term = k5 * np.cos(chi) * np.cos(beta)
+        elev_term = k6 * np.sin(beta)
+        num = k1 * va**2 * (us - k_asym) + grav + course_term + elev_term
+        den = np.maximum(k4 * mass * v_tau + k2 * va, 1e-6)
+        return -num / den
+
+    def residuals(x):
+        if with_gravity and with_asym:
+            return predict(*x) - chi_dot
+        elif with_gravity and not with_asym:
+            k1, k2, k3, k4, k5, k6 = x
+            return predict(k1, k2, k3, k4, k5, k6, k_asym_fixed) - chi_dot
+        elif not with_gravity and with_asym:
+            k1, k2, k4, k5, k6, k_asym = x
+            return predict(k1, k2, 0.0, k4, k5, k6, k_asym) - chi_dot
+        else:
+            k1, k2, k4, k5, k6 = x
+            return predict(k1, k2, 0.0, k4, k5, k6, k_asym_fixed) - chi_dot
+
+    valid = (
+        np.isfinite(chi_dot)
+        & np.isfinite(va)
+        & np.isfinite(v_tau)
+        & np.isfinite(us)
+        & np.isfinite(chi)
+        & np.isfinite(beta)
+    )
+    res = _scipy_least_squares(
+        lambda x: residuals(x)[valid],
+        x0=np.array(x0_int, dtype=float),
+        bounds=bounds,
+    )
+    if with_gravity and with_asym:
+        k1, k2, k3, k4, k5, k6, k_asym = res.x
+    elif with_gravity and not with_asym:
+        k1, k2, k3, k4, k5, k6 = res.x
+        k_asym = k_asym_fixed
+    elif not with_gravity and with_asym:
+        k1, k2, k4, k5, k6, k_asym = res.x
+        k3 = 0.0
+    else:
+        k1, k2, k4, k5, k6 = res.x
+        k3 = 0.0
+        k_asym = k_asym_fixed
+
+    return (k1, k2, k3, k4, k5, k6, k_asym), predict(
+        k1, k2, k3, k4, k5, k6, k_asym
+    )
+
+
 def plot_turn_rate_fit_results(
     phase_results,
     time,
@@ -859,13 +971,12 @@ def plot_turn_rate_fit_results(
     va,
     yaw_dot_flight=None,
     chi_dot_flight=None,
+    alt_turn_rate=None,
+    alt_label="Heading rate",
+    alt_full_label="Full (yaw rate)",
     turn_rate_source="chi_dot",
-    turn_rate_label="chi_dot",
-    selected_turn_rate_from_gradient=False,
-    yaw_used_for_derivative=None,
-    yaw_used_for_derivative_label=None,
-    selected_turn_rate_source=None,
-    plot_cycle=None,
+    turn_rate_label="Course rate",
+    plot_cycles=None,
     phase_name=None,
     palette=None,
     plot_dir=None,
@@ -873,21 +984,15 @@ def plot_turn_rate_fit_results(
     g=9.81,
 ):
     """
-    Create and save the three turn-rate law identification figures.
+    Build the composite turn-rate identification figure:
+      (a) RMSE bar chart per phase
+      (b) Representative scatter for the reel-out phase
+      (c) Time-series comparison for one or more selected cycles
 
-    Parameters
-    ----------
-    phase_results : dict
-        Output of the per-phase fitting loop (keys are phase identifiers).
-    time, chi_dot_meas, chi, beta, v_tau, us, va : np.ndarray
-        Full-length signal arrays.
-    flight_data : pd.DataFrame
-        Must contain a phase/cycle column and optionally 'cycle'.
-    plot_dir : Path or str, optional
-        Directory where figures are saved.  Created if it does not exist.
+    Saved as `turn_rate_composite.pdf` in ``plot_dir``.
     """
     if phase_name is None:
-        phase_name = {1: "reel-out", 3: "reel-in"}
+        phase_name = {1: "reel-out", 2: "rori", 3: "reel-in", 4: "riro"}
     if palette is None:
         palette = get_color_list()
     if plot_dir is None:
@@ -895,295 +1000,358 @@ def plot_turn_rate_fit_results(
     plot_dir = Path(plot_dir)
     plot_dir.mkdir(parents=True, exist_ok=True)
 
+    def get_phase_label(p, names):
+        try:
+            return names.get(int(float(p)), str(p))
+        except (ValueError, TypeError):
+            return str(p)
+
     phase_keys = sorted(
         phase_results,
-        key=lambda p: int(p) if str(p).isdigit() else str(p),
+        key=lambda p: int(float(p)) if str(p).replace(".", "", 1).isdigit() else str(p),
     )
-    phase_labels = [
-        phase_name.get(int(p), str(p)) if str(p).isdigit() else str(p)
-        for p in phase_keys
-    ]
+    phase_labels = [get_phase_label(p, phase_name) for p in phase_keys]
 
-    meas_color = palette[0]
-    simple_color = palette[1]
-    two_color = palette[2]
-    full_color = palette[5]
-    symmetry_color = palette[6]
+    sym_linear_color = palette[1]
+    course_color = palette[2]
+    full_yaw_color = palette[4]
 
-    # Figure 1: RMSE comparison bar chart
+    has_course_term = any("full_course_term" in phase_results[p] for p in phase_keys)
+    has_full_yaw = any(
+        phase_results[p].get("full_course_term_yaw") is not None for p in phase_keys
+    )
+
+    # Cycle selection for time-series panels
+    cycle_col = "cycle" if "cycle" in flight_data.columns else None
+    if plot_cycles is None and cycle_col is not None:
+        available = flight_data[cycle_col].unique()
+        plot_cycles = (
+            [int(available[len(available) // 2])] if len(available) else []
+        )
+    elif plot_cycles is None:
+        plot_cycles = []
+    plot_cycles = [c for c in plot_cycles if c is not None]
+    n_ts = max(1, len(plot_cycles))
+
+    fig = plt.figure(figsize=(12, 10))
+    gs = fig.add_gridspec(2, 2, height_ratios=[1, 1.2])
+    ax_bar = fig.add_subplot(gs[0, 0])
+    ax_scatter = fig.add_subplot(gs[0, 1])
+    ts_gs = gs[1, :].subgridspec(1, n_ts)
+    ax_ts_list = [fig.add_subplot(ts_gs[0, i]) for i in range(n_ts)]
+
+    # --- (a) RMSE bar chart -------------------------------------------------
     rmse_simple = [phase_results[p]["simple"]["RMSE"] for p in phase_keys]
-    rmse_simple_sym = [phase_results[p]["simple_symmetric"]["RMSE"] for p in phase_keys]
+    rmse_simple_sym = [
+        phase_results[p]["simple_symmetric"]["RMSE"] for p in phase_keys
+    ]
     rmse_two = [phase_results[p]["two_term"]["RMSE"] for p in phase_keys]
     rmse_full = [phase_results[p]["full"]["RMSE"] for p in phase_keys]
+    rmse_full_course = (
+        [phase_results[p]["full_course_term"]["RMSE"] for p in phase_keys]
+        if has_course_term
+        else None
+    )
+    rmse_full_yaw = (
+        [
+            (
+                phase_results[p]["full_course_term_yaw"]["RMSE"]
+                if phase_results[p].get("full_course_term_yaw") is not None
+                else np.nan
+            )
+            for p in phase_keys
+        ]
+        if has_full_yaw
+        else None
+    )
+
+    bar_items = [
+        ("Linear", rmse_simple, palette[6]),
+        ("Sym. linear", rmse_simple_sym, sym_linear_color),
+        ("Weight-corr.", rmse_two, palette[5]),
+        (
+            "Reduced full",
+            rmse_full,
+            palette[7] if len(palette) > 7 else palette[4],
+        ),
+    ]
+    if has_course_term:
+        bar_items.append(("Full", rmse_full_course, course_color))
+    if has_full_yaw:
+        bar_items.append((alt_full_label, rmse_full_yaw, full_yaw_color))
+
     x = np.arange(len(phase_keys))
-    width = 0.2
+    width = 0.8 / max(len(bar_items), 1)
+    for idx, (label, values, color) in enumerate(bar_items):
+        offset = (idx - (len(bar_items) - 1) / 2) * width
+        ax_bar.bar(x + offset, values, width, label=label, color=color)
+    ax_bar.set_xticks(x)
+    ax_bar.set_xticklabels(phase_labels, rotation=30, ha="center")
+    ax_bar.set_ylabel("RMSE [rad/s]")
+    ax_bar.set_title("(a) Simplifications comparison")
+    ax_bar.grid(True, axis="y")
 
-    fig1, ax1 = plt.subplots(figsize=(10, 4))
-    ax1.bar(
-        x - 1.5 * width,
-        rmse_simple,
-        width,
-        label="simple (no weight)",
-        color=simple_color,
-    )
-    ax1.bar(
-        x - 0.5 * width,
-        rmse_simple_sym,
-        width,
-        label="simple (symmetric)",
-        color=symmetry_color,
-    )
-    ax1.bar(
-        x + 0.5 * width,
-        rmse_two,
-        width,
-        label="two_fit (no inertial forces)",
-        color=two_color,
-    )
-    ax1.bar(x + 1.5 * width, rmse_full, width, label="full (k1-k4)", color=full_color)
-    ax1.set_xticks(x)
-    ax1.set_xticklabels(phase_labels, rotation=30, ha="right")
-    ax1.set_ylabel("RMSE [rad/s]")
-    ax1.legend()
-    ax1.grid(True, axis="y")
-    fig1.tight_layout()
-    fig1.savefig(plot_dir / "turn_rate_rmse.png", dpi=300, bbox_inches="tight")
-
-    # Figure 2: scatter plots per phase
-    n_cols = 2
-    n_rows = max(1, (len(phase_keys) + 1) // 2)
-    fig2, axes2 = plt.subplots(
-        n_rows, n_cols, figsize=(12, 4 * n_rows), sharex=False, sharey=False
-    )
-    axes2 = np.array(axes2).reshape(-1)
-
-    for ax, phase in zip(axes2, phase_keys):
-        pr = phase_results[phase]
-        xdata = pr["us_va"]
-        meas = pr["simple"]["meas"]
-
-        ax.scatter(
-            xdata, meas, s=8, alpha=0.35, color=meas_color, label=f"{turn_rate_label}"
-        )
-        if turn_rate_source != "yaw_dot" and pr.get("yaw_dot") is not None:
-            ax.scatter(
-                xdata, pr["yaw_dot"], s=8, alpha=0.25, color=palette[3], label="yaw_dot"
-            )
-        if turn_rate_source != "chi_dot" and pr.get("chi_dot") is not None:
-            ax.scatter(
-                xdata, pr["chi_dot"], s=8, alpha=0.25, color=palette[4], label="chi_dot"
-            )
-        ax.scatter(
-            xdata,
-            pr["simple"]["est"],
-            s=8,
-            alpha=0.35,
-            color=simple_color,
-            label="simple (no weight)",
-        )
-        ax.scatter(
-            xdata,
-            pr["two_term"]["est"],
-            s=8,
-            alpha=0.35,
-            color=two_color,
-            label="two_fit (no inertial forces)",
-        )
-        ax.scatter(
-            xdata,
-            pr["full"]["est"],
-            s=8,
-            alpha=0.35,
-            color=full_color,
-            label="full (k1-k4)",
-        )
-
-        x_line = np.linspace(np.nanmin(xdata), np.nanmax(xdata), 200)
-        ax.plot(
-            x_line,
-            pr["simple"]["gk"] * x_line,
-            color=symmetry_color,
-            lw=1.3,
-            label="symmetric (gk)",
-        )
-
-        p_label = (
-            phase_name.get(int(phase), str(phase))
-            if str(phase).isdigit()
-            else str(phase)
-        )
-        ax.set_title(p_label)
-        ax.set_xlabel(r"$u_s \cdot v_a$  [m/s]")
-        ax.set_ylabel(r"$\dot{\chi}$  [rad/s]")
-        ax.legend(fontsize=7)
-        ax.grid(True)
-
-    for ax in axes2[len(phase_keys) :]:
-        ax.set_visible(False)
-
-    fig2.tight_layout()
-    fig2.savefig(
-        plot_dir / "turn_rate_scatter_phases.png", dpi=300, bbox_inches="tight"
-    )
-
-    # Figure 3: one-cycle time-series with all three model estimates
+    # --- (b) representative scatter (reel-out phase) ------------------------
+    phase_target = 1
     phase_col = (
-        "flight_phase_index" if "flight_phase_index" in flight_data.columns else "cycle"
+        "flight_phase_index"
+        if "flight_phase_index" in flight_data.columns
+        else cycle_col
     )
-    cycle_col = "cycle" if "cycle" in flight_data.columns else phase_col
+    if phase_target in phase_results and phase_col is not None:
+        pr = phase_results[phase_target]
 
-    if plot_cycle is None and cycle_col in flight_data.columns:
-        available = flight_data[cycle_col].unique()
-        plot_cycle = int(available[len(available) // 2]) if len(available) else None
+        phase_mask_target = (flight_data[phase_col] == phase_target).to_numpy()
+        if cycle_col is not None:
+            cycles_in_phase = flight_data.loc[phase_mask_target, cycle_col].to_numpy()
+            unique_cycles = np.unique(cycles_in_phase)
+            n_scatter_cycles = 5
+            if len(unique_cycles) > n_scatter_cycles:
+                sel = np.linspace(0, len(unique_cycles) - 1, n_scatter_cycles).astype(
+                    int
+                )
+                selected_cycles = np.union1d(
+                    unique_cycles[sel], np.array(plot_cycles)
+                )
+            else:
+                selected_cycles = unique_cycles
+            sub_idx = np.isin(cycles_in_phase, selected_cycles)
+        else:
+            sub_idx = np.ones(len(pr["us_va"]), dtype=bool)
 
-    if plot_cycle is not None and cycle_col in flight_data.columns:
+        xdata = pr["us_va"][sub_idx]
+        meas = pr["simple"]["meas"][sub_idx]
+
+        ax_scatter.scatter(
+            xdata,
+            meas,
+            s=15,
+            alpha=0.5,
+            color=palette[0],
+            label=f"{turn_rate_label}",
+        )
+        if pr.get("yaw_dot_meas") is not None:
+            ax_scatter.scatter(
+                xdata,
+                pr["yaw_dot_meas"][sub_idx],
+                s=15,
+                alpha=0.5,
+                color=palette[3],
+                label=alt_label,
+            )
+        if has_course_term and "full_course_term" in pr:
+            ax_scatter.scatter(
+                xdata,
+                pr["full_course_term"]["est"][sub_idx],
+                s=10,
+                alpha=0.5,
+                color=course_color,
+                label="Full est.",
+            )
+        if pr.get("full_course_term_yaw") is not None:
+            ax_scatter.scatter(
+                xdata,
+                pr["full_course_term_yaw"]["est"][sub_idx],
+                s=10,
+                alpha=0.5,
+                color=full_yaw_color,
+                label=f"{alt_full_label} est.",
+            )
+
+        if len(xdata):
+            x_line = np.linspace(np.nanmin(xdata), np.nanmax(xdata), 200)
+            ax_scatter.plot(
+                x_line,
+                pr["simple_symmetric"]["gk"] * x_line,
+                color=sym_linear_color,
+                lw=2.0,
+                label="Sym. linear (gk)",
+            )
+
+        ax_scatter.set_title(
+            f"(b) Representative Scatter: {phase_name.get(phase_target, str(phase_target))}"
+        )
+        ax_scatter.set_xlabel(r"$u_s \cdot v_a$  [m/s]")
+        ax_scatter.set_ylabel(r"$\dot{\chi}$  [rad/s]")
+        ax_scatter.grid(True)
+
+    # --- (c, d, ...) time series --------------------------------------------
+    panel_letters = ["c", "d", "e", "f"]
+    for ax_ts, plot_cycle, panel_letter in zip(
+        ax_ts_list, plot_cycles, panel_letters
+    ):
+        if plot_cycle is None or cycle_col is None:
+            continue
         cyc_mask = (flight_data[cycle_col] == plot_cycle).to_numpy()
-        if cyc_mask.sum() > 0:
-            t_cyc = time[cyc_mask]
-            meas_cyc = chi_dot_meas[cyc_mask]
-            u_cyc = us[cyc_mask]
-            v_cyc = va[cyc_mask]
-            ph_cyc = flight_data.loc[cyc_mask, phase_col].to_numpy()
+        if cyc_mask.sum() == 0:
+            continue
 
-            est41_cyc = np.full(cyc_mask.sum(), np.nan)
-            est40_cyc = np.full(cyc_mask.sum(), np.nan)
-            estfull_cyc = np.full(cyc_mask.sum(), np.nan)
+        t_cyc = time[cyc_mask]
+        meas_cyc = chi_dot_meas[cyc_mask]
+        meas_alt_cyc = alt_turn_rate[cyc_mask] if alt_turn_rate is not None else None
+        u_cyc = us[cyc_mask]
+        v_cyc = va[cyc_mask]
+        ph_cyc = flight_data.loc[cyc_mask, phase_col].to_numpy()
 
-            for ph, pr in phase_results.items():
-                idx = ph_cyc == ph
-                if not idx.any():
-                    continue
-                est41_cyc[idx] = pr["simple"]["gk"] * v_cyc[idx] * u_cyc[idx]
-                est40_cyc[idx] = pr["two_term"]["c1"] * v_cyc[idx] * u_cyc[idx] + pr[
-                    "two_term"
-                ]["c2"] * np.sin(chi[cyc_mask][idx]) * np.cos(
-                    beta[cyc_mask][idx]
-                ) / np.maximum(
-                    v_cyc[idx], 1e-6
-                )
-                k1_ph, k2_ph = pr["full"]["k1"], pr["full"]["k2"]
-                k3_ph, k4_ph = pr["full"]["k3"], pr["full"]["k4"]
-                k_asym_ph = pr["full"]["k_asymmetry"]
-                num = k1_ph * v_cyc[idx] ** 2 * (
-                    u_cyc[idx] - k_asym_ph
-                ) + k3_ph * mass * g * np.sin(chi[cyc_mask][idx]) * np.cos(
-                    beta[cyc_mask][idx]
-                )
-                den = np.maximum(
-                    k4_ph * mass * v_tau[cyc_mask][idx] + k2_ph * v_cyc[idx], 1e-6
-                )
-                estfull_cyc[idx] = -num / den
+        est41_sym_cyc = np.full(cyc_mask.sum(), np.nan)
+        estfull_course_cyc = (
+            np.full(cyc_mask.sum(), np.nan) if has_course_term else None
+        )
+        estfull_yaw_cyc = np.full(cyc_mask.sum(), np.nan) if has_full_yaw else None
 
-            fig3, ax3 = plt.subplots(figsize=(14, 4))
-            ax3.plot(
-                t_cyc, meas_cyc, color=meas_color, lw=1.0, label=f"{turn_rate_label}"
+        for ph, pr in phase_results.items():
+            idx = ph_cyc == ph
+            if not idx.any():
+                continue
+            est41_sym_cyc[idx] = (
+                pr["simple_symmetric"]["gk"] * v_cyc[idx] * u_cyc[idx]
             )
-            if yaw_dot_flight is not None and turn_rate_source != "yaw_dot":
-                ax3.plot(
-                    t_cyc,
-                    yaw_dot_flight[cyc_mask],
-                    color=palette[3],
-                    lw=1.0,
-                    alpha=0.85,
-                    label="yaw_dot",
+
+            if has_course_term and "full_course_term" in pr:
+                fc = pr["full_course_term"]
+                num_ct = (
+                    fc["k1"] * v_cyc[idx] ** 2 * (u_cyc[idx] - fc["k_asymmetry"])
+                    + fc["k3"]
+                    * mass
+                    * g
+                    * np.sin(chi[cyc_mask][idx])
+                    * np.cos(beta[cyc_mask][idx])
+                    + fc["k5"] * np.cos(chi[cyc_mask][idx]) * np.cos(beta[cyc_mask][idx])
+                    + fc["k6"] * np.sin(beta[cyc_mask][idx])
                 )
-            if chi_dot_flight is not None and turn_rate_source != "chi_dot":
-                ax3.plot(
-                    t_cyc,
-                    chi_dot_flight[cyc_mask],
-                    color=palette[4],
-                    lw=1.0,
-                    alpha=0.85,
-                    label="chi_dot",
+                den_ct = np.maximum(
+                    fc["k4"] * mass * v_tau[cyc_mask][idx] + fc["k2"] * v_cyc[idx],
+                    1e-6,
                 )
-            ax3.plot(
+                estfull_course_cyc[idx] = -num_ct / den_ct
+
+            if has_full_yaw and pr.get("full_course_term_yaw") is not None:
+                fy = pr["full_course_term_yaw"]
+                num_yw = (
+                    fy["k1"] * v_cyc[idx] ** 2 * (u_cyc[idx] - fy["k_asymmetry"])
+                    + fy["k3"]
+                    * mass
+                    * g
+                    * np.sin(chi[cyc_mask][idx])
+                    * np.cos(beta[cyc_mask][idx])
+                    + fy["k5"] * np.cos(chi[cyc_mask][idx]) * np.cos(beta[cyc_mask][idx])
+                    + fy["k6"] * np.sin(beta[cyc_mask][idx])
+                )
+                den_yw = np.maximum(
+                    fy["k4"] * mass * v_tau[cyc_mask][idx] + fy["k2"] * v_cyc[idx],
+                    1e-6,
+                )
+                estfull_yaw_cyc[idx] = -num_yw / den_yw
+
+        ax_ts.plot(
+            t_cyc, meas_cyc, color=palette[0], lw=1.5, label=f"{turn_rate_label}"
+        )
+        if meas_alt_cyc is not None:
+            ax_ts.plot(
                 t_cyc,
-                est41_cyc,
-                color=simple_color,
-                lw=1.3,
-                ls="--",
-                label="simple (no weight)",
-            )
-            ax3.plot(
-                t_cyc,
-                est40_cyc,
-                color=two_color,
-                lw=1.3,
-                ls="-.",
-                label="two_fit (no inertial forces)",
-            )
-            ax3.plot(
-                t_cyc,
-                estfull_cyc,
-                color=full_color,
-                lw=1.3,
+                meas_alt_cyc,
+                color=palette[3],
+                lw=1.5,
+                label=alt_label,
                 ls="-",
-                label="full (k1-k4)",
+            )
+        ax_ts.plot(
+            t_cyc,
+            est41_sym_cyc,
+            color=sym_linear_color,
+            lw=1.5,
+            ls="--",
+            label="Sym. linear",
+        )
+        if has_course_term and estfull_course_cyc is not None:
+            ax_ts.plot(
+                t_cyc,
+                estfull_course_cyc,
+                color=course_color,
+                lw=1.5,
+                ls="-",
+                label="Full",
+            )
+        if has_full_yaw and estfull_yaw_cyc is not None:
+            ax_ts.plot(
+                t_cyc,
+                estfull_yaw_cyc,
+                color=full_yaw_color,
+                lw=1.5,
+                ls="-",
+                label=alt_full_label,
             )
 
-            phase_numeric = ph_cyc.astype(int) if ph_cyc.dtype.kind in "iuf" else ph_cyc
-            cmap = plt.cm.Set3
-            unique_phases = np.unique(phase_numeric)
-            for i, ph in enumerate(unique_phases):
-                idx = phase_numeric == ph
-                if not np.any(idx):
-                    continue
-                t_seg = t_cyc[idx]
-                ph_lbl = phase_name.get(int(ph), ph) if str(ph).isdigit() else str(ph)
-                ax3.axvspan(
-                    t_seg[0],
-                    t_seg[-1],
-                    alpha=0.15,
-                    color=cmap(i / max(len(unique_phases) - 1, 1)),
-                    label=ph_lbl,
-                )
-
-            meas_valid = meas_cyc[np.isfinite(meas_cyc)]
-            if len(meas_valid):
-                ym = 0.2 * (meas_valid.max() - meas_valid.min())
-                ax3.set_ylim(meas_valid.min() - ym, meas_valid.max() + ym)
-            ax3.set_xlabel("Time [s]")
-            ax3.set_ylabel(r"$\dot{\chi}$ [rad/s]")
-            ax3.legend(fontsize=8, loc="upper right")
-            ax3.grid(True)
-            fig3.tight_layout()
-            fig3.savefig(
-                plot_dir / f"turn_rate_cycle_{plot_cycle}.png",
-                dpi=300,
-                bbox_inches="tight",
+        phase_numeric = (
+            ph_cyc.astype(int) if ph_cyc.dtype.kind in "iuf" else ph_cyc
+        )
+        cmap = plt.cm.Set3
+        unique_phases = np.unique(phase_numeric)
+        for i, ph in enumerate(unique_phases):
+            idx = phase_numeric == ph
+            if not np.any(idx):
+                continue
+            t_seg = t_cyc[idx]
+            ph_lbl = (
+                phase_name.get(int(ph), ph) if str(ph).isdigit() else str(ph)
+            )
+            ax_ts.axvspan(
+                t_seg[0],
+                t_seg[-1],
+                alpha=0.15,
+                color=cmap(i / max(len(unique_phases) - 1, 1)),
+            )
+            ax_ts.text(
+                t_seg.mean(),
+                ax_ts.get_ylim()[1] * 0.9,
+                ph_lbl,
+                ha="center",
+                va="top",
+                fontsize=9,
+                alpha=0.7,
             )
 
-            # Figure 4: yaw angle + derived rate debug plot (only when applicable)
-            if selected_turn_rate_from_gradient and yaw_used_for_derivative is not None:
-                fig4, (ax4a, ax4b) = plt.subplots(2, 1, figsize=(14, 6), sharex=True)
-                ax4a.plot(
-                    t_cyc,
-                    yaw_used_for_derivative[cyc_mask],
-                    color=palette[7],
-                    lw=1.1,
-                    label=f"yaw used: {yaw_used_for_derivative_label}",
-                )
-                ax4a.set_ylabel("Yaw [rad]")
-                ax4a.legend(fontsize=8)
-                ax4a.grid(True)
-                ax4b.plot(
-                    t_cyc,
-                    meas_cyc,
-                    color=palette[3],
-                    lw=1.1,
-                    label=f"yaw_rate used for fit: {selected_turn_rate_source}",
-                )
-                ax4b.set_xlabel("Time [s]")
-                ax4b.set_ylabel("Yaw rate [rad/s]")
-                ax4b.legend(fontsize=8)
-                ax4b.grid(True)
-                fig4.tight_layout()
-                fig4.savefig(
-                    plot_dir / f"yaw_used_to_derive_yaw_rate_cycle_{plot_cycle}.png",
-                    dpi=300,
-                    bbox_inches="tight",
-                )
+        meas_valid = meas_cyc[np.isfinite(meas_cyc)]
+        if len(meas_valid):
+            ym = 0.2 * (meas_valid.max() - meas_valid.min())
+            ax_ts.set_ylim(meas_valid.min() - ym, meas_valid.max() + ym)
+        ax_ts.set_xlabel("Time [s]")
+        ax_ts.set_ylabel(r"$\dot{\chi}$ [rad/s]")
+        ax_ts.set_title(
+            f"({panel_letter}) Time series comparison (Cycle {plot_cycle})"
+        )
+        ax_ts.grid(True)
 
+    # Share y-axis across scatter and time-series panels.
+    shared_axes = [ax_scatter, *ax_ts_list]
+    if shared_axes:
+        y_lows, y_highs = zip(*(ax.get_ylim() for ax in shared_axes))
+        y_lim = (min(y_lows), max(y_highs))
+        for ax in shared_axes:
+            ax.set_ylim(y_lim)
+
+    handles, labels = [], []
+    for ax in [ax_bar, ax_scatter, *ax_ts_list]:
+        for h, l in zip(*ax.get_legend_handles_labels()):
+            if (
+                l not in labels
+                and not l.endswith(" est.")
+                and not l.startswith("Sym. linear (gk)")
+            ):
+                handles.append(h)
+                labels.append(l)
+
+    fig.tight_layout(rect=[0, 0, 1, 0.93])
+    fig.legend(
+        handles,
+        labels,
+        loc="upper center",
+        bbox_to_anchor=(0.5, 0.99),
+        ncol=min(len(labels), 5),
+    )
+    pdf_path = plot_dir / "turn_rate_composite.pdf"
+    fig.savefig(pdf_path, format="pdf", bbox_inches="tight")
+    print(f"Saved composite figure to {pdf_path}")
     plt.show()
 
 
@@ -1196,6 +1364,7 @@ def plot_turn_rate_identification(
     cut=0,
     cycles=None,
     plot_cycle=None,
+    plot_cycles=None,
     phases_to_fit=None,
     asym_mode="fit",
     turn_rate_source="chi_dot",
@@ -1286,35 +1455,88 @@ def plot_turn_rate_identification(
     v_tau = np.sqrt(v_beta**2 + v_phi**2)
     chi = np.unwrap(np.arctan2(v_phi, v_beta))
 
-    v_beta_dot = np.gradient(v_beta, time)
-    v_phi_dot = np.gradient(v_phi, time)
+    # Acceleration-based chi_dot in the tangential plane (with outlier removal).
+    # Falls back to numerical gradient of velocity if accel columns are missing.
+    smooth_win = 15  # matches SMOOTH_WIN in identify_aero_parameters_turn_law.py
+    accel_cols = [
+        "kite_accelerationas_x",
+        "kite_acceleratiason_y",
+        "kite_acceleratasion_z",
+    ]
+    if all(c in fd.columns for c in accel_cols):
+        a_kite = np.array([fd[c].to_numpy() for c in accel_cols])
+        a_kite = np.vstack(
+            [_remove_outliers_turn(row, size=21, threshold=3.0) for row in a_kite]
+        )
+        a_kite = np.vstack(
+            [
+                np.convolve(row, np.ones(smooth_win) / smooth_win, mode="same")
+                for row in a_kite
+            ]
+        )
+    else:
+        v_kite = np.array(
+            [
+                res["kite_velocity_x"],
+                res["kite_velocity_y"],
+                res["kite_velocity_z"],
+            ]
+        )
+        a_kite = np.gradient(v_kite, time, axis=1)
+
+    r_hat = position / np.maximum(r_norm, 1e-6)
+    v_kite = np.array(
+        [res["kite_velocity_x"], res["kite_velocity_y"], res["kite_velocity_z"]]
+    )
+    v_r = np.sum(r_hat * v_kite, axis=0)
+    v_tau_vec = v_kite - v_r * r_hat
+    e_chi = v_tau_vec / np.maximum(v_tau, 1e-6)
+    e_n = np.cross(r_hat, e_chi, axis=0)
+    a_n = np.sum(a_kite * e_n, axis=0)
+    chi_dot_kinematic_raw = -a_n / np.maximum(v_tau, 1e-6)
+    chi_dot_kinematic_raw = _remove_outliers_turn(
+        chi_dot_kinematic_raw, size=21, threshold=3.0
+    )
     chi_dot_kinematic = np.convolve(
-        (v_beta * v_phi_dot - v_phi * v_beta_dot) / np.maximum(v_tau**2, 1e-6),
-        np.ones(21) / 21,
-        mode="same",
+        chi_dot_kinematic_raw, np.ones(smooth_win) / smooth_win, mode="same"
     )
 
     # Select measurement signal
     chi_dot_flight = yaw_dot_flight = None
     if "chi_dot" in fd.columns:
-        chi_dot_flight = np.convolve(
-            fd["chi_dot"].to_numpy(), np.ones(21) / 21, mode="same"
-        )
+        raw = _remove_outliers_turn(fd["chi_dot"].to_numpy())
+        chi_dot_flight = np.convolve(raw, np.ones(smooth_win) / smooth_win, mode="same")
     yaw_rate_col = f"kite_yaw_rate_{yaw_rate_sensor_id}"
     if yaw_rate_col in fd.columns:
-        yaw_dot_flight = np.convolve(
-            fd[yaw_rate_col].to_numpy(), np.ones(21) / 21, mode="same"
-        )
+        raw = _remove_outliers_turn(fd[yaw_rate_col].to_numpy())
+        yaw_dot_flight = np.convolve(raw, np.ones(smooth_win) / smooth_win, mode="same")
     elif "kite_yaw_rate" in fd.columns:
-        yaw_dot_flight = np.convolve(
-            fd["kite_yaw_rate"].to_numpy(), np.ones(21) / 21, mode="same"
-        )
+        raw = _remove_outliers_turn(fd["kite_yaw_rate"].to_numpy())
+        yaw_dot_flight = np.convolve(raw, np.ones(smooth_win) / smooth_win, mode="same")
+    else:
+        # Fallback: gradient of yaw-angle column (kite_yaw_<id> or kite_yaw_0)
+        yaw_angle_col = f"kite_yaw_{yaw_rate_sensor_id}"
+        if yaw_angle_col not in fd.columns:
+            yaw_angle_col = "kite_yaw_0"
+        if yaw_angle_col in fd.columns:
+            raw = _remove_outliers_turn(
+                np.gradient(fd[yaw_angle_col].to_numpy(), time)
+            )
+            yaw_dot_flight = np.convolve(
+                raw, np.ones(smooth_win) / smooth_win, mode="same"
+            )
+            print(
+                f"No yaw-rate column found; derived from gradient of '{yaw_angle_col}'."
+            )
 
     if turn_rate_source == "chi_dot":
         chi_dot_meas = (
             chi_dot_flight if chi_dot_flight is not None else chi_dot_kinematic
         )
-        turn_rate_label = "chi_dot"
+        turn_rate_label = "Course rate"
+        alt_turn_rate = yaw_dot_flight
+        alt_label = "Heading rate"
+        alt_full_label = "Full (yaw rate)"
     else:
         chi_dot_meas = (
             yaw_dot_flight if yaw_dot_flight is not None else chi_dot_kinematic
@@ -1322,6 +1544,11 @@ def plot_turn_rate_identification(
         turn_rate_label = (
             yaw_rate_col if yaw_dot_flight is not None else "chi_dot_kinematic"
         )
+        alt_turn_rate = (
+            chi_dot_flight if chi_dot_flight is not None else chi_dot_kinematic
+        )
+        alt_label = "Course rate"
+        alt_full_label = "Full (course rate)"
 
     # Per-phase fitting (split by flight phase, not cycles)
     if "flight_phase_index" not in fd.columns:
@@ -1391,6 +1618,56 @@ def plot_turn_rate_identification(
             gravity_mode="fit",
         )
 
+        # Eq. (39) full + course term — warm-started from full model
+        (
+            (k1_ct, k2_ct, k3_ct, k4_ct, k5_ct, k6_ct, ka39),
+            est_full_ct,
+        ) = _fit_full_rational_course_term_turn(
+            fd_p,
+            u,
+            v,
+            vt,
+            c,
+            b,
+            mass=mass,
+            g=g,
+            x0=[k1, k2, k3, k4, 0.0, 0.0, ka38],
+            asym_mode=asym_mode,
+            gravity_mode="fit",
+        )
+
+        # Eq. (39) refit against the alternative turn-rate measurement.
+        alt_p = alt_turn_rate[mask] if alt_turn_rate is not None else None
+        full_yaw_block = None
+        if alt_p is not None:
+            (
+                (k1_yw, k2_yw, k3_yw, k4_yw, k5_yw, k6_yw, ka_yw),
+                est_full_yaw,
+            ) = _fit_full_rational_course_term_turn(
+                alt_p,
+                u,
+                v,
+                vt,
+                c,
+                b,
+                mass=mass,
+                g=g,
+                x0=[k1_ct, k2_ct, k3_ct, k4_ct, k5_ct, k6_ct, ka39],
+                asym_mode=asym_mode,
+                gravity_mode="fit",
+            )
+            full_yaw_block = {
+                "k1": k1_yw,
+                "k2": k2_yw,
+                "k3": k3_yw,
+                "k4": k4_yw,
+                "k5": k5_yw,
+                "k6": k6_yw,
+                "k_asymmetry": ka_yw,
+                "RMSE": _rmse_turn(alt_p, est_full_yaw),
+                "est": est_full_yaw,
+            }
+
         phase_results[phase] = {
             "simple": {
                 "gk": gk,
@@ -1430,8 +1707,21 @@ def plot_turn_rate_identification(
                 "RMSE": _rmse_turn(fd_p, est_full_ng),
                 "est": est_full_ng,
             },
+            "full_course_term": {
+                "k1": k1_ct,
+                "k2": k2_ct,
+                "k3": k3_ct,
+                "k4": k4_ct,
+                "k5": k5_ct,
+                "k6": k6_ct,
+                "k_asymmetry": ka39,
+                "RMSE": _rmse_turn(fd_p, est_full_ct),
+                "est": est_full_ct,
+            },
+            "full_course_term_yaw": full_yaw_block,
             "yaw_dot": yaw_dot_flight[mask] if yaw_dot_flight is not None else None,
             "chi_dot": chi_dot_flight[mask] if chi_dot_flight is not None else None,
+            "yaw_dot_meas": alt_p,
             "signals": {"u": u, "v": v, "vt": vt, "c": c, "b": b},
             "us_va": u * v,
             "time": time[mask],
@@ -1441,6 +1731,9 @@ def plot_turn_rate_identification(
     if not phase_results:
         print("No phases with enough data for turn-rate identification.")
         return
+
+    if plot_cycles is None:
+        plot_cycles = [plot_cycle] if plot_cycle is not None else None
 
     plot_turn_rate_fit_results(
         phase_results=phase_results,
@@ -1454,9 +1747,12 @@ def plot_turn_rate_identification(
         va=va,
         yaw_dot_flight=yaw_dot_flight,
         chi_dot_flight=chi_dot_flight,
+        alt_turn_rate=alt_turn_rate,
+        alt_label=alt_label,
+        alt_full_label=alt_full_label,
         turn_rate_source=turn_rate_source,
         turn_rate_label=turn_rate_label,
-        plot_cycle=plot_cycle,
+        plot_cycles=plot_cycles,
         phase_name=phase_name,
         palette=palette,
         plot_dir=plot_dir,
