@@ -186,7 +186,8 @@ class ExtendedKalmanFilter:
             # Calculate optimal state x(k+1|k+1) for valid z
             self.x_k1_k1 = np.array(self.x_k1_k + K @ (z_valid - z_k1_k)).reshape(-1)
 
-        self.P_k1_k1 = (np.eye(self.n) - K @ Hx) @ self.P_k1_k
+        IKH = np.eye(self.n) - K @ Hx
+        self.P_k1_k1 = IKH @ self.P_k1_k @ IKH.T + K @ R @ K.T
         std_x_cor = np.sqrt(
             np.diag(self.P_k1_k1)
         )  # Standard deviation of state estimation error (for validation)
