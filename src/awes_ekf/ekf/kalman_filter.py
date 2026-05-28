@@ -155,7 +155,7 @@ class ExtendedKalmanFilter:
                     - np.array((Hx @ (self.x_k1_k - eta1).T)).reshape(-1)
                 )
                 eta2 = np.array(eta2).reshape(-1)
-                err = np.linalg.norm(eta2 - eta1) / np.linalg.norm(eta1)
+                err = np.linalg.norm(eta2 - eta1) / max(np.linalg.norm(eta1), 1e-10)
 
             self.IEKF_itts = itts
             self.x_k1_k1 = eta2
