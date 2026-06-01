@@ -92,7 +92,7 @@ class ExtendedKalmanFilter:
     def predict(self, ts):
 
         # Calculate Jacobians
-        self.Fx = np.array(self.calc_Fx(self.x_k1_k, self.u, self.x_k1_k1))
+        self.Fx = np.array(self.calc_Fx(self.x_k1_k, self.u, self.x_k1_k))
         # self.G = np.array(self.calc_G(self.x_k1_k,self.u))
         nx = self.Fx.shape[0]
 
