@@ -202,8 +202,9 @@ def plot_wind_speed_height_bins(results, flight_data, lidar_heights=[], savefig=
     t_lidar = []
     i_change = []
     column: str = ""
-    for column in flight_data.columns:
-        if "Wind_Speed_m_s" in column:
+    for col in flight_data.columns:
+        if "Wind_Speed_m_s" in col:
+            column = col
             break
     for i in range(len(flight_data) - 1):
         if column and flight_data[column].iloc[i] != flight_data[column].iloc[i + 1]:
