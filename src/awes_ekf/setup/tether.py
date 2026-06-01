@@ -31,8 +31,13 @@ class Tether:
     def __init__(self, kite, kcu, obsData, elastic=True, **kwargs):
         """ "Create tether model class from material name and diameter"""
         material_name = kwargs.get("material_name")
-        diameter: float = float(kwargs.get("diameter", 0.0))
-        n_elements: int = int(kwargs.get("n_elements", 0))
+        if "diameter" not in kwargs or "n_elements" not in kwargs:
+            raise ValueError("diameter and n_elements must be provided")
+
+        diameter: float = float(kwargs["diameter"])
+        n_elements: int = int(kwargs["n_elements"])
+        if diameter <= 0 or n_elements <= 0:
+            raise ValueError("diameter and n_elements must be positive")
 
         self.density: float = 0.0
         self.cd: float = 0.0
