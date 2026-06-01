@@ -64,7 +64,7 @@ def llh_to_enu(ref_lat, ref_lon, ref_alt, lats, lons, alts):
 
 
 def calculate_log_wind_velocity(uf, wdir, wvel_z, z):
-    if isinstance(uf, ca.SX) or isinstance(z, ca.SX):
+    if any(isinstance(v, (ca.SX, ca.MX)) for v in (uf, wdir, wvel_z, z)):
         wvel = uf / kappa * ca.log(z / z0)
         return ca.vertcat(wvel * ca.cos(wdir), wvel * ca.sin(wdir), wvel_z)
     wvel = uf / kappa * np.log(z / z0)

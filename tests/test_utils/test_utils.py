@@ -1,7 +1,7 @@
 import numpy as np
 import casadi as ca
 import pytest
-from awes_ekf.utils import project_onto_plane, rotate_vector_around_axis, calculate_angle, calculate_angle_2vec, rank_observability_matrix, calculate_polar_coordinates, calculate_airflow_angles, calculate_euler_from_reference_frame
+from awes_ekf.utils import project_onto_plane, rotate_vector_around_axis, calculate_angle, calculate_angle_2vec, rank_observability_matrix, calculate_polar_coordinates, calculate_airflow_angles, calculate_euler_from_reference_frame, calculate_log_wind_velocity
 
 # Test for project_onto_plane function
 @pytest.mark.parametrize("vector, plane_normal, expected", [
@@ -72,3 +72,11 @@ def test_calculate_euler_from_reference_frame():
     result = calculate_euler_from_reference_frame(dcm)
     assert np.allclose(result, expected, atol=1e-6)
 
+
+def test_calculate_log_wind_velocity_accepts_mx_inputs():
+    uf = ca.MX.sym("uf")
+    result = calculate_log_wind_velocity(uf, 0.0, 0.0, 10.0)
+    f = ca.Function("f", [uf], [result])
+    evaluated = np.array(f(1.0)).flatten()
+    assert np.all(np.isfinite(evaluated))
+    assert evaluated.shape == (3,)
