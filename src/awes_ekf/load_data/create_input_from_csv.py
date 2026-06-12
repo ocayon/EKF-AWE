@@ -253,6 +253,24 @@ def find_initial_state_vector(
     CD=0.15,
     CS=0,
 ):
+    # Solve the tether shape with the same wind the observation model will
+    # use. With the log profile the wind state is initialized from the guess
+    # interpreted at 10 m reference height, so the observation model sees
+    # the guess scaled up to kite height; solving the shape with the raw
+    # guess instead (as before) left a multi-meter tether pseudo-measurement
+    # residual at the first update (the step-0 "Terminating IEKF: exceeded
+    # max iterations" warning, repeated after every reinitialization).
+    wind_velocity = np.asarray(wind_velocity, dtype=float)
+    solve_wind = wind_velocity
+    if simConfig.log_profile:
+        wvel = (
+            np.linalg.norm(wind_velocity)
+            * np.log(ekf_input.kite_position[2] / z0)
+            / np.log(10 / z0)
+        )
+        wdir = np.arctan2(wind_velocity[1], wind_velocity[0])
+        solve_wind = np.array([wvel * np.cos(wdir), wvel * np.sin(wdir), 0.0])
+
     tether_input = TetherInput(
         kite_position=ekf_input.kite_position,
         kite_velocity=ekf_input.kite_velocity,
@@ -263,7 +281,7 @@ def find_initial_state_vector(
         tether_elevation=ekf_input.tether_elevation_ground,
         tether_azimuth=ekf_input.tether_azimuth_ground,
         tether_length=ekf_input.tether_length,
-        wind_velocity=wind_velocity,
+        wind_velocity=solve_wind,
     )
 
     tether_input = tether.solve_tether_shape(tether_input)
@@ -280,15 +298,15 @@ def find_initial_state_vector(
     x0 = np.vstack((tether_input.kite_position, tether_input.kite_velocity))
 
     if simConfig.log_profile:
-        uf = np.linalg.norm(tether_input.wind_velocity) * kappa / np.log(10 / z0)
-        ground_winddir = np.arctan2(
-            tether_input.wind_velocity[1], tether_input.wind_velocity[0]
-        )
+        # Friction velocity from the original guess at 10 m reference height
+        # (NOT from solve_wind, which is already scaled to kite height).
+        uf = np.linalg.norm(wind_velocity) * kappa / np.log(10 / z0)
+        ground_winddir = np.arctan2(wind_velocity[1], wind_velocity[0])
         x0 = np.append(
             x0, [uf, ground_winddir, 0]
         )  # Initial wind velocity and direction
     else:
-        x0 = np.append(x0, tether_input.wind_velocity)  # Initial wind velocity
+        x0 = np.append(x0, wind_velocity)  # Initial wind velocity
     x0 = np.append(
         x0,
         [
