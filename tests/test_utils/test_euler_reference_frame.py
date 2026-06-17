@@ -9,7 +9,7 @@ import pytest
 
 @pytest.mark.parametrize("dcm, expected", [
     (np.eye(3), (0, 0, 0)),
-    (np.array([[0, -1, 0], [-1, 0, 0], [0, 0, 1]]), (0, 0, np.pi)),
+    (np.array([[-1, 0, 0], [0, -1, 0], [0, 0, 1]]), (0, 0, np.pi)),
     (np.array([[1,0, 0], [0, -1, 0], [0, 0, -1]]), (np.pi, 0, 0)),
 ])
 def test_calculate_euler_from_reference_frame(dcm, expected):
