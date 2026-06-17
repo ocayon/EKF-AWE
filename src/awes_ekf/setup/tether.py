@@ -201,7 +201,12 @@ class Tether:
                 - np.pi * self.cf * ca.sin(theta) * ca.cos(theta) ** 2
             )
             dir_D = vaj / ca.norm_2(vaj)  # Drag direction
-            dir_L = -(ej - ca.dot(ej, dir_D) * dir_D)  # Lift direction
+            # Lift is perpendicular to the apparent wind. The rejection of ej
+            # from dir_D has magnitude sin(theta), and cl_t is the coefficient
+            # for a UNIT lift direction, so this must be normalised; leaving it
+            # unnormalised scaled the lift by an extra sin(theta).
+            lift_perp = ej - ca.dot(ej, dir_D) * dir_D
+            dir_L = -lift_perp / (ca.norm_2(lift_perp) + 1e-9)  # Lift direction (unit)
             dynamic_pressure_area = (
                 0.5 * rho * ca.norm_2(vaj) ** 2 * l_unstrained * self.diameter
             )
@@ -212,12 +217,16 @@ class Tether:
 
             # Determine drag at point mass j.
             if kcu is None:
-                if self.n_elements == 1:
-                    faj = 0.5 * lift_j + 0.5 * drag_j
-                elif last_element:
+                if self.n_elements == 1 or last_element:
+                    # Boundary (kite) node carries a half-element point mass
+                    # (m_s/2 + kite mass), so it takes half the segment aero.
                     faj = 0.5 * drag_j + 0.5 * lift_j
                 else:
-                    faj = 0.5 * drag_j + 0.5 * lift_j
+                    # Interior node carries a full element mass (m_s) for
+                    # gravity, so it must carry the full element aero too; the
+                    # earlier 0.5 halved the tether drag. Matches the KCU branch
+                    # (faj = lift_j + drag_j).
+                    faj = drag_j + lift_j
             else:
                 if last_element:
                     faj = 0.5 * drag_bridles + 0.5 * lift_bridles
@@ -355,10 +364,9 @@ class Tether:
         CD = ca.dot(aerodynamic_force, dir_D) / (
             0.5 * rho * kite.area * ca.norm_2(va) ** 2
         )
-        dir_L = (
-            tension_kite / ca.norm_2(tension_kite)
-            - ca.dot(tension_kite / ca.norm_2(tension_kite), dir_D) * dir_D
-        )
+        tension_unit = tension_kite / ca.norm_2(tension_kite)
+        dir_L = tension_unit - ca.dot(tension_unit, dir_D) * dir_D
+        dir_L = dir_L / (ca.norm_2(dir_L) + 1e-9)  # unit lift direction
         CL = ca.dot(aerodynamic_force, dir_L) / (
             0.5 * rho * kite.area * ca.norm_2(va) ** 2
         )
