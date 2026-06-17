@@ -217,7 +217,7 @@ def process_data(config_data: dict, log_directory: Path) -> pd.DataFrame:
     # Airspeed and kite-specific data
     flight_data["kite_apparent_windspeed"] = log["airspeed_apparent_windspeed"]
     flight_data["bridle_angle_of_attack"] = log["airspeed_angle_of_attack"]
-    if config_data["kite"]["model_name"] == "v9":
+    if "airspeed_sideslip_angle" in log.columns:
         flight_data["bridle_sideslip_angle"] = log["airspeed_sideslip_angle"]
     flight_data["kite_airspeed_temperature"] = log["airspeed_temperature"]
 
