@@ -201,11 +201,13 @@ def plot_wind_speed_height_bins(results, flight_data, lidar_heights=[], savefig=
     wdir250 = []
     t_lidar = []
     i_change = []
-    for column in flight_data.columns:
-        if "Wind_Speed_m_s" in column:
+    column: str = ""
+    for col in flight_data.columns:
+        if "Wind_Speed_m_s" in col:
+            column = col
             break
     for i in range(len(flight_data) - 1):
-        if flight_data[column].iloc[i] != flight_data[column].iloc[i + 1]:
+        if column and flight_data[column].iloc[i] != flight_data[column].iloc[i + 1]:
             wvel = results["wind_speed_horizontal"].iloc[i0:i]
             wdir = np.degrees(results["wind_direction"].iloc[i0:i])
             wvel100.append(np.mean(wvel[results.kite_position_z < 100]))
@@ -656,7 +658,9 @@ def plot_probability_density(x, y, fig, axs, xlabel=None, ylabel=None):
 
 
 def plot_hexbin_density(x, y, xlabel=None, ylabel=None):
-    fig, ax = plt.subplots()
+    from matplotlib.axes import Axes
+    fig, _ax = plt.subplots()
+    ax: Axes = _ax  # type: ignore[assignment]
     hb = ax.hexbin(x, y, gridsize=50, cmap="viridis", bins="log")
     cb = fig.colorbar(hb, ax=ax, label="log10(N)")
     ax.set_xlabel(xlabel)
@@ -1048,13 +1052,14 @@ def plot_kite_reference_frame(results, flight_data, imus, frame_axis="xyz"):
     from mpl_toolkits.mplot3d import Axes3D
 
     fig = plt.figure()
-    ax = fig.add_subplot(111, projection="3d")
+    from typing import Any
+    ax: Any = fig.add_subplot(111, projection="3d")
     ax.set_xlabel("X_N")
     ax.set_ylabel("Y_E")
     ax.set_zlabel("Z_U")
     spacing = 40
+    len_arrow = 30
     for i in np.arange(0, len(flight_data), spacing):
-        len_arrow = 30
         # Calculate EKF tether orientation based on euler angles and plot it
         dcm = calculate_reference_frame_euler(
             results.kite_roll.iloc[i],
@@ -1248,7 +1253,8 @@ def plot_kinetic_energy_spectrum(results, flight_data, ax, savefig=False):
     subrange_mask = (pos_fft_freq > subrange_start) & (pos_fft_freq < subrange_end)
 
     # if np.any(subrange_mask):
-    slope, intercept, r_value, p_value, std_err = linregress(np.log(pos_fft_freq[subrange_mask]), np.log(pos_energy_spectrum[subrange_mask]))
+    linreg_result = linregress(np.log(pos_fft_freq[subrange_mask]), np.log(pos_energy_spectrum[subrange_mask]))
+    intercept: float = float(linreg_result.intercept)  # type: ignore[union-attr]
     #     plt.plot(pos_fft_freq[subrange_mask], np.exp(intercept) * pos_fft_freq[subrange_mask] ** slope, 'r--', label=f'Fitted Slope: {slope:.2f}')
     #     print(f"The calculated slope is: {slope:.2f}")
     # else:
@@ -1256,7 +1262,7 @@ def plot_kinetic_energy_spectrum(results, flight_data, ax, savefig=False):
 
     slope = -5/3
     freq = np.linspace(1e-3, 20, 100)
-    plt.plot(freq, np.exp(intercept) *freq ** slope, '--', label=f'Kolmogorov: -5/3', color = colors[0])
+    plt.plot(freq, np.exp(intercept) * freq ** slope, '--', label='Kolmogorov: -5/3', color=colors[0])
     plt.legend()
 
 def plot_turbulence_intensity(results,flight_data, height, ax, savefig=False):
@@ -1432,7 +1438,8 @@ def personalized_plot(results, flight_data, config_data):
     gs = gridspec.GridSpec(n, 2, width_ratios=[1, 1], height_ratios=[0.5 for _ in range(n)])
 
     # 3D plot of the trajectory
-    ax_3d = fig.add_subplot(gs[0:3, 0], projection="3d")
+    from typing import Any as _Any
+    ax_3d: _Any = fig.add_subplot(gs[0:3, 0], projection="3d")
     ax_3d.plot(x, y, z, label="Trajectory")
     red_point_3d, = ax_3d.plot([x[0]], [y[0]], [z[0]], "ro")
     ax_3d.set_xlabel("X")
@@ -1444,7 +1451,8 @@ def personalized_plot(results, flight_data, config_data):
     # Time series plots for each selected variable
     ax_vars = []
     for i, variable in enumerate(variables):
-        ax = fig.add_subplot(gs[i, 1:])
+        from typing import Any as _AnyT
+        ax: _AnyT = fig.add_subplot(gs[i, 1:])
         label = labels[i][0]  # Use provided label or default to variable name
         line, = ax.plot(t, variable, label=label)
         red_point, = ax.plot([t[0]], [variable[0]], 'ro')
@@ -1495,11 +1503,11 @@ def personalized_plot(results, flight_data, config_data):
             var = line.get_ydata()
             red_point.set_data([t[idx]], [var[idx]])
 
-        fig.canvas.draw_idle()
+        fig.canvas.draw_idle()  # type: ignore[union-attr]
 
     def update_view(val):
         ax_3d.view_init(elev=elev_slider.val, azim=azim_slider.val)
-        fig.canvas.draw_idle()
+        fig.canvas.draw_idle()  # type: ignore[union-attr]
 
     # Connect sliders to update functions
     time_slider.on_changed(update_time)
@@ -1519,7 +1527,9 @@ def plot_ekf_performance(results, flight_data, config_data):
                             and Norm of Normalized Residuals.
     """
     set_plot_style_no_latex()
-    fig, ax = plt.subplots(1, 1, figsize=(12, 6))
+    from matplotlib.axes import Axes
+    fig, _ax = plt.subplots(1, 1, figsize=(12, 6))
+    ax: Axes = _ax  # type: ignore[assignment]
 
     # Plot NIS, Mahalanobis Distance, and Norm of Normalized Residuals
     plot_time_series(flight_data, results["nis"], ax)

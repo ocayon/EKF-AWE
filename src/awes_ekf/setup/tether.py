@@ -4,6 +4,7 @@ from scipy.optimize import least_squares
 from awes_ekf.utils import project_onto_plane, calculate_angle_2vec
 import casadi as ca
 from dataclasses import dataclass, field
+from typing import Optional, Any
 
 tether_materials = {
     "Dyneema-SK78": {
@@ -30,8 +31,17 @@ class Tether:
     def __init__(self, kite, kcu, obsData, elastic=True, **kwargs):
         """ "Create tether model class from material name and diameter"""
         material_name = kwargs.get("material_name")
-        diameter = kwargs.get("diameter")
-        n_elements = kwargs.get("n_elements")
+        if "diameter" not in kwargs or "n_elements" not in kwargs:
+            raise ValueError("diameter and n_elements must be provided")
+
+        diameter: float = float(kwargs["diameter"])
+        n_elements: int = int(kwargs["n_elements"])
+        if diameter <= 0 or n_elements <= 0:
+            raise ValueError("diameter and n_elements must be positive")
+
+        self.density: float = 0.0
+        self.cd: float = 0.0
+        self.Youngs_modulus: float = 0.0
 
         if material_name in tether_materials:
             material_params = tether_materials[material_name]
@@ -97,6 +107,12 @@ class Tether:
             ca.norm_2(r_kite) ** 2
         )  # Tether angular velocity, with respect to the tether attachment point
 
+        a_kite: Any = ca.SX.sym("a_kite_default", 3)
+        alpha: Any = ca.SX.zeros(3)
+        omega_kite: Any = ca.SX.zeros(3)
+        a_kcu: Any = ca.SX.zeros(3)
+        v_kcu: Any = ca.SX.zeros(3)
+
         if self.obsData.kite_acceleration:
             a_kite = ca.SX.sym("a_kite", 3)
             # Find instantaneuous center of rotation and omega of the kite
@@ -130,6 +146,14 @@ class Tether:
 
         velocities = ca.SX.zeros((n_elements + 1, 3))
         accelerations = ca.SX.zeros((n_elements + 1, 3))
+
+        vwj: Any = ca.SX.zeros(3)
+        vj: Any = ca.SX.zeros(3)
+        vaj: Any = ca.SX.zeros(3)
+        aerodynamic_force: Any = ca.SX.zeros(3)
+        D_kcu: Any = ca.SX.zeros(1)
+        drag_bridles: Any = ca.SX.zeros(3)
+        lift_bridles: Any = ca.SX.zeros(3)
 
         drag_tether = 0
         stretched_tether_length = l_s  # Stretched
@@ -502,9 +526,9 @@ class TetherInput:
     tether_elevation: float
     tether_azimuth: float
     wind_velocity: np.ndarray = field(default_factory=lambda: np.zeros(3))
-    kite_acceleration: np.ndarray = None
-    kcu_acceleration: np.ndarray = None
-    kcu_velocity: np.ndarray = None
+    kite_acceleration: Optional[np.ndarray] = None
+    kcu_acceleration: Optional[np.ndarray] = None
+    kcu_velocity: Optional[np.ndarray] = None
 
     def create_input_tuple(self, obsData):
 

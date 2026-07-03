@@ -29,7 +29,9 @@ def get_color_list():
 
 def visualize_palette():
     """Visualize the color palette."""
-    fig, ax = plt.subplots(figsize=(20, 2))
+    from matplotlib.axes import Axes
+    fig, _ax = plt.subplots(figsize=(20, 2))
+    ax: Axes = _ax  # type: ignore[assignment]
     for i, (color_name, color_hex) in enumerate(PALETTE.items()):
         ax.add_patch(plt.Rectangle((i * 2, 0), 2, 2, color=color_hex))
         ax.text(i * 2 + 1, 1, color_name, color='black' if color_name == 'White' else 'white',

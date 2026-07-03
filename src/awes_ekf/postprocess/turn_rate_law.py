@@ -9,6 +9,7 @@ def find_turn_rate_law(yaw_rate, apparent_windspeed, steering_input, elevation, 
     Find the turn rate law of the kite.
     """
 
+    A = np.vstack([apparent_windspeed * steering_input]).T  # default
     if coordinated_turn:
         if va_eq_vk:
             if mass_effects:

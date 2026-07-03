@@ -96,28 +96,30 @@ def initialize_ekf(
 
                 # Find offset
                 # TODO: Define universal namings and create timeseries class
+                input_variable = variable
+                output_variable = variable
                 if variable == "bridle_angle_of_attack":
-                    variable = "kite_angle_of_attack"
+                    output_variable = "kite_angle_of_attack"
                 converged_idx = int(3000)
                 estimated_variable = np.array(
-                    [ekf_output.__dict__[variable] for ekf_output in ekf_output_list]
+                    [ekf_output.__dict__[output_variable] for ekf_output in ekf_output_list]
                 )
                 measured_variable = np.array(
                     [
-                        ekf_input.__dict__[variable]
+                        ekf_input.__dict__[input_variable]
                         for ekf_input in ekf_input_list[:offset_sim_length]
                     ]
                 )
                 offset = find_offset(
-                    estimated_variable[converged_idx::],
-                    measured_variable[converged_idx : len(ekf_input_list)],
+                    estimated_variable[converged_idx:],
+                    measured_variable[converged_idx:offset_sim_length],
                     offset_range=[-15, 15],
                 )
-                print(f"Offset for {variable}: {offset}")
+                print(f"Offset for {input_variable}: {offset}")
 
                 # Update offset
                 for i in range(len(ekf_input_list)):
-                    ekf_input_list[i].__dict__[variable] += offset
+                    ekf_input_list[i].__dict__[input_variable] += offset
 
     return ekf, ekf_input_list
 

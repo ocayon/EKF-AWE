@@ -1,0 +1,5 @@
+{
+  "pythonVersion": "3.12",
+  "reportMissingModuleSource": "none",
+  "stubPath": "stubs"
+}
