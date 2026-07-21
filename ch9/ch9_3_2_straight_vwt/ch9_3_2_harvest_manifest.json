@@ -1,0 +1,188 @@
+{
+  "acceptance_notes": {
+    "coefficient_warning": "EKF coefficient estimates are model states/outputs, not direct measurements.",
+    "expected_manual_qc": "Run plot_straight_vwt_harvest_qc.py and inspect the retained intervals before using these cases for dissertation plots."
+  },
+  "bin_definitions": {
+    "V_a": {
+      "percentiles": [
+        16.0,
+        50.0,
+        84.0
+      ],
+      "source_column": "mean_V_a_ms",
+      "width": 2.0
+    },
+    "tether_length": {
+      "percentiles": [
+        16.0,
+        50.0,
+        84.0
+      ],
+      "source_column": "mean_tether_length_m",
+      "width": 25.0
+    }
+  },
+  "campaign_config": {
+    "2019": {
+      "depower_conversion": "convert_2019_to_2025_best_guess_section_9_1",
+      "force_priority": [
+        "tether_force_kite",
+        "load_cell_main_force",
+        "ground_tether_force"
+      ],
+      "time_range_optional": null,
+      "year": 2019
+    },
+    "2025": {
+      "depower_conversion": "use_2025_convention",
+      "force_priority": [
+        "tether_force_kite",
+        "ground_tether_force",
+        "sensor_tether_force"
+      ],
+      "time_range_optional": [
+        700.0,
+        1000.0
+      ],
+      "year": 2025
+    }
+  },
+  "column_definitions": {
+    "CD_kcu_ekf/CD_bridles_ekf/CD_tether_ekf": "Parasitic drag coefficients exported by EKF-AWE, nondimensionalized with kite reference area.",
+    "CL_ekf/CD_ekf/L_over_D_ekf": "EKF state/model estimates; not direct aerodynamic force-balance measurements. These are wing-level coefficients.",
+    "CL_kite_ekf/CD_kite_ekf/L_over_D_kite_ekf": "Kite-level validation coefficients. CL_kite_ekf is the exported wing lift coefficient; CD_kite_ekf adds exported KCU and bridle parasitic drag coefficients to CD_ekf. Tether drag is exported separately as CD_tether_ekf and is not included.",
+    "depower_tape_length_m": "0.2 + 5 u_dp_ch9.",
+    "preferred_tether_force_N": "First positive finite force source in the campaign force-source priority list.",
+    "u_dp_ch9": "Dimensionless dissertation depower convention for Ch. 9.",
+    "u_s_ch9": "Dimensionless steering, positive/negative signed, near zero for symmetric validation."
+  },
+  "counts": {
+    "askite_case_rows": 13,
+    "binned_tether_rows": 9,
+    "binned_va_rows": 13,
+    "retained_windows_by_campaign": {
+      "2019": 520,
+      "2025": 151
+    },
+    "samples_retained": 10176,
+    "samples_total": 89976,
+    "windows_retained": 671,
+    "windows_total": 17993
+  },
+  "created_time_utc": "2026-05-23T14:26:44.013738+00:00",
+  "depower_conversion_rules": {
+    "2019": "Retain u_p_2019_raw_or_normalized and use Section 9.1 best guess u_dp_ch9 = 0.2564 - 0.0768 u_p_2019. depower_tape_length_m = 0.2 + 5 u_dp_ch9.",
+    "2025": "Use documented 2025 convention. If kcu_actual_depower is stored as percent, u_dp_ch9 = kcu_actual_depower / 100. depower_tape_length_m = 0.2 + 5 u_dp_ch9."
+  },
+  "effective_year_filters": {
+    "2019": {
+      "max_abs_u_s": 0.05,
+      "max_abs_yaw_rate_deg_s": 90.0,
+      "max_path_curvature_1pm": 0.6666666666666666,
+      "only_reel_out": true,
+      "time_bin_s": 2.0,
+      "time_bin_step_s": 0.5,
+      "time_range_s": null,
+      "u_dp_max": 0.2,
+      "u_dp_min": 0
+    },
+    "2025": {
+      "max_abs_u_s": 0.05,
+      "max_abs_yaw_rate_deg_s": 90.0,
+      "max_path_curvature_1pm": 0.6666666666666666,
+      "only_reel_out": true,
+      "time_bin_s": 2.0,
+      "time_bin_step_s": 0.5,
+      "time_range_s": [
+        700.0,
+        1000.0
+      ],
+      "u_dp_max": 0.42,
+      "u_dp_min": 0.0
+    }
+  },
+  "filter_thresholds": {
+    "max_abs_slack_m": 30.0,
+    "max_abs_us": null,
+    "max_abs_yaw_rate_deg_s": null,
+    "max_depower_std": 0.015,
+    "max_force_cv": 0.12,
+    "max_lateral_accel_ms2": 8.0,
+    "max_reel_speed_std": 0.35,
+    "max_steering_rate_s": 0.2,
+    "max_tether_length_m": 1000.0,
+    "max_tether_length_std": 0.75,
+    "max_u_dp_2019": null,
+    "max_va_cv": 0.08,
+    "max_va_ms": 60.0,
+    "min_abs_turn_radius_m": 150.0,
+    "min_force_n": 50.0,
+    "min_reelout_speed_ms": 0.0,
+    "min_tether_length_m": 20.0,
+    "min_va_ms": 5.0,
+    "rolling_quantile": 0.84,
+    "window_s": null,
+    "window_step_s": null
+  },
+  "force_source_priority": {
+    "2019": [
+      "tether_force_kite",
+      "load_cell_main_force",
+      "ground_tether_force"
+    ],
+    "2025": [
+      "tether_force_kite",
+      "ground_tether_force",
+      "sensor_tether_force"
+    ]
+  },
+  "git_commit": "da1bbbfcd2c0aa528501c58ac305b2d168680373",
+  "script": "/home/jellepoland/ownCloud/phd/code/EKF-AWE/harvest_straight_vwt_validation_cases.py",
+  "source_h5": {
+    "2019": {
+      "modified_time_utc": "2026-01-08T14:01:24.978910+00:00",
+      "path": "/home/jellepoland/ownCloud/phd/code/EKF-AWE/results/v3/v3_2019-10-08_t26.h5",
+      "size_bytes": 76271216
+    },
+    "2025": {
+      "modified_time_utc": "2026-01-19T12:57:14.668016+00:00",
+      "path": "/home/jellepoland/ownCloud/phd/code/EKF-AWE/results/v3/v3_2025-10-09.h5",
+      "size_bytes": 22955152
+    }
+  },
+  "warnings": [
+    "2019: u_dp_ch9 uses the approximate Section 9.1 conversion u_dp = 0.2564 - 0.0768 u_p_2019; treat 2019 geometry validation as trend-only.",
+    "2019: force source 'load_cell_main_force' has no positive finite samples and will not be selected.",
+    "2025: u_dp_ch9 mean over validation window 700.0-1000.0 s is 0.422, near the Section 9.1 value 0.42.",
+    "2025: force source 'sensor_tether_force' has no positive finite samples and will not be selected."
+  ],
+  "year_default_filters": {
+    "2019": {
+      "max_abs_u_s": 0.05,
+      "max_abs_yaw_rate_deg_s": 90.0,
+      "max_path_curvature_1pm": 0.6666666666666666,
+      "only_reel_out": true,
+      "time_bin_s": 2.0,
+      "time_bin_step_s": 0.5,
+      "time_range_s": null,
+      "u_dp_max": 0.2,
+      "u_dp_min": 0
+    },
+    "2025": {
+      "max_abs_u_s": 0.05,
+      "max_abs_yaw_rate_deg_s": 90.0,
+      "max_path_curvature_1pm": 0.6666666666666666,
+      "only_reel_out": true,
+      "time_bin_s": 2.0,
+      "time_bin_step_s": 0.5,
+      "time_range_s": [
+        700.0,
+        1000.0
+      ],
+      "u_dp_max": 0.42,
+      "u_dp_min": 0.0
+    }
+  },
+  "year_default_filters_enabled": true
+}

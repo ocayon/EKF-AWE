@@ -19,3 +19,10 @@ processed_data/
 ./ekf_debug.logunwanted_file.txt
 ekf_debug.log
 .DS_Store   
+# Raw samples CSV exceeds the 100 MB GitHub limit; the .gz alongside it is tracked
+ch9/ch9_3_2_straight_vwt/ch9_3_2_straight_samples.csv
+
+# Chapter 9 outputs are published deliberately (see phd-dissertation-chapter-9)
+!ch9/processed_data/
+!ch9/results/
+!ch9/ch9_3_2_straight_vwt/results/

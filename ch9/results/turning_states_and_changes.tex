@@ -1,0 +1,17 @@
+%
+\begin{table}[h!]
+\centering
+\caption{
+Inputs and -- photogrammetry and EKF-derived -- estimated outputs for straight flight $PS_1$ and turning flight $PT_1$, see \autoref{fig:straight_vs_turning_camera_frame}.
+}
+\label{tab:turning_states_and_changes}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccccccc} \hline
+State & $u_\mathrm{dp}$ ($\unit{-}$) & $u_\mathrm{s}$ ($\unit{-}$) & $b$ ($\unit{m}$) & $v_\mathrm{a}$ ($\unit{m s^{-1}}$) & $\alpha_\mathrm{fl}$ ($\unit{\degree}$) & $\beta_\mathrm{s}$ ($\unit{\degree}$) & $F_\mathrm{T,KCU}$ ($\unit{N}$) & $\epsilon_\mathrm{p,avg}$ ($\unit{cm}$) \\ \hline
+Straight flight & 0.3937 & 0.0003 & 7.30 & 10.53 & 13.3 & -6 & 1179 & 2.91 \\
+Right turn      & 0.3937 & -0.1870 & 7.25 & 15.46 & 11.5 & -3 & 4371 & 2.94 \\
+\hline
+\end{tabular}%
+}
+\end{table}
+%

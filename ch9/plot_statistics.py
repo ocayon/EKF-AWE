@@ -1,0 +1,1097 @@
+"""
+Two-column comparison plots of 2019 vs 2025 flight statistics.
+Produces statistics_all.pdf and statistics_turns.pdf.
+"""
+
+from pathlib import Path
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from awes_ekf.load_data.read_data import read_results
+from awes_ekf.plotting.color_palette import get_color_list, set_plot_style
+from awes_ekf.setup.settings import SimulationConfig
+from awes_ekf.setup.kite import PointMassEKF
+from awes_ekf.setup.kcu import KCU
+from utils import STATS_2019, STATS_2025
+
+
+def convert_2019_depower_to_2025_updata(
+    x19_depower,
+    x19_pow=22.68,
+    x19_dep=0.02,
+    ld_0=1.098,
+    delta_d=0.08,
+    delta_ld_max=4.8,
+    ld_2025_offset=0.2,
+    ld_2025_scale=5.0,
+):
+    """
+    Convert 2019 kcu_actual_depower (depower angle in degrees) to 2025-equivalent up_data.
+
+    This conversion assumes both systems measure the same physical tape deployment (ld),
+    using the paper's physics as the bridge:
+
+    1. Map 2019 depower angle → paper's normalized up_paper ∈ [0,1]
+    2. Calculate physical tape deployment: ld = ld_0 + δd·Δld,max·(1 - up_paper)
+    3. Convert to 2025 notation: up_data_2025 = (ld - 0.2) / 5
+
+    From paper (Table 2, Equations 1-2):
+    - ld_0 = 1.098 m (baseline at fully powered)
+    - δd = 0.08 (8% of max tape used, from 2019 campaign)
+    - Δld,max = 4.8 m (maximum tape capacity)
+
+    2025 affine relation: ld = 0.2 + 5·up_data_2025
+
+    Verification:
+    - At powered (up_paper=1): ld=1.098m → up_data_2025=0.1796
+    - At depowered (up_paper=0): ld=1.482m → up_data_2025=0.2564
+
+    Note: If observed 2025 range differs from [0.18, 0.26], it may indicate:
+    - Different δd value used in 2025 operations
+    - Different ld_0 baseline configuration
+    - Different physical measurements (not the same tape)
+
+    Parameters:
+    -----------
+    x19_depower : array-like
+        2019 depower angle in degrees
+    x19_pow : float
+        2019 depower angle at fully powered state (degrees)
+    x19_dep : float
+        2019 depower angle at fully depowered state (degrees)
+    ld_0 : float
+        Baseline tape deployment at fully powered (meters)
+    delta_d : float
+        Fraction of max tape capacity used (dimensionless)
+    delta_ld_max : float
+        Maximum tape capacity (meters)
+    ld_2025_offset : float
+        2025 affine relation offset (meters)
+    ld_2025_scale : float
+        2025 affine relation scale (meters)
+
+    Returns:
+    --------
+    up_data_2025 : array-like
+        2025-equivalent up_data values
+    """
+    x19_depower = np.asarray(x19_depower)
+
+    # Step 1: Normalize 2019 depower to paper's up_paper ∈ [0, 1]
+    # up_paper = 1 at fully powered, 0 at fully depowered
+    up_paper_2019 = np.clip((x19_depower - x19_dep) / (x19_pow - x19_dep), 0, 1)
+
+    # Step 2: Calculate physical tape deployment using paper's physics
+    # ld = ld_0 + δd·Δld,max·(1 - up_paper)
+    ld_2019 = ld_0 + delta_d * delta_ld_max * (1.0 - up_paper_2019)
+
+    # Step 3: Convert to 2025 notation
+    # From ld = 0.2 + 5·up_data_2025, solve for up_data_2025
+    up_data_2025 = (ld_2019 - ld_2025_offset) / ld_2025_scale
+
+    return up_data_2025
+
+
+def load_and_process_data(
+    year, month, day, kite_model, addition, time_range, downsample_frac
+):
+    """Load and process flight data for a given year."""
+    results, flight_data, config_data = read_results(
+        year, month, day, kite_model, addition=addition
+    )
+
+    # Time-based filtering
+    time_mask = (results["time"] >= time_range[0]) & (results["time"] <= time_range[1])
+    results = results.loc[time_mask].reset_index(drop=True)
+    flight_data = flight_data.loc[time_mask].reset_index(drop=True)
+
+    # Create system components
+    simConfig = SimulationConfig(**config_data["simulation_parameters"])
+    kite = PointMassEKF(simConfig, **config_data["kite"])
+    kcu = KCU(**config_data["kcu"])
+
+    # Prepare yaw rate
+    flight_data["kite_yaw_rate"] = flight_data["kite_yaw_rate_1"]
+    flight_data["kcu_actual_steering_delay"] = np.roll(
+        flight_data["kcu_actual_steering"], int(8)
+    )
+
+    # Downsample and filter to powered mode
+    downsampled_data = flight_data.sample(frac=downsample_frac, random_state=42)
+    downsampled_results = results.loc[downsampled_data.index]
+    downsampled_data = downsampled_data[downsampled_data["powered"] == "powered"]
+    downsampled_results = downsampled_results.loc[downsampled_data.index]
+
+    downsampled_sorted = downsampled_data.sort_values("time")
+    downsampled_results_sorted = downsampled_results.loc[downsampled_sorted.index]
+
+    return (
+        downsampled_data,
+        downsampled_results,
+        downsampled_sorted,
+        downsampled_results_sorted,
+    )
+
+
+def get_first_available_series(df, columns):
+    """Return first matching column as a series, else None."""
+    for col in columns:
+        if col in df.columns:
+            return df[col]
+    return None
+
+
+def get_multi_row_signals(
+    downsampled_data,
+    downsampled_results_sorted,
+    downsampled_sorted,
+):
+    """Define the multi-row signal list."""
+    tether_force_series = get_first_available_series(
+        downsampled_sorted,
+        ["ground_tether_force", "load_cell_main_force", "sensor_tether_force"],
+    )
+    tether_reelout_speed_series = get_first_available_series(
+        downsampled_sorted,
+        ["tether_reelout_speed", "ground_tether_reelout_speed"],
+    )
+    traction_power_proxy_series = (
+        tether_force_series * tether_reelout_speed_series
+        if tether_force_series is not None and tether_reelout_speed_series is not None
+        else None
+    )
+    wing_lift_coeff_series = (
+        downsampled_results_sorted["wing_lift_coefficient"]
+        if "wing_lift_coefficient" in downsampled_results_sorted.columns
+        else None
+    )
+    wing_drag_coeff_series = (
+        downsampled_results_sorted["wing_drag_coefficient"]
+        if "wing_drag_coefficient" in downsampled_results_sorted.columns
+        else None
+    )
+    wing_lift_over_drag_series = (
+        wing_lift_coeff_series / wing_drag_coeff_series.replace(0.0, np.nan)
+        if wing_lift_coeff_series is not None and wing_drag_coeff_series is not None
+        else None
+    )
+
+    signals = [
+        (
+            "tether_length",
+            (
+                downsampled_sorted["tether_length"]
+                if "tether_length" in downsampled_sorted.columns
+                else None
+            ),
+            r"$\mathrm{tether\_length}\;(\mathrm{m})$",
+            r"\mathrm{m}",
+        ),
+        (
+            "ground_tether_force",
+            tether_force_series,
+            r"$\mathrm{ground\_tether\_force}\;(\mathrm{N})$",
+            r"\mathrm{N}",
+        ),
+        (
+            "traction_power_proxy",
+            traction_power_proxy_series,
+            r"$\mathrm{traction\_power\_proxy}\;(\mathrm{W})$",
+            r"\mathrm{W}",
+        ),
+        (
+            "kite_elevation",
+            (
+                np.degrees(downsampled_sorted["kite_elevation"])
+                if "kite_elevation" in downsampled_sorted.columns
+                else None
+            ),
+            r"$\mathrm{kite\_elevation}\;(^\circ)$",
+            r"^\circ",
+        ),
+        (
+            "wind_speed_horizontal",
+            (
+                downsampled_results_sorted["wind_speed_horizontal"]
+                if "wind_speed_horizontal" in downsampled_results_sorted.columns
+                else None
+            ),
+            r"$\mathrm{wind\_speed\_horizontal}\;(\mathrm{m\,s^{-1}})$",
+            r"\mathrm{m\,s^{-1}}",
+        ),
+        (
+            "wing_angle_of_attack",
+            (
+                downsampled_results_sorted["wing_angle_of_attack"]
+                if "wing_angle_of_attack" in downsampled_results_sorted.columns
+                else None
+            ),
+            r"$\mathrm{wing\_angle\_of\_attack}\;(^\circ)$",
+            r"^\circ",
+        ),
+        (
+            "wing_lift_coefficient",
+            wing_lift_coeff_series,
+            r"$\mathrm{wing\_lift\_coefficient}\;(-)$",
+            r"-",
+        ),
+        (
+            "wing_drag_coefficient",
+            wing_drag_coeff_series,
+            r"$\mathrm{wing\_drag\_coefficient}\;(-)$",
+            r"-",
+        ),
+        (
+            "wing_lift_over_drag",
+            wing_lift_over_drag_series,
+            (
+                r"$\mathrm{wing\_lift\_coefficient}"
+                r"/\mathrm{wing\_drag\_coefficient}\;(-)$"
+            ),
+            r"-",
+        ),
+        (
+            "kite_apparent_windspeed",
+            (
+                downsampled_results_sorted["kite_apparent_windspeed"]
+                if "kite_apparent_windspeed" in downsampled_results_sorted.columns
+                else None
+            ),
+            r"$\mathrm{kite\_apparent\_windspeed}\;(\mathrm{m\,s^{-1}})$",
+            r"\mathrm{m\,s^{-1}}",
+        ),
+        (
+            "radius_turn",
+            (
+                downsampled_results_sorted["radius_turn"]
+                if "radius_turn" in downsampled_results_sorted.columns
+                else None
+            ),
+            r"$\mathrm{radius\_turn}\;(\mathrm{m})$",
+            r"\mathrm{m}",
+        ),
+        (
+            "tether_force_kite",
+            (
+                downsampled_results_sorted["tether_force_kite"]
+                if "tether_force_kite" in downsampled_results_sorted.columns
+                else None
+            ),
+            r"$\mathrm{tether\_force\_kite}\;(\mathrm{N})$",
+            r"\mathrm{N}",
+        ),
+        # (
+        #     "kite_thrust_force",
+        #     (
+        #         downsampled_results_sorted["kite_thrust_force"]
+        #         if "kite_thrust_force" in downsampled_results_sorted.columns
+        #         else None
+        #     ),
+        #     r"$\mathrm{kite\_thrust\_force}\;(\mathrm{N})$",
+        #     r"\mathrm{N}",
+        # ),
+        (
+            "kcu_actual_depower",
+            (
+                downsampled_sorted["kcu_actual_depower"]
+                if "kcu_actual_depower" in downsampled_sorted.columns
+                else None
+            ),
+            r"$\mathrm{kcu\_actual\_depower}$",
+            r"",
+        ),
+        (
+            "kcu_actual_depower_raw_deg",
+            (
+                downsampled_sorted["kcu_actual_depower_raw_deg"]
+                if "kcu_actual_depower_raw_deg" in downsampled_sorted.columns
+                else None
+            ),
+            r"$\mathrm{kcu\_actual\_depower\_raw}\;(^\circ)$",
+            r"^\circ",
+        ),
+        (
+            "kcu_actual_steering",
+            (
+                downsampled_sorted["kcu_actual_steering"]
+                if "kcu_actual_steering" in downsampled_sorted.columns
+                else None
+            ),
+            r"$\mathrm{kcu\_actual\_steering}\;(\%)$",
+            r"\%",
+        ),
+    ]
+
+    return [entry for entry in signals if entry[1] is not None]
+
+
+def plot_multi_row_comparison(
+    data_2019,
+    results_2019,
+    sorted_2019,
+    results_sorted_2019,
+    data_2025,
+    results_2025,
+    sorted_2025,
+    results_sorted_2025,
+    colors,
+    output_filename,
+):
+    """Create 2-column multi-row comparison plot (all data)."""
+
+    # Get signal definitions
+    signals_2019 = get_multi_row_signals(data_2019, results_sorted_2019, sorted_2019)
+    signals_2025 = get_multi_row_signals(data_2025, results_sorted_2025, sorted_2025)
+
+    signals_by_name_2019 = {s[0]: s for s in signals_2019}
+    signals_by_name_2025 = {s[0]: s for s in signals_2025}
+
+    signal_order = [s[0] for s in signals_2019]
+    signal_order.extend(
+        [s[0] for s in signals_2025 if s[0] not in signals_by_name_2019]
+    )
+
+    n_rows = len(signal_order)
+    if n_rows == 0:
+        print("Skipping all-data comparison: no plottable signals.")
+        return
+
+    fig, axes = plt.subplots(n_rows, 2, figsize=(12, 3 * n_rows), sharex=False)
+
+    if n_rows == 1:
+        axes = axes.reshape(1, -1)
+
+    for row_idx, signal_name in enumerate(signal_order):
+        sig_2019 = signals_by_name_2019.get(signal_name)
+        sig_2025 = signals_by_name_2025.get(signal_name)
+        fallback_label = sig_2019[2] if sig_2019 is not None else sig_2025[2]
+
+        # 2019 column (left)
+        ax_left = axes[row_idx, 0]
+        if sig_2019 is not None:
+            _, series_19, label_19, unit_19 = sig_2019
+            mean_val = float(series_19.mean())
+            min_val = float(series_19.min())
+            max_val = float(series_19.max())
+
+            ax_left.plot(
+                sorted_2019["time"],
+                series_19,
+                color=colors[0],
+                marker=".",
+                linestyle="None",
+                alpha=0.6,
+                label=label_19,
+            )
+            ax_left.axhline(
+                mean_val,
+                color=colors[1],
+                linestyle="--",
+                label=rf"$\mathrm{{mean}} = {mean_val:.3f}\,{unit_19}$",
+            )
+            ax_left.axhline(
+                min_val,
+                color=colors[2],
+                linestyle=":",
+                label=rf"$\mathrm{{min}} = {min_val:.3f}\,{unit_19}$",
+            )
+            ax_left.axhline(
+                max_val,
+                color=colors[3],
+                linestyle=":",
+                label=rf"$\mathrm{{max}} = {max_val:.3f}\,{unit_19}$",
+            )
+            ax_left.set_ylabel(label_19)
+            ax_left.legend(frameon=True, loc="upper left", framealpha=1.0, fontsize=8)
+        else:
+            ax_left.set_ylabel(fallback_label)
+            ax_left.text(
+                0.5,
+                0.5,
+                "Signal unavailable",
+                transform=ax_left.transAxes,
+                ha="center",
+                va="center",
+            )
+        if signal_name == "radius_turn":
+            ax_left.set_ylim(0, 400)
+        ax_left.set_title("2019" if row_idx == 0 else "")
+
+        # 2025 column (right)
+        ax_right = axes[row_idx, 1]
+        if sig_2025 is not None:
+            _, series_25, label_25, unit_25 = sig_2025
+            mean_val = float(series_25.mean())
+            min_val = float(series_25.min())
+            max_val = float(series_25.max())
+
+            ax_right.plot(
+                sorted_2025["time"],
+                series_25,
+                color=colors[0],
+                marker=".",
+                linestyle="None",
+                alpha=0.6,
+                label=label_25,
+            )
+            ax_right.axhline(
+                mean_val,
+                color=colors[1],
+                linestyle="--",
+                label=rf"$\mathrm{{mean}} = {mean_val:.3f}\,{unit_25}$",
+            )
+            ax_right.axhline(
+                min_val,
+                color=colors[2],
+                linestyle=":",
+                label=rf"$\mathrm{{min}} = {min_val:.3f}\,{unit_25}$",
+            )
+            ax_right.axhline(
+                max_val,
+                color=colors[3],
+                linestyle=":",
+                label=rf"$\mathrm{{max}} = {max_val:.3f}\,{unit_25}$",
+            )
+            ax_right.set_ylabel(label_25)
+            ax_right.legend(frameon=True, loc="upper left", framealpha=1.0, fontsize=8)
+        else:
+            ax_right.set_ylabel(fallback_label)
+            ax_right.text(
+                0.5,
+                0.5,
+                "Signal unavailable",
+                transform=ax_right.transAxes,
+                ha="center",
+                va="center",
+            )
+        if signal_name == "radius_turn":
+            ax_right.set_ylim(0, 400)
+        ax_right.set_title("2025" if row_idx == 0 else "")
+
+    axes[-1, 0].set_xlabel("time (s)")
+    axes[-1, 1].set_xlabel("time (s)")
+
+    fig.tight_layout()
+    fig.savefig(output_filename, dpi=150)
+    print(f"Saved {output_filename}")
+    plt.close(fig)
+
+
+def plot_turn_comparison(
+    data_2019,
+    results_2019,
+    sorted_2019,
+    results_sorted_2019,
+    data_2025,
+    results_2025,
+    sorted_2025,
+    results_sorted_2025,
+    colors,
+    output_filename,
+):
+    """Create 2-column multi-row comparison plot (left and right turns)."""
+
+    # Define steering thresholds
+    upper_threshold_19 = 0.08 * 100  # Convert to % scale for 2019 data
+    upper_threshold_25 = 0.08 * 100
+
+    # Get masks for left and right turns
+    x_full_kcu_sorted_19 = -sorted_2019["kcu_actual_steering_delay"] / 100
+    mask_turn_19 = np.abs(x_full_kcu_sorted_19) > upper_threshold_19 / 100
+
+    x_full_kcu_sorted_25 = -sorted_2025["kcu_actual_steering_delay"] / 100
+    mask_turn_25 = np.abs(x_full_kcu_sorted_25) > upper_threshold_25 / 100
+
+    # Filter signals to turn periods
+    signals_2019 = get_multi_row_signals(data_2019, results_sorted_2019, sorted_2019)
+    signals_2025 = get_multi_row_signals(data_2025, results_sorted_2025, sorted_2025)
+
+    signals_2019_turn = {}
+    for name, series, label, unit in signals_2019:
+        series_turn = series.loc[mask_turn_19]
+        if not series_turn.empty:
+            signals_2019_turn[name] = (name, series_turn, label, unit)
+
+    signals_2025_turn = {}
+    for name, series, label, unit in signals_2025:
+        series_turn = series.loc[mask_turn_25]
+        if not series_turn.empty:
+            signals_2025_turn[name] = (name, series_turn, label, unit)
+
+    signal_order = list(signals_2019_turn.keys())
+    signal_order.extend(
+        [name for name in signals_2025_turn if name not in signals_2019_turn]
+    )
+
+    n_rows = len(signal_order)
+    if n_rows == 0:
+        print("Skipping turn comparison: no plottable turn signals.")
+        return
+
+    fig, axes = plt.subplots(n_rows, 2, figsize=(12, 3 * n_rows), sharex=False)
+
+    if n_rows == 1:
+        axes = axes.reshape(1, -1)
+
+    time_turn_2019 = sorted_2019.loc[mask_turn_19, "time"]
+    time_turn_2025 = sorted_2025.loc[mask_turn_25, "time"]
+
+    for row_idx, signal_name in enumerate(signal_order):
+        sig_2019 = signals_2019_turn.get(signal_name)
+        sig_2025 = signals_2025_turn.get(signal_name)
+        fallback_label = sig_2019[2] if sig_2019 is not None else sig_2025[2]
+
+        # 2019 column (left)
+        ax_left = axes[row_idx, 0]
+        if sig_2019 is not None:
+            _, series_19, label_19, unit_19 = sig_2019
+            mean_val = float(series_19.mean())
+            min_val = float(series_19.min())
+            max_val = float(series_19.max())
+
+            ax_left.plot(
+                time_turn_2019,
+                series_19,
+                color=colors[0],
+                marker=".",
+                linestyle="None",
+                alpha=0.6,
+                label=label_19,
+            )
+            ax_left.axhline(
+                mean_val,
+                color=colors[1],
+                linestyle="--",
+                label=rf"$\mathrm{{mean}} = {mean_val:.3f}\,{unit_19}$",
+            )
+            ax_left.axhline(
+                min_val,
+                color=colors[2],
+                linestyle=":",
+                label=rf"$\mathrm{{min}} = {min_val:.3f}\,{unit_19}$",
+            )
+            ax_left.axhline(
+                max_val,
+                color=colors[3],
+                linestyle=":",
+                label=rf"$\mathrm{{max}} = {max_val:.3f}\,{unit_19}$",
+            )
+            ax_left.set_ylabel(label_19)
+            ax_left.legend(frameon=True, loc="upper left", framealpha=1.0, fontsize=8)
+        else:
+            ax_left.set_ylabel(fallback_label)
+            ax_left.text(
+                0.5,
+                0.5,
+                "Signal unavailable",
+                transform=ax_left.transAxes,
+                ha="center",
+                va="center",
+            )
+        if signal_name == "radius_turn":
+            ax_left.set_ylim(0, 400)
+        ax_left.set_title("2019 (Left + Right Turns)" if row_idx == 0 else "")
+
+        # 2025 column (right)
+        ax_right = axes[row_idx, 1]
+        if sig_2025 is not None:
+            _, series_25, label_25, unit_25 = sig_2025
+            mean_val = float(series_25.mean())
+            min_val = float(series_25.min())
+            max_val = float(series_25.max())
+
+            ax_right.plot(
+                time_turn_2025,
+                series_25,
+                color=colors[0],
+                marker=".",
+                linestyle="None",
+                alpha=0.6,
+                label=label_25,
+            )
+            ax_right.axhline(
+                mean_val,
+                color=colors[1],
+                linestyle="--",
+                label=rf"$\mathrm{{mean}} = {mean_val:.3f}\,{unit_25}$",
+            )
+            ax_right.axhline(
+                min_val,
+                color=colors[2],
+                linestyle=":",
+                label=rf"$\mathrm{{min}} = {min_val:.3f}\,{unit_25}$",
+            )
+            ax_right.axhline(
+                max_val,
+                color=colors[3],
+                linestyle=":",
+                label=rf"$\mathrm{{max}} = {max_val:.3f}\,{unit_25}$",
+            )
+            ax_right.set_ylabel(label_25)
+            ax_right.legend(frameon=True, loc="upper left", framealpha=1.0, fontsize=8)
+        else:
+            ax_right.set_ylabel(fallback_label)
+            ax_right.text(
+                0.5,
+                0.5,
+                "Signal unavailable",
+                transform=ax_right.transAxes,
+                ha="center",
+                va="center",
+            )
+        if signal_name == "radius_turn":
+            ax_right.set_ylim(0, 400)
+        ax_right.set_title("2025 (Left + Right Turns)" if row_idx == 0 else "")
+
+    axes[-1, 0].set_xlabel("time (s)")
+    axes[-1, 1].set_xlabel("time (s)")
+
+    fig.tight_layout()
+    fig.savefig(output_filename, dpi=150)
+    print(f"Saved {output_filename}")
+    plt.close(fig)
+
+
+def plot_tether_reelout_speed_comparison(
+    sorted_2019,
+    sorted_2025,
+    colors,
+    output_filename,
+):
+    """Create a dedicated 2-column plot for tether reelout speed."""
+    reelout_2019 = get_first_available_series(
+        sorted_2019, ["tether_reelout_speed", "ground_tether_reelout_speed"]
+    )
+    reelout_2025 = get_first_available_series(
+        sorted_2025, ["tether_reelout_speed", "ground_tether_reelout_speed"]
+    )
+
+    if reelout_2019 is None or reelout_2025 is None:
+        print(
+            "Skipping tether reelout speed plot: missing reelout speed in one dataset."
+        )
+        return
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 3.5), sharey=True)
+    label = r"$\mathrm{tether\_reelout\_speed}\;(\mathrm{m\,s^{-1}})$"
+    unit = r"\mathrm{m\,s^{-1}}"
+
+    plot_specs = [
+        (axes[0], sorted_2019["time"], reelout_2019, "2019"),
+        (axes[1], sorted_2025["time"], reelout_2025, "2025"),
+    ]
+
+    for ax, time_series, reelout_series, title in plot_specs:
+        mean_val = float(reelout_series.mean())
+        min_val = float(reelout_series.min())
+        max_val = float(reelout_series.max())
+
+        ax.plot(
+            time_series,
+            reelout_series,
+            color=colors[0],
+            marker=".",
+            linestyle="None",
+            alpha=0.6,
+            label=label,
+        )
+        ax.axhline(
+            mean_val,
+            color=colors[1],
+            linestyle="--",
+            label=rf"$\mathrm{{mean}} = {mean_val:.3f}\,{unit}$",
+        )
+        ax.axhline(
+            min_val,
+            color=colors[2],
+            linestyle=":",
+            label=rf"$\mathrm{{min}} = {min_val:.3f}\,{unit}$",
+        )
+        ax.axhline(
+            max_val,
+            color=colors[3],
+            linestyle=":",
+            label=rf"$\mathrm{{max}} = {max_val:.3f}\,{unit}$",
+        )
+        ax.set_title(title)
+        ax.set_xlabel("time (s)")
+        ax.legend(frameon=True, loc="upper left", framealpha=1.0, fontsize=8)
+
+    axes[0].set_ylabel(label)
+
+    fig.tight_layout()
+    fig.savefig(output_filename, dpi=150)
+    print(f"Saved {output_filename}")
+    plt.close(fig)
+
+
+def plot_straight_comparison(
+    data_2019,
+    results_2019,
+    sorted_2019,
+    results_sorted_2019,
+    data_2025,
+    results_2025,
+    sorted_2025,
+    results_sorted_2025,
+    colors,
+    output_filename,
+    steering_threshold=0.05,
+):
+    """Create 2-column multi-row comparison plot (straight flight: |us| < threshold)."""
+
+    # Filter to straight flight: |us| < threshold (opposite of turn filter)
+    x_full_kcu_sorted_19 = -sorted_2019["kcu_actual_steering_delay"] / 100
+    mask_straight_19 = np.abs(x_full_kcu_sorted_19) < steering_threshold
+
+    x_full_kcu_sorted_25 = -sorted_2025["kcu_actual_steering_delay"] / 100
+    mask_straight_25 = np.abs(x_full_kcu_sorted_25) < steering_threshold
+
+    signals_2019 = get_multi_row_signals(data_2019, results_sorted_2019, sorted_2019)
+    signals_2025 = get_multi_row_signals(data_2025, results_sorted_2025, sorted_2025)
+
+    signals_2019_straight = {}
+    for name, series, label, unit in signals_2019:
+        series_straight = series.loc[mask_straight_19]
+        if not series_straight.empty:
+            signals_2019_straight[name] = (name, series_straight, label, unit)
+
+    signals_2025_straight = {}
+    for name, series, label, unit in signals_2025:
+        series_straight = series.loc[mask_straight_25]
+        if not series_straight.empty:
+            signals_2025_straight[name] = (name, series_straight, label, unit)
+
+    signal_order = list(signals_2019_straight.keys())
+    signal_order.extend(
+        [name for name in signals_2025_straight if name not in signals_2019_straight]
+    )
+
+    n_rows = len(signal_order)
+    if n_rows == 0:
+        print("Skipping straight comparison: no plottable straight-flight signals.")
+        return
+
+    fig, axes = plt.subplots(n_rows, 2, figsize=(12, 3 * n_rows), sharex=False)
+    if n_rows == 1:
+        axes = axes.reshape(1, -1)
+
+    time_straight_2019 = sorted_2019.loc[mask_straight_19, "time"]
+    time_straight_2025 = sorted_2025.loc[mask_straight_25, "time"]
+
+    for row_idx, signal_name in enumerate(signal_order):
+        sig_2019 = signals_2019_straight.get(signal_name)
+        sig_2025 = signals_2025_straight.get(signal_name)
+        fallback_label = sig_2019[2] if sig_2019 is not None else sig_2025[2]
+
+        for ax, sig, time_series, year_label in [
+            (axes[row_idx, 0], sig_2019, time_straight_2019, "2019"),
+            (axes[row_idx, 1], sig_2025, time_straight_2025, "2025"),
+        ]:
+            if sig is not None:
+                _, series, label, unit = sig
+                mean_val = float(series.mean())
+                min_val = float(series.min())
+                max_val = float(series.max())
+
+                ax.plot(
+                    time_series,
+                    series,
+                    color=colors[0],
+                    marker=".",
+                    linestyle="None",
+                    alpha=0.6,
+                    label=label,
+                )
+                ax.axhline(
+                    mean_val,
+                    color=colors[1],
+                    linestyle="--",
+                    label=rf"$\mathrm{{mean}} = {mean_val:.3f}\,{unit}$",
+                )
+                ax.axhline(
+                    min_val,
+                    color=colors[2],
+                    linestyle=":",
+                    label=rf"$\mathrm{{min}} = {min_val:.3f}\,{unit}$",
+                )
+                ax.axhline(
+                    max_val,
+                    color=colors[3],
+                    linestyle=":",
+                    label=rf"$\mathrm{{max}} = {max_val:.3f}\,{unit}$",
+                )
+                ax.set_ylabel(label)
+                ax.legend(frameon=True, loc="upper left", framealpha=1.0, fontsize=8)
+            else:
+                ax.set_ylabel(fallback_label)
+                ax.text(
+                    0.5,
+                    0.5,
+                    "Signal unavailable",
+                    transform=ax.transAxes,
+                    ha="center",
+                    va="center",
+                )
+
+            if signal_name == "radius_turn":
+                ax.set_ylim(0, 400)
+
+            ax.set_title(
+                f"{year_label} (Straight flight, $|u_s| < {steering_threshold}$)"
+                if row_idx == 0
+                else ""
+            )
+
+    axes[-1, 0].set_xlabel("time (s)")
+    axes[-1, 1].set_xlabel("time (s)")
+
+    fig.tight_layout()
+    fig.savefig(output_filename, dpi=150)
+    print(f"Saved {output_filename}")
+    plt.close(fig)
+
+
+def plot_straight_and_turn_comparison(
+    data_2019,
+    results_2019,
+    sorted_2019,
+    results_sorted_2019,
+    data_2025,
+    results_2025,
+    sorted_2025,
+    results_sorted_2025,
+    colors,
+    output_filename,
+    steering_threshold=5,
+):
+    """Create 2-column multi-row comparison plot (straight flight: |us| < threshold)."""
+
+    # Filter to straight flight: |us| < threshold (opposite of turn filter)
+    x_full_kcu_sorted_19 = -sorted_2019["kcu_actual_steering_delay"] / 100
+    mask_straight_19 = np.abs(x_full_kcu_sorted_19) < steering_threshold
+
+    x_full_kcu_sorted_25 = -sorted_2025["kcu_actual_steering_delay"] / 100
+    mask_straight_25 = np.abs(x_full_kcu_sorted_25) < steering_threshold
+
+    signals_2019 = get_multi_row_signals(data_2019, results_sorted_2019, sorted_2019)
+    signals_2025 = get_multi_row_signals(data_2025, results_sorted_2025, sorted_2025)
+
+    signals_2019_straight = {}
+    for name, series, label, unit in signals_2019:
+        series_straight = series.loc[mask_straight_19]
+        if not series_straight.empty:
+            signals_2019_straight[name] = (name, series_straight, label, unit)
+
+    signals_2025_straight = {}
+    for name, series, label, unit in signals_2025:
+        series_straight = series.loc[mask_straight_25]
+        if not series_straight.empty:
+            signals_2025_straight[name] = (name, series_straight, label, unit)
+
+    signal_order = list(signals_2019_straight.keys())
+    signal_order.extend(
+        [name for name in signals_2025_straight if name not in signals_2019_straight]
+    )
+
+    n_rows = len(signal_order)
+    if n_rows == 0:
+        print("Skipping straight comparison: no plottable straight-flight signals.")
+        return
+
+    fig, axes = plt.subplots(n_rows, 2, figsize=(12, 3 * n_rows), sharex=False)
+    if n_rows == 1:
+        axes = axes.reshape(1, -1)
+
+    time_straight_2019 = sorted_2019.loc[mask_straight_19, "time"]
+    time_straight_2025 = sorted_2025.loc[mask_straight_25, "time"]
+
+    for row_idx, signal_name in enumerate(signal_order):
+        sig_2019 = signals_2019_straight.get(signal_name)
+        sig_2025 = signals_2025_straight.get(signal_name)
+        fallback_label = sig_2019[2] if sig_2019 is not None else sig_2025[2]
+
+        for ax, sig, time_series, year_label in [
+            (axes[row_idx, 0], sig_2019, time_straight_2019, "2019"),
+            (axes[row_idx, 1], sig_2025, time_straight_2025, "2025"),
+        ]:
+            if sig is not None:
+                _, series, label, unit = sig
+                mean_val = float(series.mean())
+                min_val = float(series.min())
+                max_val = float(series.max())
+
+                ax.plot(
+                    time_series,
+                    series,
+                    color=colors[0],
+                    marker=".",
+                    linestyle="None",
+                    alpha=0.6,
+                    label=label,
+                )
+                ax.axhline(
+                    mean_val,
+                    color=colors[1],
+                    linestyle="--",
+                    label=rf"$\mathrm{{mean}} = {mean_val:.3f}\,{unit}$",
+                )
+                ax.axhline(
+                    min_val,
+                    color=colors[2],
+                    linestyle=":",
+                    label=rf"$\mathrm{{min}} = {min_val:.3f}\,{unit}$",
+                )
+                ax.axhline(
+                    max_val,
+                    color=colors[3],
+                    linestyle=":",
+                    label=rf"$\mathrm{{max}} = {max_val:.3f}\,{unit}$",
+                )
+                ax.set_ylabel(label)
+                ax.legend(frameon=True, loc="upper left", framealpha=1.0, fontsize=8)
+            else:
+                ax.set_ylabel(fallback_label)
+                ax.text(
+                    0.5,
+                    0.5,
+                    "Signal unavailable",
+                    transform=ax.transAxes,
+                    ha="center",
+                    va="center",
+                )
+
+            if signal_name == "radius_turn":
+                ax.set_ylim(0, 400)
+
+            ax.set_title(
+                f"{year_label} (Straight flight, $|u_s| < {steering_threshold}$)"
+                if row_idx == 0
+                else ""
+            )
+
+    axes[-1, 0].set_xlabel("time (s)")
+    axes[-1, 1].set_xlabel("time (s)")
+
+    fig.tight_layout()
+    fig.savefig(output_filename, dpi=150)
+    print(f"Saved {output_filename}")
+    plt.close(fig)
+
+
+def main():
+    set_plot_style()
+    colors = get_color_list()
+
+    # Load 2019 data
+    print("Loading 2019 data...")
+    data_19, results_19, sorted_19, results_sorted_19 = load_and_process_data(
+        year="2019",
+        month="10",
+        day="08",
+        kite_model="v3",
+        addition="_t26",
+        **STATS_2019,
+    )
+
+    # Convert 2019 depower to 2025-equivalent up_data using paper physics
+    if "kcu_actual_depower" in sorted_19.columns:
+        sorted_19["kcu_actual_depower_raw_deg"] = sorted_19["kcu_actual_depower"].copy()
+        print(
+            f"2019 raw kcu_actual_depower (deg): "
+            f"min={sorted_19['kcu_actual_depower_raw_deg'].min():.4f}, "
+            f"max={sorted_19['kcu_actual_depower_raw_deg'].max():.4f}"
+        )
+        sorted_19["kcu_actual_depower"] = convert_2019_depower_to_2025_updata(
+            sorted_19["kcu_actual_depower"]
+        )
+        print(
+            f"2019 kcu_actual_depower converted to 2025-equivalent (via paper physics): "
+            f"min={sorted_19['kcu_actual_depower'].min():.4f}, "
+            f"max={sorted_19['kcu_actual_depower'].max():.4f}"
+        )
+
+    # Load 2025 data
+    print("Loading 2025 data...")
+    data_25, results_25, sorted_25, results_sorted_25 = load_and_process_data(
+        year="2025",
+        month="10",
+        day="09",
+        kite_model="v3",
+        addition="",
+        **STATS_2025,
+    )
+
+    # Create comparison plots
+    _out = Path(__file__).resolve().parent / "results" / "plots_paper"
+    _out.mkdir(parents=True, exist_ok=True)
+
+    print("Creating statistics_all.pdf...")
+    plot_multi_row_comparison(
+        data_19,
+        results_19,
+        sorted_19,
+        results_sorted_19,
+        data_25,
+        results_25,
+        sorted_25,
+        results_sorted_25,
+        colors,
+        str(_out / "statistics_all.pdf"),
+    )
+
+    print("Creating statistics_turns.pdf...")
+    plot_turn_comparison(
+        data_19,
+        results_19,
+        sorted_19,
+        results_sorted_19,
+        data_25,
+        results_25,
+        sorted_25,
+        results_sorted_25,
+        colors,
+        str(_out / "statistics_turns.pdf"),
+    )
+
+    print("Creating statistics_straight.pdf...")
+    plot_straight_comparison(
+        data_19,
+        results_19,
+        sorted_19,
+        results_sorted_19,
+        data_25,
+        results_25,
+        sorted_25,
+        results_sorted_25,
+        colors,
+        str(_out / "statistics_straight.pdf"),
+    )
+
+    print("Creating statistics_straight_and_turn.pdf...")
+    plot_straight_and_turn_comparison(
+        data_19,
+        results_19,
+        sorted_19,
+        results_sorted_19,
+        data_25,
+        results_25,
+        sorted_25,
+        results_sorted_25,
+        colors,
+        str(_out / "statistics_straight_and_turn.pdf"),
+    )
+
+    print("Creating tether_reelout_speed.pdf...")
+    plot_tether_reelout_speed_comparison(
+        sorted_19,
+        sorted_25,
+        colors,
+        str(_out / "tether_reelout_speed.pdf"),
+    )
+
+    print("Done!")
+
+
+if __name__ == "__main__":
+    main()

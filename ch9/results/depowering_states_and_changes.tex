@@ -1,0 +1,17 @@
+%
+\begin{table}[h!]
+\centering
+\caption{
+Inputs and -- photogrammetry and EKF-derived -- estimated outputs for powered straight flight $PS_3$ and depowered straight flight $DR_1$, see \autoref{fig:powered_depowered_camera_frame}, including the average point-position error $\epsilon_\text{p,avg}$ and front-line angle $\alpha_\mathrm{fl}$.
+}
+\label{tab:depowering_states_and_changes}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccccccc} \hline
+State & $u_\mathrm{dp}$ ($\unit{-}$) & $u_\mathrm{s}$ ($\unit{-}$) & $b$ ($\unit{m}$) & $v_\mathrm{a}$ ($\unit{m s^{-1}}$) & $\alpha_\mathrm{fl}$ ($\unit{\degree}$) & $\beta_\mathrm{s}$ ($\unit{\degree}$) & $F_\mathrm{T,KCU}$ ($\unit{N}$) & $\epsilon_\mathrm{p,avg}$ ($\unit{cm}$) \\ \hline
+Powered         & 0.4151 & 0.0028 & 7.32 & 16.75 & 10.9 & -9 & 3342 & 5.95 \\
+Depowered       & 0.5012 & 0.0014 & 7.12 & 10.56 & 19.4 & -8 & 680 & 4.14 \\
+\hline
+\end{tabular}%
+}
+\end{table}
+%
