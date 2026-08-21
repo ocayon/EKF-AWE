@@ -38,6 +38,18 @@ class ExtendedKalmanFilter:
         self.P_k1_k1 = np.eye(self.n) * 1**2
         self.simConfig = simConfig
 
+        # Declare state/filter attributes used outside __init__
+        self.x_k1_k: np.ndarray = np.empty(0)
+        self.x_k1_k1: np.ndarray = np.empty(0)
+        self.u: np.ndarray = np.empty(0)
+        self.z: np.ndarray = np.empty(0)
+        self.Phi: np.ndarray = np.empty(0)
+        self.P_k1_k: np.ndarray = np.eye(self.n)
+        self.Fx: np.ndarray = np.empty(0)
+        self.Hx: np.ndarray = np.empty(0)
+        self.IEKF_itts: int = 0
+        self.debug_info: dict = {}
+
         self.kite = kite
         self.kcu = kcu
         self.tether = tether
@@ -63,6 +75,7 @@ class ExtendedKalmanFilter:
 
     @stdv_dynamic_model.setter
     def stdv_dynamic_model(self, value):
+        self._stdv_dynamic_model = value
         self.Q = self.get_state_noise_covariance(value, self.simConfig)
         self.n = len(value)
         self.P_k1_k1 = np.eye(self.n) * 1**2
@@ -73,6 +86,7 @@ class ExtendedKalmanFilter:
 
     @stdv_measurements.setter
     def stdv_measurements(self, value):
+        self._stdv_measurements = value
         self.R = self.get_observation_noise_covariance(value)
 
     def predict(self, ts):
@@ -87,7 +101,7 @@ class ExtendedKalmanFilter:
             self.Fx, np.zeros([nx, nx]), np.zeros(nx), np.zeros(nx)
         )  # If process noise input matrix wants to be added ->control.ss(self.Fx, self.G, np.zeros(nx), np.zeros(nx))
         sys_dt = control.sample_system(sys_ct, ts, method="zoh")
-        self.Phi = sys_dt.A
+        self.Phi = np.asarray(sys_dt.A)  # type: ignore[assignment]
         # self.Gamma = sys_dt.B
         # Calculate covariance prediction error
         self.P_k1_k = self.Phi @ self.P_k1_k1 @ self.Phi.T + self.Q
@@ -108,6 +122,14 @@ class ExtendedKalmanFilter:
 
         # Create a reduced version of z without None values
         z_valid = self.z[valid_indices]
+
+        K: np.ndarray = np.empty(0)
+        Hx: np.ndarray = np.empty(0)
+        R: np.ndarray = self.R
+        R_full: np.ndarray = self.R
+        z_k1_k: np.ndarray = np.empty(0)
+        P_zz: np.ndarray = np.empty(0)
+        Hx_full: np.ndarray = np.empty(0)
 
         if self.doIEKF == True:
 
@@ -153,7 +175,7 @@ class ExtendedKalmanFilter:
                     - np.array((Hx @ (self.x_k1_k - eta1).T)).reshape(-1)
                 )
                 eta2 = np.array(eta2).reshape(-1)
-                err = np.linalg.norm(eta2 - eta1) / np.linalg.norm(eta1)
+                err = np.linalg.norm(eta2 - eta1) / max(np.linalg.norm(eta1), 1e-10)
 
             self.IEKF_itts = itts
             self.x_k1_k1 = eta2
@@ -184,7 +206,8 @@ class ExtendedKalmanFilter:
             # Calculate optimal state x(k+1|k+1) for valid z
             self.x_k1_k1 = np.array(self.x_k1_k + K @ (z_valid - z_k1_k)).reshape(-1)
 
-        self.P_k1_k1 = (np.eye(self.n) - K @ Hx) @ self.P_k1_k
+        IKH = np.eye(self.n) - K @ Hx
+        self.P_k1_k1 = IKH @ self.P_k1_k @ IKH.T + K @ R @ K.T
         std_x_cor = np.sqrt(
             np.diag(self.P_k1_k1)
         )  # Standard deviation of state estimation error (for validation)

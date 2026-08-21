@@ -113,7 +113,7 @@ def initialize_ekf(
                 )
                 measured_variable = np.array(
                     [
-                        ekf_input.__dict__[variable]
+                        ekf_input.__dict__[input_variable]
                         for ekf_input in ekf_input_list[:offset_sim_length]
                     ]
                 )

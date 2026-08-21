@@ -12,10 +12,10 @@ from awes_ekf.utils import (
 
 class Kite(ABC):
     def __init__(self, **kwargs):
-        self.mass = kwargs.get("mass")
-        self.area = kwargs.get("area")
-        self.span = kwargs.get("span")
-        self.model_name = kwargs.get("model_name")
+        self.mass: float = float(kwargs.get("mass") or 0.0)
+        self.area: float = float(kwargs.get("area") or 0.0)
+        self.span: float = float(kwargs.get("span") or 0.0)
+        self.model_name: str = str(kwargs.get("model_name") or "")
         self.thrust = kwargs.get("thrust", False)
 
     @abstractmethod
@@ -27,15 +27,15 @@ class Kite(ABC):
         pass
 
     @abstractmethod
-    def get_fx(self, tether):
+    def get_fx(self, *args, **kwargs):  # type: ignore[override]
         pass
 
     @abstractmethod
-    def get_fx_fun(self, kite, tether, kcu):
+    def get_fx_fun(self, *args, **kwargs):  # type: ignore[override]
         pass
 
     @abstractmethod
-    def propagate(self, x, u, kite, tether, kcu, ts):
+    def propagate(self, *args, **kwargs):  # type: ignore[override]
         pass
 
 
@@ -503,11 +503,11 @@ class PointMass(Kite):
 
 @dataclass
 class KiteInput:
-    kite_position: np.array
-    kite_velocity: np.array
+    kite_position: np.ndarray
+    kite_velocity: np.ndarray
     kite_yaw: float
-    wind_velocity: np.array
+    wind_velocity: np.ndarray
     us: float
     up: float
-    tether_force: np.array
+    tether_force: np.ndarray
     tether_length: float

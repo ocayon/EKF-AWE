@@ -21,12 +21,12 @@ class KCU:
 
     def __init__(self, **kwargs):
 
-        self.length = kwargs.get("length")
-        self.diameter = kwargs.get("diameter")
-        self.mass = kwargs.get("mass")
-        self.distance_kcu_kite = kwargs.get("distance_kcu_kite")
-        self.total_length_bridle_lines = kwargs.get("total_length_bridle_lines")
-        self.diameter_bridle_lines = kwargs.get("diameter_bridle_lines")
+        self.length: float = float(kwargs.get("length") or 0.0)
+        self.diameter: float = float(kwargs.get("diameter") or 0.0)
+        self.mass: float = float(kwargs.get("mass") or 0.0)
+        self.distance_kcu_kite: float = float(kwargs.get("distance_kcu_kite") or 0.0)
+        self.total_length_bridle_lines: float = float(kwargs.get("total_length_bridle_lines") or 0.0)
+        self.diameter_bridle_lines: float = float(kwargs.get("diameter_bridle_lines") or 0.0)
 
         # Example: Interpolate Cd for tangential flow at a specific L/D
         self.cdt = splev(self.length / self.diameter, KCU.spline_t)

@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 import numpy as np
+from typing import Optional
 
 @dataclass
 class EKFInput:
@@ -14,18 +15,18 @@ class EKFInput:
     tether_reelout_speed: float  # Reelout speed (positive values reel out) (m/s)
 
     # Optional attributes
-    kite_apparent_windspeed: float = None  # Apparent windspeed (m/s)
-    bridle_angle_of_attack: float = None  # Kite angle of attack (between last tether element and wind incident) (rad)
+    kite_apparent_windspeed: Optional[float] = None  # Apparent windspeed (m/s)
+    bridle_angle_of_attack: Optional[float] = None  # Kite angle of attack (between last tether element and wind incident) (rad)
     kcu_velocity: np.ndarray = field(default_factory=lambda: np.zeros(3))  # KCU velocity in ENU coordinates (m/s)
     kcu_acceleration: np.ndarray = field(default_factory=lambda: np.zeros(3))  # KCU acceleration in ENU coordinates (m/s^2)
-    tether_elevation_ground: float = None  # Elevation angle (angle of tether element at GS exit with respect to the horizon) (rad)
-    tether_azimuth_ground: float = None  # Azimuth angle (With respect to east in EN plane) (rad)
-    kite_yaw: float = None  # Yaw angle (don't use) (rad)
-    steering_input: float = None  # Steering input (don't use, define units later) (from -1 to 1)
+    tether_elevation_ground: Optional[float] = None  # Elevation angle (angle of tether element at GS exit with respect to the horizon) (rad)
+    tether_azimuth_ground: Optional[float] = None  # Azimuth angle (With respect to east in EN plane) (rad)
+    kite_yaw: Optional[float] = None  # Yaw angle (don't use) (rad)
+    steering_input: Optional[float] = None  # Steering input (don't use, define units later) (from -1 to 1)
     kite_thrust_force: np.ndarray = field(default_factory=lambda: np.zeros(3))  # Thrust force (fly-gen kites value) (N)
-    depower_input: float = None  # Depower input (Units are irrelevant, as constant is automatically calculated) (from 0 to 1)
-    kite_course: float = None # Kite course angle (angle between kite velocity and ENU x-axis) (rad)
-    delta_up: float = None # Change in depower input
+    depower_input: Optional[float] = None  # Depower input (Units are irrelevant, as constant is automatically calculated) (from 0 to 1)
+    kite_course: Optional[float] = None # Kite course angle (angle between kite velocity and ENU x-axis) (rad)
+    delta_up: Optional[float] = None # Change in depower input
 
     def __post_init__(self):
         # Ensure all array attributes have a length of 3

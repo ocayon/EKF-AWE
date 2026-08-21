@@ -1,6 +1,6 @@
 from pathlib import Path
 import pandas as pd
-import h5py
+import h5py  # type: ignore[import]
 
 
 def read_processed_flight_data(year, month, day, kite_model):

@@ -402,6 +402,7 @@ def postprocess_results(
     omega_q = []
     omega_r = []
     heading = []
+    dcm = np.eye(3)
     for i in range(len(results)):
         res = results.iloc[i]
         fd = flight_data.iloc[i]
