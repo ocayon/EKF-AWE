@@ -69,6 +69,35 @@ class SimulationConfig:
             kwargs.get("initial_wind_velocity", [1e-3, 8, 0]), dtype=float
         )
         self.tether_offset = kwargs.get("tether_offset", True)
+        # Sensors calibrated in a pre-run before the main filter loop. Keys match
+        # the measurement names in ObservationData; a sensor is only calibrated if
+        # the corresponding measurement is also enabled. The apparent wind speed
+        # gets a pitot calibration (scale factor on the dynamic pressure), the
+        # angle of attack an additive offset (vane misalignment).
+        self.calibrate_sensor = {
+            "kite_apparent_windspeed": kwargs.get(
+                "calibrate_apparent_windspeed", True
+            ),
+            "bridle_angle_of_attack": kwargs.get(
+                "find_offset_angle_of_attack", True
+            ),
+        }
+        # How the apparent wind speed is corrected: "pitot" fits a scale factor
+        # on the dynamic pressure, the way a pitot tube is calibrated; "offset"
+        # is the legacy additive offset on the speed, kept for comparison.
+        self.apparent_windspeed_calibration = kwargs.get(
+            "apparent_windspeed_calibration", "pitot"
+        )
+        if self.apparent_windspeed_calibration not in ("pitot", "offset"):
+            raise ValueError(
+                "apparent_windspeed_calibration must be 'pitot' or 'offset', got "
+                f"{self.apparent_windspeed_calibration!r}"
+            )
+        # Also fit the pitot transducer zero on top of the calibration
+        # coefficient. Only useful over a wide apparent wind speed range.
+        self.pitot_calibration_fit_zero = kwargs.get(
+            "pitot_calibration_fit_zero", False
+        )
         self.enforce_vertical_wind_to_0 = kwargs.get(
             "enforce_vertical_wind_to_0", False
         )

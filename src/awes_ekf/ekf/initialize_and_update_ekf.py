@@ -4,7 +4,7 @@ from awes_ekf.ekf import ExtendedKalmanFilter, DynamicModel, ObservationModel
 from awes_ekf.setup.kite import Kite
 from awes_ekf.setup.kcu import KCU
 from awes_ekf.ekf.ekf_output import create_ekf_output
-from awes_ekf.postprocess.postprocessing import find_offset
+from awes_ekf.postprocess.postprocessing import find_offset, find_pitot_calibration
 import time
 import copy
 
@@ -49,16 +49,20 @@ def initialize_ekf(
     ekf_copy = copy.deepcopy(ekf)
     simConfig_copy = copy.deepcopy(simConfig)
     if find_offsets:
-        offset_variables = ["kite_apparent_windspeed", "bridle_angle_of_attack"]
-        # Find offsets
+        calibration_variables = [
+            variable
+            for variable, enabled in simConfig_copy.calibrate_sensor.items()
+            if enabled
+        ]
+        # Calibrate the enabled sensors
         for variable in simConfig_copy.obsData.__dict__.keys():
             if (
-                variable in offset_variables
+                variable in calibration_variables
                 and simConfig_copy.obsData.__dict__[variable]
             ):
-                print(f"Finding offset for {variable}")
-                ekf_output_list = []
-                offset_sim_length = int(6000)
+                print(f"Calibrating {variable}")
+                # The pre-run cannot be longer than the data it is given
+                offset_sim_length = min(int(6000), len(ekf_input_list))
                 ekf_output_list = []
                 simConfig_copy.obsData.__dict__[variable] = False
                 simConfig_copy.enforce_vertical_wind_to_0 = True
@@ -94,13 +98,18 @@ def initialize_ekf(
                             f"Real time: {mins} minutes.  Elapsed time: {elapsed_time:.2f} seconds"
                         )
 
-                # Find offset
+                # Calibrate the sensor against the converged EKF estimate
                 # TODO: Define universal namings and create timeseries class
-                if variable == "bridle_angle_of_attack":
-                    variable = "kite_angle_of_attack"
-                converged_idx = int(3000)
+                estimate_name = (
+                    "kite_angle_of_attack"
+                    if variable == "bridle_angle_of_attack"
+                    else variable
+                )
                 estimated_variable = np.array(
-                    [ekf_output.__dict__[variable] for ekf_output in ekf_output_list]
+                    [
+                        ekf_output.__dict__[estimate_name]
+                        for ekf_output in ekf_output_list
+                    ]
                 )
                 measured_variable = np.array(
                     [
@@ -108,16 +117,47 @@ def initialize_ekf(
                         for ekf_input in ekf_input_list[:offset_sim_length]
                     ]
                 )
-                offset = find_offset(
-                    estimated_variable[converged_idx::],
-                    measured_variable[converged_idx : len(ekf_input_list)],
-                    offset_range=[-15, 15],
-                )
-                print(f"Offset for {variable}: {offset}")
+                # The pre-run can stop early, so only compare the samples both have
+                n_samples = min(len(estimated_variable), len(measured_variable))
+                # Discard the transient before the filter has converged
+                converged_idx = min(int(3000), n_samples // 2)
+                estimated_variable = estimated_variable[converged_idx:n_samples]
+                measured_variable = measured_variable[converged_idx:n_samples]
+                if len(estimated_variable) == 0:
+                    print(f"Not enough samples to calibrate {variable}, skipping")
+                    continue
 
-                # Update offset
-                for i in range(len(ekf_input_list)):
-                    ekf_input_list[i].__dict__[variable] += offset
+                if (
+                    variable == "kite_apparent_windspeed"
+                    and simConfig_copy.apparent_windspeed_calibration == "pitot"
+                ):
+                    # A pitot tube is calibrated in dynamic pressure, not with an
+                    # additive offset on the speed
+                    calibration = find_pitot_calibration(
+                        estimated_variable,
+                        measured_variable,
+                        fit_zero=simConfig_copy.pitot_calibration_fit_zero,
+                    )
+                    print(
+                        f"Pitot calibration for {variable}: k = {calibration.k:.4f}, "
+                        f"zero = {calibration.b:.4f} m2/s2 "
+                        f"(speed scale {calibration.speed_scale:.4f})"
+                    )
+                    for ekf_input in ekf_input_list:
+                        ekf_input.kite_apparent_windspeed = float(
+                            calibration.apply(ekf_input.kite_apparent_windspeed)
+                        )
+                else:
+                    offset = find_offset(
+                        estimated_variable,
+                        measured_variable,
+                        offset_range=[-15, 15],
+                    )
+                    print(f"Offset for {variable}: {offset}")
+
+                    # Update offset
+                    for ekf_input in ekf_input_list:
+                        ekf_input.__dict__[variable] += offset
 
     return ekf, ekf_input_list
 

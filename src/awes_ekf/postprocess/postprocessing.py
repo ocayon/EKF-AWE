@@ -1,4 +1,5 @@
 import numpy as np
+from dataclasses import dataclass
 from awes_ekf.utils import calculate_reference_frame_euler, calculate_airflow_angles
 
 
@@ -74,6 +75,92 @@ def find_offset(signal1, signal2, offset_range=[-2 * np.pi, 2 * np.pi]):
     mse_values = [compute_mse(signal1, signal2, offset) for offset in offsets]
     offset = offsets[np.argmin(mse_values)]
     return offset
+
+
+@dataclass
+class PitotCalibration:
+    """Calibration coefficients of a pitot tube.
+
+    Attributes:
+        k: Probe calibration coefficient, the ratio between the dynamic pressure
+            sensed by the probe and the true dynamic pressure. k < 1 means the
+            probe under-reads (incomplete total pressure recovery), k > 1 means
+            it over-reads (static port sitting in a locally accelerated flow).
+        b: Transducer zero expressed in velocity squared, b = 2*dp_0/rho (m^2/s^2).
+    """
+
+    k: float
+    b: float = 0.0
+
+    @property
+    def speed_scale(self):
+        """Multiplier applied to the indicated speed when the zero is negligible."""
+        return 1 / np.sqrt(self.k)
+
+    def apply(self, va):
+        """Convert an indicated apparent wind speed into a calibrated one."""
+        va = np.asarray(va, dtype=float)
+        return np.sqrt(np.clip((va**2 - self.b) / self.k, 0.0, None))
+
+
+def find_pitot_calibration(
+    reference_va, measured_va, fit_zero=False, k_range=[0.25, 4.0]
+):
+    """
+    Calibrate an apparent wind speed measurement against a reference speed.
+
+    A pitot tube does not measure a velocity but a differential pressure
+
+        dp = k * 1/2 * rho * v^2 + dp_0
+
+    with k the probe calibration coefficient (total pressure recovery and static
+    port position error) and dp_0 the transducer zero. The logged speed is
+    va_meas = sqrt(2*dp/rho), so the calibration is linear in the square of the
+    speed:
+
+        va_meas^2 = k * va_ref^2 + b,        b = 2*dp_0/rho
+
+    which is fitted here by least squares in dynamic pressure space, the same
+    way a probe is calibrated against a reference in a wind tunnel. This is a
+    scale factor on the dynamic pressure, not an additive offset on the speed:
+    the correction grows with the speed.
+
+    :param reference_va: reference apparent wind speed (m/s)
+    :param measured_va: indicated apparent wind speed of the probe (m/s)
+    :param fit_zero: also fit the transducer zero b. Only meaningful when the
+        data spans a wide speed range, otherwise the two parameters trade off
+        against each other.
+    :param k_range: bounds the fitted coefficient is clipped to, to keep a bad
+        pre-run from producing a nonsensical calibration
+    :return: PitotCalibration
+    """
+    reference_va = np.asarray(reference_va, dtype=float)
+    measured_va = np.asarray(measured_va, dtype=float)
+
+    mask = (
+        np.isfinite(reference_va)
+        & np.isfinite(measured_va)
+        & (reference_va > 0)
+        & (measured_va > 0)
+    )
+    if not np.any(mask):
+        raise ValueError("No valid samples to calibrate the pitot tube")
+
+    q_ref = reference_va[mask] ** 2
+    q_meas = measured_va[mask] ** 2
+
+    if fit_zero:
+        k, b = np.polyfit(q_ref, q_meas, 1)
+    else:
+        # Least squares through the origin: single calibration coefficient
+        k = float(q_ref @ q_meas / (q_ref @ q_ref))
+        b = 0.0
+
+    k_clipped = float(np.clip(k, k_range[0], k_range[1]))
+    if k_clipped != k:
+        print(f"Warning: pitot calibration coefficient {k:.4f} clipped to {k_clipped}")
+
+    return PitotCalibration(k=k_clipped, b=float(b))
 
 
 def construct_transformation_matrix(e_x_b, e_y_b, e_z_b):
