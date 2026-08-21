@@ -127,10 +127,7 @@ def initialize_ekf(
                     print(f"Not enough samples to calibrate {variable}, skipping")
                     continue
 
-                if (
-                    variable == "kite_apparent_windspeed"
-                    and simConfig_copy.apparent_windspeed_calibration == "pitot"
-                ):
+                if variable == "kite_apparent_windspeed":
                     # A pitot tube is calibrated in dynamic pressure, not with an
                     # additive offset on the speed
                     calibration = find_pitot_calibration(

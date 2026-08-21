@@ -82,17 +82,6 @@ class SimulationConfig:
                 "find_offset_angle_of_attack", True
             ),
         }
-        # How the apparent wind speed is corrected: "pitot" fits a scale factor
-        # on the dynamic pressure, the way a pitot tube is calibrated; "offset"
-        # is the legacy additive offset on the speed, kept for comparison.
-        self.apparent_windspeed_calibration = kwargs.get(
-            "apparent_windspeed_calibration", "pitot"
-        )
-        if self.apparent_windspeed_calibration not in ("pitot", "offset"):
-            raise ValueError(
-                "apparent_windspeed_calibration must be 'pitot' or 'offset', got "
-                f"{self.apparent_windspeed_calibration!r}"
-            )
         # Also fit the pitot transducer zero on top of the calibration
         # coefficient. Only useful over a wide apparent wind speed range.
         self.pitot_calibration_fit_zero = kwargs.get(
