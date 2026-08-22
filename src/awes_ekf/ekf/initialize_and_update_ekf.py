@@ -9,6 +9,111 @@ import time
 import copy
 
 
+def mean_timestep(ekf_input_list, n_samples=100):
+    """Mean timestep of the first samples, used to convert minutes to samples."""
+    return float(np.mean([i.timestep for i in ekf_input_list[:n_samples]]))
+
+
+def calibration_window(ekf_input_list, simConfig):
+    """First and last sample of the window a sensor calibration is fitted on.
+
+    The window starts after the filter transient, lasts as long as the
+    configuration asks for, and always stops short of the end of the flight,
+    where the data is often unreliable.
+    """
+    samples_per_minute = 60.0 / mean_timestep(ekf_input_list)
+    n_samples = len(ekf_input_list)
+
+    start = int(simConfig.calibration_start_minutes * samples_per_minute)
+    duration = int(simConfig.calibration_duration_minutes * samples_per_minute)
+    margin = int(simConfig.calibration_end_margin_minutes * samples_per_minute)
+
+    end = min(start + duration, max(n_samples - margin, 0))
+    if end <= start:
+        # The flight is too short for the configured window, use its middle half
+        start, end = n_samples // 4, (3 * n_samples) // 4
+        print(
+            "Warning: flight too short for the configured calibration window, "
+            f"falling back to samples {start} to {end}"
+        )
+    return start, end
+
+
+def calibration_series(
+    ekf_input_list, simConfig, tuningParams, x0, kite, kcu, tether, variable
+):
+    """Estimate a sensor with the filter while holding it out of the measurements.
+
+    Returns the estimated and the measured series over the calibration window,
+    which is what the sensor calibration is then fitted on.
+    """
+    input_variable = variable
+    output_variable = (
+        "kite_angle_of_attack" if variable == "bridle_angle_of_attack" else variable
+    )
+
+    fit_start, fit_end = calibration_window(ekf_input_list, simConfig)
+    timestep = mean_timestep(ekf_input_list)
+    print(
+        f"Calibrating {variable} on minutes {fit_start * timestep / 60:.1f} to "
+        f"{fit_end * timestep / 60:.1f} of the flight"
+    )
+
+    simConfig_prerun = copy.deepcopy(simConfig)
+    simConfig_prerun.obsData.__dict__[input_variable] = False
+    simConfig_prerun.enforce_vertical_wind_to_0 = True
+
+    dyn_model = DynamicModel(kite, tether, simConfig_prerun)
+    obs_model = ObservationModel(
+        dyn_model.x, dyn_model.u, simConfig_prerun, kite, tether, kcu
+    )
+    tuningParams.update_observation_vector(simConfig_prerun)
+    try:
+        ekf = ExtendedKalmanFilter(
+            tuningParams.stdv_dynamic_model,
+            tuningParams.stdv_measurements,
+            dyn_model,
+            obs_model,
+            kite,
+            tether,
+            kcu,
+            simConfig_prerun,
+        )
+        ekf.update_input_vector(ekf_input_list[0])
+        ekf.x_k1_k1 = x0
+
+        ekf_output_list = []
+        start_time = time.time()
+        for k in range(fit_end):
+            try:
+                ekf, ekf_output = propagate_state_EKF(
+                    ekf, ekf_input_list[k], simConfig_prerun, tether, kite, kcu
+                )
+            except Exception as e:
+                print(f"Error at timestep {k}: {e}")
+                break
+            ekf_output_list.append(ekf_output)
+            if k > 0 and k % 3000 == 0:
+                print(
+                    f"  Pre-run at minute {k * timestep / 60:.1f}, "
+                    f"{time.time() - start_time:.1f} s elapsed"
+                )
+    finally:
+        # Leave the tuning parameters as the caller passed them: they describe
+        # the real filter, not the one used for this pre-run
+        tuningParams.update_observation_vector(simConfig)
+
+    # The pre-run can stop early, so only keep the samples both series have
+    n_samples = min(len(ekf_output_list), fit_end)
+    estimated = np.array(
+        [output.__dict__[output_variable] for output in ekf_output_list[:n_samples]]
+    )
+    measured = np.array(
+        [ekf_input.__dict__[input_variable] for ekf_input in ekf_input_list[:n_samples]]
+    )
+    return estimated[fit_start:], measured[fit_start:]
+
+
 def initialize_ekf(
     ekf_input_list, simConfig, tuningParams, x0, kite, kcu, tether, find_offsets=True
 ):
@@ -45,116 +150,56 @@ def initialize_ekf(
     # Initialize state vector
     ekf.x_k1_k1 = x0
 
-    # Copy ekf using deepcopy
-    ekf_copy = copy.deepcopy(ekf)
-    simConfig_copy = copy.deepcopy(simConfig)
     if find_offsets:
         calibration_variables = [
             variable
-            for variable, enabled in simConfig_copy.calibrate_sensor.items()
+            for variable, enabled in simConfig.calibrate_sensor.items()
             if enabled
         ]
         # Calibrate the enabled sensors
-        for variable in simConfig_copy.obsData.__dict__.keys():
+        for variable in simConfig.obsData.__dict__.keys():
             if (
-                variable in calibration_variables
-                and simConfig_copy.obsData.__dict__[variable]
+                variable not in calibration_variables
+                or not simConfig.obsData.__dict__[variable]
             ):
-                print(f"Calibrating {variable}")
-                # The pre-run cannot be longer than the data it is given
-                offset_sim_length = min(int(6000), len(ekf_input_list))
-                ekf_output_list = []
-                simConfig_copy.obsData.__dict__[variable] = False
-                simConfig_copy.enforce_vertical_wind_to_0 = True
-                obs_model = ObservationModel(
-                    dyn_model.x, dyn_model.u, simConfig_copy, kite, tether, kcu
-                )
-                tuningParams.update_observation_vector(simConfig_copy)
-                ekf_copy.stdv_measurements = tuningParams.stdv_measurements
-                ekf_copy.obs_model = obs_model
-                start_time = time.time()
-                mins = 0
-                for k in range(offset_sim_length):
-                    try:
-                        ekf_copy, ekf_ouput = propagate_state_EKF(
-                            ekf_copy,
-                            ekf_input_list[k],
-                            simConfig_copy,
-                            tether,
-                            kite,
-                            kcu,
-                        )
-                    except Exception as e:
-                        print(f"Error at timestep {k}: {e}")
-                        break
-                    # Store results
-                    ekf_output_list.append(ekf_ouput)
-                    # Print progress
-                    if k % 600 == 0:
-                        elapsed_time = time.time() - start_time
-                        start_time = time.time()  # Record end time
-                        mins += 1
-                        print(
-                            f"Real time: {mins} minutes.  Elapsed time: {elapsed_time:.2f} seconds"
-                        )
+                continue
 
-                # Calibrate the sensor against the converged EKF estimate
-                # TODO: Define universal namings and create timeseries class
-                estimate_name = (
-                    "kite_angle_of_attack"
-                    if variable == "bridle_angle_of_attack"
-                    else variable
-                )
-                estimated_variable = np.array(
-                    [
-                        ekf_output.__dict__[estimate_name]
-                        for ekf_output in ekf_output_list
-                    ]
-                )
-                measured_variable = np.array(
-                    [
-                        ekf_input.__dict__[input_variable]
-                        for ekf_input in ekf_input_list[:offset_sim_length]
-                    ]
-                )
-                # The pre-run can stop early, so only compare the samples both have
-                n_samples = min(len(estimated_variable), len(measured_variable))
-                # Discard the transient before the filter has converged
-                converged_idx = min(int(3000), n_samples // 2)
-                estimated_variable = estimated_variable[converged_idx:n_samples]
-                measured_variable = measured_variable[converged_idx:n_samples]
-                if len(estimated_variable) == 0:
-                    print(f"Not enough samples to calibrate {variable}, skipping")
-                    continue
+            estimated, measured = calibration_series(
+                ekf_input_list,
+                simConfig,
+                tuningParams,
+                x0,
+                kite,
+                kcu,
+                tether,
+                variable,
+            )
+            if len(estimated) == 0:
+                print(f"Not enough samples to calibrate {variable}, skipping")
+                continue
 
-                if variable == "kite_apparent_windspeed":
-                    # A pitot tube is calibrated in dynamic pressure, not with an
-                    # additive offset on the speed
-                    calibration = find_pitot_calibration(
-                        estimated_variable,
-                        measured_variable,
-                        fit_zero=simConfig_copy.pitot_calibration_fit_zero,
+            if variable == "kite_apparent_windspeed":
+                # A pitot tube is calibrated in dynamic pressure, not with an
+                # additive offset on the speed
+                calibration = find_pitot_calibration(
+                    estimated, measured, fit_zero=simConfig.pitot_calibration_fit_zero
+                )
+                print(
+                    f"Pitot calibration for {variable}: k = {calibration.k:.4f}, "
+                    f"zero = {calibration.b:.4f} m2/s2 "
+                    f"(speed scale {calibration.speed_scale:.4f})"
+                )
+                for ekf_input in ekf_input_list:
+                    ekf_input.kite_apparent_windspeed = float(
+                        calibration.apply(ekf_input.kite_apparent_windspeed)
                     )
-                    print(
-                        f"Pitot calibration for {variable}: k = {calibration.k:.4f}, "
-                        f"zero = {calibration.b:.4f} m2/s2 "
-                        f"(speed scale {calibration.speed_scale:.4f})"
-                    )
-                    for ekf_input in ekf_input_list:
-                        ekf_input.kite_apparent_windspeed = float(
-                            calibration.apply(ekf_input.kite_apparent_windspeed)
-                        )
-                else:
-                    offset = find_offset(
-                        estimated_variable,
-                        measured_variable,
-                        offset_range=[-15, 15],
-                    )
-                    print(f"Offset for {variable}: {offset}")
+            else:
+                offset = find_offset(estimated, measured, offset_range=[-15, 15])
+                print(f"Offset for {variable}: {offset}")
 
-                    # Update offset
-                    for ekf_input in ekf_input_list:
-                        ekf_input.__dict__[variable] += offset
+                # Update offset
+                for ekf_input in ekf_input_list:
+                    ekf_input.__dict__[variable] += offset
 
     return ekf, ekf_input_list
 

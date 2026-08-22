@@ -9,6 +9,9 @@ simulation_parameters:
   model_yaw: false                   # Model the yaw angle in the state vector
   calibrate_apparent_windspeed: true     # Calibrate the pitot tube against the EKF estimate in a pre-run (only if kite_apparent_windspeed is measured)
   pitot_calibration_fit_zero: false      # Also fit the pitot transducer zero, not only the calibration coefficient
+  calibration_start_minutes: 5           # Skip this much of the start of the flight, the filter is still converging
+  calibration_duration_minutes: 15       # Minutes of flight the calibration is fitted on (longer averages out more turbulence)
+  calibration_end_margin_minutes: 3      # Never calibrate on the last minutes of a flight, the data there is unreliable
   find_offset_angle_of_attack: true      # Find the bridle angle of attack sensor offset in a pre-run (only if bridle_angle_of_attack is measured)
 
   measurements:

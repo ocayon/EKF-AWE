@@ -87,6 +87,19 @@ class SimulationConfig:
         self.pitot_calibration_fit_zero = kwargs.get(
             "pitot_calibration_fit_zero", False
         )
+        # Window the sensor calibrations are fitted on, in minutes of flight.
+        # It starts after the filter transient, lasts as long as asked for, and
+        # always stops short of the end of the flight, where the data is often
+        # unreliable. A longer window averages out more turbulence.
+        self.calibration_start_minutes = float(
+            kwargs.get("calibration_start_minutes", 5)
+        )
+        self.calibration_duration_minutes = float(
+            kwargs.get("calibration_duration_minutes", 15)
+        )
+        self.calibration_end_margin_minutes = float(
+            kwargs.get("calibration_end_margin_minutes", 3)
+        )
         self.enforce_vertical_wind_to_0 = kwargs.get(
             "enforce_vertical_wind_to_0", False
         )
