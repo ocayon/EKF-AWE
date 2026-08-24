@@ -2,6 +2,7 @@ import yaml
 import numpy as np
 from dataclasses import dataclass
 import os
+from pathlib import Path
 
 # %% Define atmospheric parameters
 rho = 1.225  # Air density [kg/m^3]
@@ -9,40 +10,164 @@ kappa = 0.4  # Von Karman constant [-]
 g = 9.81  # Gravity acceleration [m/s^2]
 z0 = 0.01  # Surface roughness [m]
 
+_EKF_CONFIG_NAME = "ekf_config.yaml"
 
-# Load the configuration file
-def load_config():
-    # Set the directory path where configuration files are stored
-    config_directory = "data/config/"
 
-    # List all files in the config directory
-    config_files = os.listdir(config_directory)
+def get_kite(system_config):
+    """Primary kite component dict of an awesIO system config.
 
-    # Prompt user to select a file from the list
-    print("Available configuration files:")
-    for index, filename in enumerate(config_files, start=1):
-        print(f"{index}: {filename}")
+    Handles the current awesIO layout (``components.kites`` array), the
+    legacy singular ``components.kite``, and an inline-flat layout (wing /
+    control_system directly under ``components``).
+    """
+    components = system_config.get("components", {})
+    kites = components.get("kites")
+    if isinstance(kites, list) and kites:
+        return kites[0]
+    return components.get("kite", components)
 
-    # Get user selection
-    selection = int(input("Select a configuration file by number: ")) - 1
 
-    # Ensure selection is valid
-    if 0 <= selection < len(config_files):
-        selected_file = config_files[selection]
-        config_path = os.path.join(config_directory, selected_file)
+def get_tether(system_config):
+    """Primary tether component dict of an awesIO system config."""
+    components = system_config.get("components", {})
+    tethers = components.get("tethers")
+    if isinstance(tethers, list) and tethers:
+        return tethers[0]
+    return components.get("tether", {})
 
-        # Load the configuration file
-        with open(config_path, "r") as file:
-            config_data = yaml.safe_load(file)
 
-        # Optional: Check if the config has all required data
-        if not validate_config(config_data):
-            raise ValueError("Configuration file is missing required data.")
+def _prompt_path(message):
+    try:
+        from prompt_toolkit import prompt
+        from prompt_toolkit.completion import PathCompleter
 
-        print(f"Configuration loaded from: {selected_file}")
-        return config_data
+        return prompt(message, completer=PathCompleter(expanduser=True)).strip()
+    except ImportError:
+        return input(message).strip()
+
+
+# Load the configuration folder
+def load_config(config_folder=None):
+    """Load and merge a kite configuration from a config folder.
+
+    AWETrim convention: the folder (``data/<KITE-NAME>/``) holds
+
+    - ``ekf_config.yaml`` — simulation_parameters and tuning_parameters, and
+    - one or more awesIO-validated ``system*.yaml`` files with the physical
+      properties of the hardware. A kite can have several system variants
+      depending on what it was flown with (e.g. ``system_flown_2019.yaml``
+      vs ``system_flown_2025.yaml`` differ in KCU and tether); with more
+      than one candidate the user picks which hardware the EKF assumes.
+
+    The ``kite`` / ``kcu`` / ``tether`` blocks the models consume are
+    extracted from the chosen system yaml and merged into the returned
+    config dict, with ``system_yaml_used`` recording the variant.
+    """
+    if config_folder is None:
+        raw = _prompt_path(
+            "Enter the config folder (with system*.yaml and ekf_config.yaml), "
+            "or leave empty to list data/: "
+        )
+        if raw:
+            config_folder = raw
+        else:
+            candidates = sorted(
+                path.parent for path in Path("data").glob(f"*/{_EKF_CONFIG_NAME}")
+            )
+            if not candidates:
+                raise FileNotFoundError(
+                    f"No data/*/{_EKF_CONFIG_NAME} found; pass the folder path"
+                )
+            print("Available config folders:")
+            for index, path in enumerate(candidates, start=1):
+                print(f"{index}: {path.name}")
+            selection = (
+                input(f"Select a config folder (1-{len(candidates)}) [default: 1]: ").strip()
+                or "1"
+            )
+            config_folder = candidates[int(selection) - 1]
+
+    folder = Path(config_folder).expanduser()
+    if not folder.exists() and (Path("data") / folder).exists():
+        folder = Path("data") / folder  # a bare kite name resolves to data/<name>
+    folder = folder.resolve()
+    if not folder.exists():
+        raise FileNotFoundError(f"Folder does not exist: {folder}")
+
+    ekf_config_path = folder / _EKF_CONFIG_NAME
+    if not ekf_config_path.exists():
+        raise FileNotFoundError(f"{_EKF_CONFIG_NAME} not found in {folder}")
+
+    # Every system variant in the folder is a candidate; the physical
+    # properties the EKF assumes -- KCU mass and tether above all -- depend
+    # on which one is chosen.
+    candidates = sorted(
+        set(folder.glob("system*.yaml")) | set(folder.glob("system*.yml"))
+    )
+    if not candidates:
+        raise FileNotFoundError(f"No system*.yaml / system*.yml in {folder}")
+    if len(candidates) == 1:
+        system_yaml_path = candidates[0]
     else:
-        raise ValueError("Invalid selection. Please choose a valid file number.")
+        print("Available system configuration files:")
+        for index, path in enumerate(candidates, start=1):
+            print(f"{index}: {path.name}")
+        selection = (
+            input(f"Select a system file (1-{len(candidates)}) [default: 1]: ").strip()
+            or "1"
+        )
+        system_yaml_path = candidates[int(selection) - 1]
+    print(f"Using system config: {system_yaml_path.name}")
+
+    with open(ekf_config_path, "r", encoding="utf-8") as file:
+        config_data = yaml.safe_load(file)
+    with open(system_yaml_path, "r", encoding="utf-8") as file:
+        system_config = yaml.safe_load(file)
+
+    kite_node = get_kite(system_config)
+    wing_struct = kite_node.get("wing", {}).get("structure", {})
+    bridle_struct = kite_node.get("bridle", {}).get("structure", {})
+    control_sys_struct = kite_node.get("control_system", {}).get("structure", {})
+    tether_struct = get_tether(system_config).get("structure", {})
+
+    config_data["kite"] = {
+        "model_name": kite_node.get("name", "unknown"),
+        "mass": wing_struct.get("mass", 0.0),
+        "area": wing_struct.get(
+            "projected_surface_area", wing_struct.get("planform_surface_area", 0.0)
+        ),
+        "span": wing_struct.get("span", 0.0),
+        "sensor_ids": [0, 1],
+    }
+    config_data["kcu"] = {
+        "length": control_sys_struct.get("length", 1.0),
+        "diameter": control_sys_struct.get("diameter", 0.48),
+        "mass": control_sys_struct.get("mass", 0.0),
+        "distance_kcu_kite": (
+            bridle_struct.get("bridle_point_node", [0, 0, 0])[2]
+            if bridle_struct.get("bridle_point_node")
+            else 0.0
+        ),
+        "total_length_bridle_lines": bridle_struct.get(
+            "total_nominal_line_length", 0.0
+        ),
+        "diameter_bridle_lines": bridle_struct.get("avg_line_diameter", 0.0),
+    }
+    config_data["tether"] = {
+        "material_name": tether_struct.get("material", {}).get("type", "Dyneema-SK78"),
+        "diameter": tether_struct.get("diameter", 0.01),
+        "n_elements": 30,
+    }
+    # Record WHICH system variant the EKF assumed; it ends up in the results
+    # config, so a flown-2019 vs flown-2025 run stays identifiable.
+    config_data["system_yaml_used"] = system_yaml_path.name
+
+    if not validate_config(config_data):
+        raise ValueError("Configuration is missing required data.")
+
+    print(f"EKF config loaded from: {ekf_config_path}")
+    print(f"Kite model: {config_data['kite']['model_name']}")
+    return config_data
 
 
 def validate_config(config_data):

@@ -10,6 +10,7 @@ data/flight_logs/kitekraft/
 data/config/v9_config.yaml
 data/config/v11_config.yaml
 data/config/kft_config.yaml
+data/LEI-V9-KITE/
 *toyota*
 data/data_preprocessors/process_KFT_data.py
 data/data_preprocessors/process_KP_data.py
