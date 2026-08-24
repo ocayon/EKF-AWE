@@ -8,6 +8,10 @@ from awes_ekf.postprocess.postprocessing import find_offset, find_pitot_calibrat
 import time
 import copy
 
+# A pre-run over a long flight can hit a handful of unusable samples; report the
+# first few and summarise the rest instead of flooding the log.
+_MAX_REPORTED_PRERUN_FAILURES = 10
+
 
 def mean_timestep(ekf_input_list, n_samples=100):
     """Mean timestep of the first samples, used to convert minutes to samples."""
@@ -83,6 +87,8 @@ def calibration_series(
         ekf.x_k1_k1 = x0
 
         ekf_output_list = []
+        n_failed = 0
+        last_good = None
         start_time = time.time()
         for k in range(fit_end):
             try:
@@ -90,26 +96,59 @@ def calibration_series(
                     ekf, ekf_input_list[k], simConfig_prerun, tether, kite, kcu
                 )
             except Exception as e:
-                print(f"Error at timestep {k}: {e}")
-                break
+                # A sample the filter cannot integrate must not cut the
+                # calibration window short. Hold its place so the series stays
+                # aligned with ekf_input_list, and carry on to the end of the
+                # window; the fit leaves the gap out.
+                n_failed += 1
+                if n_failed <= _MAX_REPORTED_PRERUN_FAILURES:
+                    print(f"  Skipping timestep {k} of the pre-run: {e}")
+                ekf_output_list.append(None)
+                # A failed step can leave a non-finite state behind, which would
+                # poison every step after it. Roll back to the last state the
+                # filter did converge on.
+                if last_good is not None and not np.all(
+                    np.isfinite(np.asarray(ekf.x_k1_k1, dtype=float))
+                ):
+                    ekf.x_k1_k1 = last_good[0].copy()
+                    ekf.P_k1_k1 = last_good[1].copy()
+                continue
             ekf_output_list.append(ekf_output)
+            last_good = (
+                np.asarray(ekf.x_k1_k1, dtype=float).copy(),
+                np.asarray(ekf.P_k1_k1, dtype=float).copy(),
+            )
             if k > 0 and k % 3000 == 0:
                 print(
                     f"  Pre-run at minute {k * timestep / 60:.1f}, "
                     f"{time.time() - start_time:.1f} s elapsed"
                 )
+        if n_failed:
+            print(
+                f"  {n_failed} of {fit_end} pre-run samples were unusable and are "
+                "left out of the fit"
+            )
     finally:
         # Leave the tuning parameters as the caller passed them: they describe
         # the real filter, not the one used for this pre-run
         tuningParams.update_observation_vector(simConfig)
 
-    # The pre-run can stop early, so only keep the samples both series have
+    # Skipped samples come back as NaN rather than being dropped, so the two
+    # series stay aligned sample for sample and the fits ignore the gaps.
     n_samples = min(len(ekf_output_list), fit_end)
     estimated = np.array(
-        [output.__dict__[output_variable] for output in ekf_output_list[:n_samples]]
+        [
+            np.nan if output is None else output.__dict__[output_variable]
+            for output in ekf_output_list[:n_samples]
+        ],
+        dtype=float,
     )
     measured = np.array(
-        [ekf_input.__dict__[input_variable] for ekf_input in ekf_input_list[:n_samples]]
+        [
+            ekf_input.__dict__[input_variable]
+            for ekf_input in ekf_input_list[:n_samples]
+        ],
+        dtype=float,
     )
     return estimated[fit_start:], measured[fit_start:]
 
@@ -174,9 +213,14 @@ def initialize_ekf(
                 tether,
                 variable,
             )
-            if len(estimated) == 0:
-                print(f"Not enough samples to calibrate {variable}, skipping")
+            usable = np.isfinite(estimated) & np.isfinite(measured)
+            if not usable.any():
+                print(f"No usable samples to calibrate {variable}, skipping")
                 continue
+            print(
+                f"Fitting {variable} on {int(usable.sum())} of {len(estimated)} "
+                "samples of the calibration window"
+            )
 
             if variable == "kite_apparent_windspeed":
                 # A pitot tube is calibrated in dynamic pressure, not with an

@@ -60,7 +60,8 @@ def normalize_angles(signal):
 
 def compute_mse(sig1, sig2, offset):
     shifted_sig2 = sig2 + offset
-    mse = np.mean((sig1 - shifted_sig2) ** 2)
+    # Samples the pre-run could not produce are NaN and are left out of the fit
+    mse = np.nanmean((sig1 - shifted_sig2) ** 2)
     return mse
 
 
