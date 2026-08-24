@@ -17,15 +17,14 @@ Input CSV spec and diagrams: `.claude/`.
 
 ### State of the repo
 
-- `main` is at `4dee7c6` (calibration pre-run robustness). **Unpushed.**
-- UNCOMMITTED implementation of the steering-dependent aero stages (this
-  session, tested, works): `setup/settings.py`, `setup/kite.py`,
-  `ekf/kalman_filter.py`, `ekf/ekf_output.py`,
-  `load_data/create_input_from_csv.py`. Both flags default False → base runs
-  bit-identical. Also uncommitted user WIP:
-  `examples/identify_aero_parameters_turn_law.py`.
-- AWETrim-side edit: `tune_ekf.py: apply_override` now CREATES unknown keys
-  inside known blocks (needed to `--set` the new flags, absent from base h5s).
+- `main` = `2bd0cd0`, PUSHED to origin: the steering-dependent stages
+  (`c12e96a`), CLAUDE.md, and the earlier calibration robustness (`4dee7c6`).
+  Uncommitted user WIP: `examples/identify_aero_parameters_turn_law.py`.
+- AWETrim-side edits (UNCOMMITTED in AWETrim): `tune_ekf.py: apply_override`
+  now CREATES unknown keys inside known blocks (needed to `--set` new flags
+  absent from base h5s), and `data/LEI-V3-KITE/ekf_config.yaml` now carries
+  the s3b recommendation (all three stage flags + lag 0.3 + walks
+  0.005/0.002/0.003) — the next production solve uses the stages.
 
 ### The steering-dependent aero stages (implemented + validated)
 
@@ -107,6 +106,30 @@ Candidate landscape, pattern pp per channel (60–100 min slice):
   pinz2 and s2 were regenerated and reproduce the originals exactly, s1 and
   s2loose were not (regenerate with the flags above if needed).
 
+### 2025-10-09 lidar validation (28-min flight, profiling lidar 40-250 m)
+
+The one flight with an independent wind reference. base25 (pinz2 tuning,
+pre-run pitot k=0.8308 b=-5.12 — k nearly identical to 2019's 0.8224) vs
+s3b25 (same frozen pitot + the s3b flags), full flight minus the last ~40 s
+(landing garbage that reset-storms the filter; cut at minute 28):
+
+- EKF vs lidar at kite height, 60-s blocks: speed bias +0.16 -> +0.10 m/s
+  (RMS 0.48/0.47, corr 0.81/0.78), direction bias -0.4 -> -0.2 deg (RMS
+  10.2 -> 9.9), w_z bias +0.13 -> +0.07 (lidar mean -0.08, EKF -0.01 with
+  the stages). The stages are equal-or-better on every lidar metric; the
+  small wind-speed pattern increase the phase metric shows (1.6 -> 2.6 %)
+  does NOT show up as a real accuracy loss against the lidar.
+- Stages transfer: CS pattern 0.072 -> 0.042 pp, CL 0.118 -> 0.056 (pat%
+  33 -> 13), CD 0.036 -> 0.023. Mean profile matches lidar within ~0.2 m/s
+  and 1-2 deg at every height.
+- Constants (/200 scale): k_phi_us -0.75 (2019: -0.60, split-half 4 %),
+  k_cl_us -1.1 and k_cd_us +7.5 (larger than 2019, split-half 10-22 % — a
+  28-min flight converges them only roughly), k_cl_us_odd NOT identified
+  (split-half 206 %) — don't trust the asym constant from short flights.
+- Results: `_tune_base25`, `_tune_s3b25` h5s; lidar comparison script:
+  the session scratchpad's `lidar_compare.py` (interpolates the profile to
+  kite height; met dir -> ENU downwind is rad = deg2rad(270 - dir_met)).
+
 ### Fixed background decisions (do not relitigate)
 
 - vw 0.02 is the sweet spot (0.05 wanders with the loop, 0.01 suppresses real
@@ -117,34 +140,5 @@ Candidate landscape, pattern pp per channel (60–100 min slice):
 - NIS consistency is muddied by the 1e-5 least-squares pseudo-measurements —
   don't tune toward it.
 - CL/CD steering terms are EVEN (|u_s|, u_s²); only CS is odd. A signed
-  sign(u_s)·u_s² would claim left/right turns change drag oppositely.
-
-### Test harness (lives in AWETrim, works on any results h5)
-
-- Solver driver:
-  `C:\Users\ocayon\Repositories\AWETrim\scripts\personal\wes-quasi-steady\tune_ekf.py`
-  — non-interactive re-run of the 2019 flight on a minutes slice (default
-  60–100), config taken from an existing results h5, `--set key=value`
-  overrides, `--name X` → `..._tune_X.h5`. `--pitot 0.8224,33.0322` freezes
-  the pitot calibration (recovered from the production solve) — WITHOUT it the
-  pre-run refits k with the candidate's own tuning, which moved k by 20 %
-  between candidates and shifted the whole wind level (a confound).
-- Acceptance metric:
-  `...\wes-quasi-steady\diagnose_ekf.py --ekf <h5> [--plot]` — decomposes each
-  wind/coefficient channel into loop-locked (pattern), height (shear) and
-  residual parts over the figure-eight phase. Success = the CS/CL/CD "pat%"
-  columns drop with the wind channels unchanged or better.
-- Reference numbers to beat (recommended tuning `pinz2`, minutes 60–100:
-  vw 0.02, vwz 0.005, CL/CD/CS 0.01/0.003/0.01, enforce_vertical_wind_to_0
-  true): wind speed 3.1 % pattern-locked / TI 8.8 %, direction 2.3° pp,
-  CS 72 % pattern-locked (the number stage 1 attacks).
-
-### Fixed background decisions (do not relitigate)
-
-- vw 0.02 is the sweet spot (0.05 wanders with the loop, 0.01 suppresses real
-  turbulence and biases the wind level +0.4 m/s).
-- Mean w_z is unobservable in this filter (sign flips with tuning on the same
-  data; 2019-10-08 was overcast + rain, so the +1 m/s "updraft" is spurious)
-  → `enforce_vertical_wind_to_0: true` in AWETrim's ekf_config.yaml.
-- NIS consistency is muddied by the 1e-5 least-squares pseudo-measurements —
-  don't tune toward it.
+  sign(u_s)·u_s² would claim left/right turns change drag oppositely, and a
+  signed linear CD term was tried and made CD worse.
