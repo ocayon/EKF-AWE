@@ -100,6 +100,17 @@ class EKFOutput:
     )
     k_cl_up: Optional[float] = None  # Power input coefficient with cl
     k_cd_up: Optional[float] = None  # Power input coefficient with cd
+    # Steering-dependent aero stages. The wing_*_coefficient fields above hold
+    # the STATES, which with the stages enabled carry only the residual the
+    # steering input cannot explain; the *_total fields reconstruct the full
+    # coefficients the force model used.
+    k_phi_us: Optional[float] = None  # Steering-to-sideslip constant (-)
+    k_cl_us: Optional[float] = None  # Steering magnitude coefficient on CL (-)
+    k_cd_us: Optional[float] = None  # Squared steering coefficient on CD (-)
+    k_cl_us_odd: Optional[float] = None  # Signed steering coefficient on CL (-)
+    wing_lift_coefficient_total: Optional[float] = None  # CL incl. steering part (-)
+    wing_drag_coefficient_total: Optional[float] = None  # CD incl. steering part (-)
+    wing_sideforce_coefficient_total: Optional[float] = None  # CS incl. steering part (-)
 
 
 def create_ekf_output(x, u, ekf_input, tether, kite, simConfig):
@@ -114,6 +125,34 @@ def create_ekf_output(x, u, ekf_input, tether, kite, simConfig):
 
     k_cl_up = float(x[state_index_map.get("k_cl_up", 0)])
     k_cd_up = float(x[state_index_map.get("k_cd_up", 0)])
+
+    # Steering-dependent aero stages: reconstruct the total coefficients the
+    # force model used from the residual states and the steering input.
+    steering_outputs = {}
+    if "us" in input_index_map:
+        us = float(u[input_index_map["us"]])
+        CL_eff = float(x[state_index_map["CL"]])
+        CD_eff = float(x[state_index_map["CD"]])
+        CS_eff = float(x[state_index_map["CS"]])
+        if "k_cl_us" in state_index_map:
+            k_cl_us = float(x[state_index_map["k_cl_us"]])
+            k_cd_us = float(x[state_index_map["k_cd_us"]])
+            CL_eff += k_cl_us * abs(us)
+            CD_eff += k_cd_us * us * us
+            steering_outputs.update(k_cl_us=k_cl_us, k_cd_us=k_cd_us)
+        if "k_cl_us_odd" in state_index_map:
+            k_cl_us_odd = float(x[state_index_map["k_cl_us_odd"]])
+            CL_eff += k_cl_us_odd * us
+            steering_outputs["k_cl_us_odd"] = k_cl_us_odd
+        if "k_phi_us" in state_index_map:
+            k_phi_us = float(x[state_index_map["k_phi_us"]])
+            CS_eff = CL_eff * np.tan(k_phi_us * us) + CS_eff
+            steering_outputs["k_phi_us"] = k_phi_us
+        steering_outputs.update(
+            wing_lift_coefficient_total=CL_eff,
+            wing_drag_coefficient_total=CD_eff,
+            wing_sideforce_coefficient_total=CS_eff,
+        )
 
     # Calculate wind velocity based on configuration
     if simConfig.log_profile:
@@ -219,6 +258,7 @@ def create_ekf_output(x, u, ekf_input, tether, kite, simConfig):
         kite_apparent_windspeed=float(kite_apparent_windspeed),
         k_cl_up=k_cl_up,
         k_cd_up=k_cd_up,
+        **steering_outputs,
     )
 
     # Optional yaw modeling

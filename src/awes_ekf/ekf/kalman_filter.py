@@ -235,6 +235,16 @@ class ExtendedKalmanFilter:
             input = np.concatenate((input, input_class.kcu_velocity))
         if self.simConfig.obsData.kite_thrust_force:
             input = np.concatenate((input, input_class.kite_thrust_force))
+        if (
+            self.simConfig.model_yaw
+            or self.simConfig.steering_dependent_cs
+            or self.simConfig.steering_dependent_clcd
+            or self.simConfig.steering_dependent_cl_asym
+        ):
+            us = input_class.steering_input
+            input = np.concatenate(
+                (input, np.array([0.0 if us is None else float(us)]))
+            )
         if self.simConfig.obsData.dynamic_depower:
             input = np.concatenate((input, np.array([input_class.depower_input])))
             input = np.concatenate((input, np.array([input_class.delta_up])))

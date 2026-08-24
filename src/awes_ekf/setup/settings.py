@@ -104,6 +104,25 @@ class SimulationConfig:
             "enforce_vertical_wind_to_0", False
         )
         self.model_yaw = kwargs.get("model_yaw", False)
+        # Deterministic dependence of the aero coefficients on the measured
+        # steering input, with the constants estimated as near-zero-process-
+        # noise states (the same mechanism as the depower constants k_cl_up/
+        # k_cd_up). The steering is loop-phase-locked, so leaving it to the
+        # random walks makes them chase a loop-frequency sinusoid with lag.
+        # Stage 1: CS = CL * tan(k_phi_us * us) plus the CS state as residual.
+        self.steering_dependent_cs = kwargs.get("steering_dependent_cs", False)
+        # Stage 2: k_cl_us * |us| on CL and k_cd_us * us^2 on CD.
+        self.steering_dependent_clcd = kwargs.get("steering_dependent_clcd", False)
+        # Left/right asymmetry: signed k_cl_us_odd * us on CL, on top of the
+        # even stage-2 terms. CL only: a signed CD term was tried on the
+        # 2019-10-08 flight and made the CD pattern-lock worse.
+        self.steering_dependent_cl_asym = kwargs.get(
+            "steering_dependent_cl_asym", False
+        )
+        # First-order lag [s] applied to the steering input before it enters
+        # the model: the aero response lags the measured actuation (identified
+        # at ~0.3 s on the 2019-10-08 flight). 0 disables the filter.
+        self.steering_input_lag = float(kwargs.get("steering_input_lag", 0.0))
         self.thrust_force = kwargs.get("thrust_force", False)
         self.debug = kwargs.get("debug", False)
         measurements = kwargs.get("measurements", {})
@@ -195,6 +214,21 @@ class TuningParameters:
             self.stdv_dynamic_model = np.append(
                 self.stdv_dynamic_model, 1e-6
             )  # Depower constant
+        if simConfig.steering_dependent_cs:
+            self.stdv_dynamic_model = np.append(
+                self.stdv_dynamic_model, 1e-6
+            )  # Steering-to-sideforce constant k_phi_us
+        if simConfig.steering_dependent_clcd:
+            self.stdv_dynamic_model = np.append(
+                self.stdv_dynamic_model, 1e-6
+            )  # Steering constant k_cl_us
+            self.stdv_dynamic_model = np.append(
+                self.stdv_dynamic_model, 1e-6
+            )  # Steering constant k_cd_us
+        if simConfig.steering_dependent_cl_asym:
+            self.stdv_dynamic_model = np.append(
+                self.stdv_dynamic_model, 1e-6
+            )  # Steering asymmetry constant k_cl_us_odd
         self.indices_measurements = [
             "x",
             "x",

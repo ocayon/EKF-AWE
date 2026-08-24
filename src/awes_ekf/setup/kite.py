@@ -70,6 +70,10 @@ class PointMassEKF(Kite):
         self.k_yaw_rate = ca.SX.sym("k_yaw_rate")  # Yaw rate constant
         self.k_cl_up = ca.SX.sym("k_cl_up")  # Effect of depower rate on CL
         self.k_cd_up = ca.SX.sym("k_cd_up")  # Effect of depower rate on CL
+        self.k_phi_us = ca.SX.sym("k_phi_us")  # Steering-to-sideslip constant
+        self.k_cl_us = ca.SX.sym("k_cl_us")  # Effect of steering magnitude on CL
+        self.k_cd_us = ca.SX.sym("k_cd_us")  # Effect of squared steering on CD
+        self.k_cl_us_odd = ca.SX.sym("k_cl_us_odd")  # Signed steering effect on CL
         self.depower_input = ca.SX.sym("depower_input")
         self.delta_up = ca.SX.sym("delta_up")  # Change in depower setting
 
@@ -128,6 +132,20 @@ class PointMassEKF(Kite):
             self.x = ca.vertcat(self.x, self.k_cd_up)
             self.state_names.append("k_cd_up")
 
+        if self.simConfig.steering_dependent_cs:
+            self.x = ca.vertcat(self.x, self.k_phi_us)
+            self.state_names.append("k_phi_us")
+
+        if self.simConfig.steering_dependent_clcd:
+            self.x = ca.vertcat(self.x, self.k_cl_us)
+            self.state_names.append("k_cl_us")
+            self.x = ca.vertcat(self.x, self.k_cd_us)
+            self.state_names.append("k_cd_us")
+
+        if self.simConfig.steering_dependent_cl_asym:
+            self.x = ca.vertcat(self.x, self.k_cl_us_odd)
+            self.state_names.append("k_cl_us_odd")
+
         return self.x
 
     def get_wind_velocity(self):
@@ -169,7 +187,12 @@ class PointMassEKF(Kite):
             input = ca.vertcat(input, self.thrust)
             self.input_names.extend([f"thrust_{i}" for i in range(3)])
 
-        if self.simConfig.model_yaw:
+        if (
+            self.simConfig.model_yaw
+            or self.simConfig.steering_dependent_cs
+            or self.simConfig.steering_dependent_clcd
+            or self.simConfig.steering_dependent_cl_asym
+        ):
             input = ca.vertcat(input, self.us)
             self.input_names.append("us")
 
@@ -222,9 +245,26 @@ class PointMassEKF(Kite):
         )
         dir_S = ca.cross(dir_L, dir_D)
 
-        L = self.CL * 0.5 * rho * self.area * ca.norm_2(self.va) ** 2 * dir_L
-        D = self.CD * 0.5 * rho * self.area * ca.norm_2(self.va) ** 2 * dir_D
-        S = self.CS * 0.5 * rho * self.area * ca.norm_2(self.va) ** 2 * dir_S
+        # With the steering-dependent stages enabled, the loop-locked part of
+        # the aero coefficients is carried deterministically by the measured
+        # steering input and the CL/CD/CS states keep only the residual the
+        # actuation cannot explain.
+        CL_eff = self.CL
+        CD_eff = self.CD
+        CS_eff = self.CS
+        if self.simConfig.steering_dependent_clcd:
+            CL_eff = CL_eff + self.k_cl_us * ca.fabs(self.us)
+            CD_eff = CD_eff + self.k_cd_us * self.us * self.us
+        if self.simConfig.steering_dependent_cl_asym:
+            CL_eff = CL_eff + self.k_cl_us_odd * self.us
+        if self.simConfig.steering_dependent_cs:
+            # The aerodynamic sideslip phi_a = atan(CS/CL) is proportional to
+            # the steering input, so the sideforce follows the lift
+            CS_eff = CL_eff * ca.tan(self.k_phi_us * self.us) + CS_eff
+
+        L = CL_eff * 0.5 * rho * self.area * ca.norm_2(self.va) ** 2 * dir_L
+        D = CD_eff * 0.5 * rho * self.area * ca.norm_2(self.va) ** 2 * dir_D
+        S = CS_eff * 0.5 * rho * self.area * ca.norm_2(self.va) ** 2 * dir_S
 
         Fg = ca.vertcat(0, 0, -self.mass * g)
         rp = self.v
@@ -278,6 +318,13 @@ class PointMassEKF(Kite):
             fx = ca.vertcat(fx, 0)
         if self.simConfig.obsData.dynamic_depower:
             fx = ca.vertcat(fx, 0)
+            fx = ca.vertcat(fx, 0)
+        if self.simConfig.steering_dependent_cs:
+            fx = ca.vertcat(fx, 0)
+        if self.simConfig.steering_dependent_clcd:
+            fx = ca.vertcat(fx, 0)
+            fx = ca.vertcat(fx, 0)
+        if self.simConfig.steering_dependent_cl_asym:
             fx = ca.vertcat(fx, 0)
 
         return fx

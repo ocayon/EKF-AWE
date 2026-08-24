@@ -121,12 +121,29 @@ def create_input_from_csv(
         depower_input = np.zeros(n_intervals)
 
     try:
-        steering_input = flight_data["kcu_actual_steering"] / max(
-            abs(flight_data["kcu_actual_steering"])
+        steering_input = np.array(
+            flight_data["kcu_actual_steering"]
+            / max(abs(flight_data["kcu_actual_steering"]))
         )
     except KeyError:
         print("No steering input data found")
         steering_input = np.zeros(n_intervals)
+
+    # The aero response lags the measured steering; a first-order filter with
+    # the identified time constant aligns the model input with the response
+    # it drives.
+    tau_us = getattr(simConfig, "steering_input_lag", 0.0)
+    if tau_us > 0:
+        time_values = np.asarray(flight_data["time"], dtype=float)
+        filtered = np.array(steering_input, dtype=float)
+        for i in range(1, len(filtered)):
+            dt_i = time_values[i] - time_values[i - 1]
+            alpha = dt_i / (tau_us + dt_i)
+            filtered[i] = filtered[i - 1] + alpha * (
+                steering_input[i] - filtered[i - 1]
+            )
+        steering_input = filtered
+        print(f"Steering input filtered with a {tau_us:.2f} s first-order lag")
 
     try:
         kite_course = np.array(flight_data["kite_course"])
@@ -331,5 +348,12 @@ def find_initial_state_vector(
     if simConfig.obsData.dynamic_depower:
         x0 = np.append(x0, 0)
         x0 = np.append(x0, 0)
+    if simConfig.steering_dependent_cs:
+        x0 = np.append(x0, 0)  # k_phi_us
+    if simConfig.steering_dependent_clcd:
+        x0 = np.append(x0, 0)  # k_cl_us
+        x0 = np.append(x0, 0)  # k_cd_us
+    if simConfig.steering_dependent_cl_asym:
+        x0 = np.append(x0, 0)  # k_cl_us_odd
 
     return x0
