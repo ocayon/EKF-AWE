@@ -17,9 +17,13 @@ Input CSV spec and diagrams: `.claude/`.
 
 ### State of the repo
 
-- `main` = `2bd0cd0`, PUSHED to origin: the steering-dependent stages
-  (`c12e96a`), CLAUDE.md, and the earlier calibration robustness (`4dee7c6`).
-  Uncommitted user WIP: `examples/identify_aero_parameters_turn_law.py`.
+- `main` = `f7ba973`, PUSHED to origin: the steering-dependent stages
+  (`c12e96a`), the folder-based config convention (`f7ba973` — load_config
+  asks for a data/<KITE-NAME>/ folder holding ekf_config.yaml + awesIO
+  system*.yaml variants, same extraction as AWETrim; data/LEI-V3-KITE/
+  carries both flown variants, V9 stays local-only per the ignore rules),
+  and the earlier calibration robustness (`4dee7c6`). Uncommitted user WIP:
+  `examples/identify_aero_parameters_turn_law.py`.
 - AWETrim-side edits (UNCOMMITTED in AWETrim): `tune_ekf.py: apply_override`
   now CREATES unknown keys inside known blocks (needed to `--set` new flags
   absent from base h5s), and `data/LEI-V3-KITE/ekf_config.yaml` now carries
