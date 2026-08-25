@@ -229,7 +229,6 @@ def create_input_from_csv(
         # raise ValueError("Initial wind velocity is NaN")
 
     ekf_input_list = []
-    import matplotlib.pyplot as plt
 
     delta_up = np.gradient(depower_input, flight_data["time"].values)
 
