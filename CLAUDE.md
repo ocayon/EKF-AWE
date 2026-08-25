@@ -17,6 +17,9 @@ Input CSV spec and diagrams: `.claude/`.
 
 ### State of the repo
 
+- NOTE: the PRODUCTION 2019 h5 (`LEI-V3 Kite_2019-10-08.h5`) was re-solved
+  by the user with the s3b config on 2026-08-25 — base h5 configs read from
+  it now carry the stage flags and tightened walks by default.
 - `main` = `f7ba973`, PUSHED to origin: the steering-dependent stages
   (`c12e96a`), the folder-based config convention (`f7ba973` — load_config
   asks for a data/<KITE-NAME>/ folder holding ekf_config.yaml + awesIO
@@ -133,6 +136,37 @@ s3b25 (same frozen pitot + the s3b flags), full flight minus the last ~40 s
 - Results: `_tune_base25`, `_tune_s3b25` h5s; lidar comparison script:
   the session scratchpad's `lidar_compare.py` (interpolates the profile to
   kite height; met dir -> ENU downwind is rad = deg2rad(270 - dir_met)).
+
+### The wing-CD dips and the drag-polar stage (2026-08-25, negative result)
+
+The 2019 wing CD (median 0.09) dips below 0.05 for ~12 % of samples and
+below 0 for ~0.3 % (2.6 % in the old loose production tuning). Diagnosed:
+
+- Dips are brief (2-4 s) episodes, 88-93 % of them in REEL-OUT, at normal
+  va, with the parasitic KCU+tether+bridle CD flat (0.068) — NOT a low-va,
+  depower, or component-drag problem. At the dips CL is HIGH (0.66 vs
+  0.59): the signature of lift/drag AXIS MISATTRIBUTION — a 2-3 deg
+  apparent-wind direction error rotates ~eps*CL between the axes, which at
+  CL 0.7 is exactly the 0.03 dip scale. CD suffers most because it sits
+  orthogonal to a force 7x larger.
+- `drag_polar` (SimulationConfig, default OFF): CD = CD0 + k_cd_cl2*CL_eff^2
+  is IMPLEMENTED (constant state k_cd_cl2; with the flag on, the depower
+  path k_cd_up*delta_up on CD is disabled so the polar owns the slow
+  signal). DO NOT ENABLE for this data: k_cd_cl2 converges confidently
+  NEGATIVE (-0.013, split-half 3.5 %) because the fast CD-CL covariance the
+  filter sees is the anticorrelated misattribution noise, and the slow
+  phase-level relation is flat too — reel-in flies CL 0.42 at CD 0.089 vs
+  reel-out CL 0.66 at CD 0.093, where a physical polar (k ~ 0.11 from
+  AR 3.47) would give ~0.064. Whether that is genuine depowered-LEI
+  aerodynamics or reel-in parasitic-drag bias, the polar is not
+  identifiable from this flight; it also leaves the dips unchanged
+  (12.3 -> 12.1 % below 0.05). Runs: `_tune_s4` (first form), `_tune_s4b`
+  (depower path removed), `_tune_s4c` (CD walk 0.001 — dips 11.2 %, best
+  of the three, still no fix).
+- Remaining honest fix for the dips: POSITIVITY REPARAMETERIZATION of the
+  CD state (CD0 = floor + softplus(x), floor ~0.04; near-linear away from
+  the floor so the Q interpretation survives). Not implemented — the axis
+  noise then redistributes, watch the wind channels when trying it.
 
 ### Fixed background decisions (do not relitigate)
 

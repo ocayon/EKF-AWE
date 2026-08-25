@@ -108,6 +108,7 @@ class EKFOutput:
     k_cl_us: Optional[float] = None  # Steering magnitude coefficient on CL (-)
     k_cd_us: Optional[float] = None  # Squared steering coefficient on CD (-)
     k_cl_us_odd: Optional[float] = None  # Signed steering coefficient on CL (-)
+    k_cd_cl2: Optional[float] = None  # Induced-drag factor CL^2 -> CD (-)
     wing_lift_coefficient_total: Optional[float] = None  # CL incl. steering part (-)
     wing_drag_coefficient_total: Optional[float] = None  # CD incl. steering part (-)
     wing_sideforce_coefficient_total: Optional[float] = None  # CS incl. steering part (-)
@@ -126,28 +127,39 @@ def create_ekf_output(x, u, ekf_input, tether, kite, simConfig):
     k_cl_up = float(x[state_index_map.get("k_cl_up", 0)])
     k_cd_up = float(x[state_index_map.get("k_cd_up", 0)])
 
-    # Steering-dependent aero stages: reconstruct the total coefficients the
-    # force model used from the residual states and the steering input.
+    # Steering-dependent aero stages and drag polar: reconstruct the total
+    # coefficients the force model used from the residual states. The term
+    # order mirrors kite.get_fx: CL is completed first, the polar uses the
+    # complete CL, and the sideforce follows the complete lift.
     steering_outputs = {}
-    if "us" in input_index_map:
-        us = float(u[input_index_map["us"]])
-        CL_eff = float(x[state_index_map["CL"]])
-        CD_eff = float(x[state_index_map["CD"]])
-        CS_eff = float(x[state_index_map["CS"]])
-        if "k_cl_us" in state_index_map:
-            k_cl_us = float(x[state_index_map["k_cl_us"]])
-            k_cd_us = float(x[state_index_map["k_cd_us"]])
-            CL_eff += k_cl_us * abs(us)
-            CD_eff += k_cd_us * us * us
-            steering_outputs.update(k_cl_us=k_cl_us, k_cd_us=k_cd_us)
-        if "k_cl_us_odd" in state_index_map:
-            k_cl_us_odd = float(x[state_index_map["k_cl_us_odd"]])
-            CL_eff += k_cl_us_odd * us
-            steering_outputs["k_cl_us_odd"] = k_cl_us_odd
-        if "k_phi_us" in state_index_map:
-            k_phi_us = float(x[state_index_map["k_phi_us"]])
-            CS_eff = CL_eff * np.tan(k_phi_us * us) + CS_eff
-            steering_outputs["k_phi_us"] = k_phi_us
+    model_terms = False
+    CL_eff = float(x[state_index_map["CL"]])
+    CD_eff = float(x[state_index_map["CD"]])
+    CS_eff = float(x[state_index_map["CS"]])
+    us = float(u[input_index_map["us"]]) if "us" in input_index_map else None
+    if us is not None and "k_cl_us" in state_index_map:
+        k_cl_us = float(x[state_index_map["k_cl_us"]])
+        k_cd_us = float(x[state_index_map["k_cd_us"]])
+        CL_eff += k_cl_us * abs(us)
+        CD_eff += k_cd_us * us * us
+        steering_outputs.update(k_cl_us=k_cl_us, k_cd_us=k_cd_us)
+        model_terms = True
+    if us is not None and "k_cl_us_odd" in state_index_map:
+        k_cl_us_odd = float(x[state_index_map["k_cl_us_odd"]])
+        CL_eff += k_cl_us_odd * us
+        steering_outputs["k_cl_us_odd"] = k_cl_us_odd
+        model_terms = True
+    if "k_cd_cl2" in state_index_map:
+        k_cd_cl2 = float(x[state_index_map["k_cd_cl2"]])
+        CD_eff += k_cd_cl2 * CL_eff * CL_eff
+        steering_outputs["k_cd_cl2"] = k_cd_cl2
+        model_terms = True
+    if us is not None and "k_phi_us" in state_index_map:
+        k_phi_us = float(x[state_index_map["k_phi_us"]])
+        CS_eff = CL_eff * np.tan(k_phi_us * us) + CS_eff
+        steering_outputs["k_phi_us"] = k_phi_us
+        model_terms = True
+    if model_terms:
         steering_outputs.update(
             wing_lift_coefficient_total=CL_eff,
             wing_drag_coefficient_total=CD_eff,

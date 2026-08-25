@@ -74,6 +74,7 @@ class PointMassEKF(Kite):
         self.k_cl_us = ca.SX.sym("k_cl_us")  # Effect of steering magnitude on CL
         self.k_cd_us = ca.SX.sym("k_cd_us")  # Effect of squared steering on CD
         self.k_cl_us_odd = ca.SX.sym("k_cl_us_odd")  # Signed steering effect on CL
+        self.k_cd_cl2 = ca.SX.sym("k_cd_cl2")  # Induced-drag factor: CL^2 on CD
         self.depower_input = ca.SX.sym("depower_input")
         self.delta_up = ca.SX.sym("delta_up")  # Change in depower setting
 
@@ -145,6 +146,10 @@ class PointMassEKF(Kite):
         if self.simConfig.steering_dependent_cl_asym:
             self.x = ca.vertcat(self.x, self.k_cl_us_odd)
             self.state_names.append("k_cl_us_odd")
+
+        if self.simConfig.drag_polar:
+            self.x = ca.vertcat(self.x, self.k_cd_cl2)
+            self.state_names.append("k_cd_cl2")
 
         return self.x
 
@@ -257,6 +262,10 @@ class PointMassEKF(Kite):
             CD_eff = CD_eff + self.k_cd_us * self.us * self.us
         if self.simConfig.steering_dependent_cl_asym:
             CL_eff = CL_eff + self.k_cl_us_odd * self.us
+        if self.simConfig.drag_polar:
+            # Induced drag follows the COMPLETE effective lift coefficient;
+            # the CD state is then only the parasitic residual CD0
+            CD_eff = CD_eff + self.k_cd_cl2 * CL_eff * CL_eff
         if self.simConfig.steering_dependent_cs:
             # The aerodynamic sideslip phi_a = atan(CS/CL) is proportional to
             # the steering input, so the sideforce follows the lift
@@ -289,7 +298,11 @@ class PointMassEKF(Kite):
             delta_up = self.delta_up
 
             CLdot = k_cl_up * delta_up
-            CDdot = k_cd_up * delta_up
+            # With the drag polar, the depower-driven CD change flows through
+            # CL (CLdot above, then k_cd_cl2*CL_eff^2 in the force model). An
+            # independent k_cd_up path would compete for the same slow signal
+            # and leave the polar constant only the corrupted fast covariance.
+            CDdot = 0 if self.simConfig.drag_polar else k_cd_up * delta_up
         else:
             CLdot = 0
             CDdot = 0
@@ -325,6 +338,8 @@ class PointMassEKF(Kite):
             fx = ca.vertcat(fx, 0)
             fx = ca.vertcat(fx, 0)
         if self.simConfig.steering_dependent_cl_asym:
+            fx = ca.vertcat(fx, 0)
+        if self.simConfig.drag_polar:
             fx = ca.vertcat(fx, 0)
 
         return fx

@@ -248,6 +248,12 @@ class SimulationConfig:
         # the model: the aero response lags the measured actuation (identified
         # at ~0.3 s on the 2019-10-08 flight). 0 disables the filter.
         self.steering_input_lag = float(kwargs.get("steering_input_lag", 0.0))
+        # Drag polar: CD = CD0 + k_cd_cl2 * CL_eff^2 (+ the steering term),
+        # with k_cd_cl2 a near-constant state and the CD state the parasitic
+        # residual CD0. Couples CD to CL the way the physics does, so
+        # lift/drag axis-misattribution noise can no longer walk the wing CD
+        # to unphysical near-zero values independently of CL.
+        self.drag_polar = kwargs.get("drag_polar", False)
         self.thrust_force = kwargs.get("thrust_force", False)
         self.debug = kwargs.get("debug", False)
         measurements = kwargs.get("measurements", {})
@@ -354,6 +360,10 @@ class TuningParameters:
             self.stdv_dynamic_model = np.append(
                 self.stdv_dynamic_model, 1e-6
             )  # Steering asymmetry constant k_cl_us_odd
+        if simConfig.drag_polar:
+            self.stdv_dynamic_model = np.append(
+                self.stdv_dynamic_model, 1e-6
+            )  # Induced-drag constant k_cd_cl2
         self.indices_measurements = [
             "x",
             "x",

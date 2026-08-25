@@ -355,5 +355,7 @@ def find_initial_state_vector(
         x0 = np.append(x0, 0)  # k_cd_us
     if simConfig.steering_dependent_cl_asym:
         x0 = np.append(x0, 0)  # k_cl_us_odd
+    if simConfig.drag_polar:
+        x0 = np.append(x0, 0)  # k_cd_cl2
 
     return x0
