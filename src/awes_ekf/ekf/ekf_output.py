@@ -70,9 +70,9 @@ class EKFOutput:
     kite_sideslip_angle: Optional[float] = (
         None  # Sideslip angle in degrees (rad) (Angle between velocity and apparent velocity)
     )
-    wing_lift_coefficient: Optional[float] = None  # Lift coefficient of the wing (-)
-    wing_drag_coefficient: Optional[float] = None  # Drag coefficient of the wing (-)
-    wing_sideforce_coefficient: Optional[float] = None  # Side force coefficient of the wing (-)
+    wing_lift_coefficient: Optional[float] = None  # Full wing CL the force model used (-)
+    wing_drag_coefficient: Optional[float] = None  # Full wing CD the force model used (-)
+    wing_sideforce_coefficient: Optional[float] = None  # Full wing CS the force model used (-)
     tether_angle_of_attack: Optional[float] = (
         None  # Angle of attack of the tether element below the KCU (rad)
     )
@@ -101,17 +101,18 @@ class EKFOutput:
     k_cl_up: Optional[float] = None  # Power input coefficient with cl
     k_cd_up: Optional[float] = None  # Power input coefficient with cd
     # Steering-dependent aero stages. The wing_*_coefficient fields above hold
-    # the STATES, which with the stages enabled carry only the residual the
-    # steering input cannot explain; the *_total fields reconstruct the full
-    # coefficients the force model used.
+    # the FULL coefficients the force model used (with the stages enabled:
+    # walk state + steering terms); the fields below expose the walk states
+    # alone — the near-constant parasitic CD0 and the residuals the steering
+    # input cannot explain. Without stages the two sets are identical.
     k_phi_us: Optional[float] = None  # Steering-to-sideslip constant (-)
     k_cl_us: Optional[float] = None  # Steering magnitude coefficient on CL (-)
     k_cd_us: Optional[float] = None  # Squared steering coefficient on CD (-)
     k_cl_us_odd: Optional[float] = None  # Signed steering coefficient on CL (-)
     k_cd_cl2: Optional[float] = None  # Induced-drag factor CL^2 -> CD (-)
-    wing_lift_coefficient_total: Optional[float] = None  # CL incl. steering part (-)
-    wing_drag_coefficient_total: Optional[float] = None  # CD incl. steering part (-)
-    wing_sideforce_coefficient_total: Optional[float] = None  # CS incl. steering part (-)
+    wing_lift_coefficient_residual: Optional[float] = None  # CL walk state alone (-)
+    wing_parasitic_drag_coefficient: Optional[float] = None  # CD walk state alone (-)
+    wing_sideforce_coefficient_residual: Optional[float] = None  # CS walk state alone (-)
 
 
 def create_ekf_output(x, u, ekf_input, tether, kite, simConfig):
@@ -127,12 +128,11 @@ def create_ekf_output(x, u, ekf_input, tether, kite, simConfig):
     k_cl_up = float(x[state_index_map.get("k_cl_up", 0)])
     k_cd_up = float(x[state_index_map.get("k_cd_up", 0)])
 
-    # Steering-dependent aero stages and drag polar: reconstruct the total
-    # coefficients the force model used from the residual states. The term
+    # Steering-dependent aero stages and drag polar: reconstruct the full
+    # coefficients the force model used from the walk states. The term
     # order mirrors kite.get_fx: CL is completed first, the polar uses the
     # complete CL, and the sideforce follows the complete lift.
     steering_outputs = {}
-    model_terms = False
     CL_eff = float(x[state_index_map["CL"]])
     CD_eff = float(x[state_index_map["CD"]])
     CS_eff = float(x[state_index_map["CS"]])
@@ -143,28 +143,18 @@ def create_ekf_output(x, u, ekf_input, tether, kite, simConfig):
         CL_eff += k_cl_us * abs(us)
         CD_eff += k_cd_us * us * us
         steering_outputs.update(k_cl_us=k_cl_us, k_cd_us=k_cd_us)
-        model_terms = True
     if us is not None and "k_cl_us_odd" in state_index_map:
         k_cl_us_odd = float(x[state_index_map["k_cl_us_odd"]])
         CL_eff += k_cl_us_odd * us
         steering_outputs["k_cl_us_odd"] = k_cl_us_odd
-        model_terms = True
     if "k_cd_cl2" in state_index_map:
         k_cd_cl2 = float(x[state_index_map["k_cd_cl2"]])
         CD_eff += k_cd_cl2 * CL_eff * CL_eff
         steering_outputs["k_cd_cl2"] = k_cd_cl2
-        model_terms = True
     if us is not None and "k_phi_us" in state_index_map:
         k_phi_us = float(x[state_index_map["k_phi_us"]])
         CS_eff = CL_eff * np.tan(k_phi_us * us) + CS_eff
         steering_outputs["k_phi_us"] = k_phi_us
-        model_terms = True
-    if model_terms:
-        steering_outputs.update(
-            wing_lift_coefficient_total=CL_eff,
-            wing_drag_coefficient_total=CD_eff,
-            wing_sideforce_coefficient_total=CS_eff,
-        )
 
     # Calculate wind velocity based on configuration
     if simConfig.log_profile:
@@ -248,9 +238,12 @@ def create_ekf_output(x, u, ekf_input, tether, kite, simConfig):
         tether_length=tether_length,
         kite_angle_of_attack=airflow_angles[0],
         kite_sideslip_angle=airflow_angles[1],
-        wing_lift_coefficient=x[state_index_map["CL"]],
-        wing_drag_coefficient=x[state_index_map["CD"]],
-        wing_sideforce_coefficient=x[state_index_map["CS"]],
+        wing_lift_coefficient=CL_eff,
+        wing_drag_coefficient=CD_eff,
+        wing_sideforce_coefficient=CS_eff,
+        wing_lift_coefficient_residual=float(x[state_index_map["CL"]]),
+        wing_parasitic_drag_coefficient=float(x[state_index_map["CD"]]),
+        wing_sideforce_coefficient_residual=float(x[state_index_map["CS"]]),
         tether_elevation=elevation_0,
         tether_azimuth=azimuth_0,
         kcu_drag_coefficient=drag_coefficient_kcu,

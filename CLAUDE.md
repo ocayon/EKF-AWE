@@ -47,9 +47,14 @@ Config flags in `simulation_parameters` (SimulationConfig):
   lift/drag); run with `model_stdv.CL/CD = 0.005/0.002` (tightening CONFIRMED
   better than leaving 0.01/0.003: loose control run had wind-speed pattern
   0.457 vs 0.401 pp).
-- Outputs: `wing_*_coefficient` = the STATES (residuals when stages on, so
-  diagnose_ekf stays apples-to-apples); totals in `wing_*_coefficient_total`;
-  constants in `k_phi_us`, `k_cl_us`, `k_cd_us`.
+- Outputs (convention FLIPPED 2026-08-25, user request): `wing_*_coefficient`
+  = the FULL coefficients the force model used (paper-comparable, what the
+  plots show); the walk states alone are in `wing_parasitic_drag_coefficient`
+  and `wing_lift/sideforce_coefficient_residual` (the old `_total` columns
+  are gone — h5s from before the flip have plain=STATE and `_total`=full).
+  diagnose_ekf reads the residual columns (falls back to plain on old h5s)
+  so its CL/CD/CS leakage channels still score the walks. Constants in
+  `k_phi_us`, `k_cl_us`, `k_cd_us`.
 - NOTE `create_input_from_csv` normalizes steering by max|kcu_actual_steering|
   of the LOADED slice (35.0 for minutes 60–100), not /200 — constants scale
   accordingly (k_phi_us −0.096 on the slice ≡ −0.55 on the /200 scale).
@@ -188,8 +193,9 @@ below 0 for ~0.3 % (2.6 % in the old loose production tuning). Diagnosed:
 User asked why the 2019 wing CD is ~0.07 when the paper (`v1.2.0-paper` tag,
 Apr 2025, old h5s in `EKF-AWE\results\v3\`) said 0.123. Decomposition:
 
-- ~0.015 is display: `wing_drag_coefficient` is the residual STATE since the
-  stages; the physically comparable number is `wing_drag_coefficient_total`.
+- ~0.015 was display: `wing_drag_coefficient` held the residual STATE from
+  the stages until 2026-08-25; the user disliked that and the convention is
+  now flipped (plain = full coefficient, see the stages section).
 - ~0.011 is the pitot dynamic-pressure calibration (paper used raw va;
   calibrated va is ~+5 % speed → all coefficients ~−10 %, lidar-backed).
 - ~0.014 is tether discretization 5→30 elements (tether CD 0.031→0.045).
@@ -216,7 +222,11 @@ Apr 2025, old h5s in `EKF-AWE\results\v3\`) said 0.123. Decomposition:
 - PENDING: both production h5s must be RE-SOLVED by the user (interactive
   run_analysis_ekf) to pick up the fix; until then base-h5 configs feed
   tune runs distance 0 (override with --set kcu.distance_kcu_kite=10.3).
-  All reference tune h5s except `_tune_dist115` carry the bug.
+  All reference tune h5s except `_tune_dist115`/`_tune_cg103` carry the bug.
+- `_tune_cg103` = the slice reference with the CG-derived 10.3 m AND the
+  renamed output columns: wing CD (full) 0.093 flight med / 0.091 reel-out,
+  parasitic CD0 0.084/0.079, bridle CD 0.012, KCU 0.007, offset 26.2 m,
+  CD<0.05 at 6.9 %, constants within noise of `_tune_dist115`.
 
 ### Fixed background decisions (do not relitigate)
 
