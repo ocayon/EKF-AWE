@@ -183,6 +183,41 @@ below 0 for ~0.3 % (2.6 % in the old loose production tuning). Diagnosed:
   ADOPTED 2026-08-25: CD = 0.0005 is in data/LEI-V3-KITE/ekf_config.yaml in
   BOTH repos (EKF-AWE committed, AWETrim committed separately).
 
+### The distance_kcu_kite=0 regression and the wing-CD level (2026-08-25)
+
+User asked why the 2019 wing CD is ~0.07 when the paper (`v1.2.0-paper` tag,
+Apr 2025, old h5s in `EKF-AWE\results\v3\`) said 0.123. Decomposition:
+
+- ~0.015 is display: `wing_drag_coefficient` is the residual STATE since the
+  stages; the physically comparable number is `wing_drag_coefficient_total`.
+- ~0.011 is the pitot dynamic-pressure calibration (paper used raw va;
+  calibrated va is ~+5 % speed → all coefficients ~−10 %, lidar-backed).
+- ~0.014 is tether discretization 5→30 elements (tether CD 0.031→0.045).
+- +0.006 was a BUG: every awesIO-convention run (both productions, ALL tune
+  h5s, the lidar validation) had `distance_kcu_kite = 0`, because the
+  extraction (in BOTH repos) read `bridle_point_node[2]`, which is the
+  body-frame origin in awesIO — always 0. Zero bridle length degenerates the
+  KCU→kite direction ej in tether.py to solver-residual noise: bridle drag
+  collapsed 0.012→0.001, KCU CD doubled 0.007→0.014, and the tether-length
+  offset state silently absorbed ~9 m.
+- FIX (user decision): derive the distance from the wing CG height above the
+  bridle point — `wing_struct["center_of_mass"][2]` = 10.3 m for the V3 —
+  in both `src/awes_ekf/setup/settings.py` and AWETrim's
+  `src/awetrim/experimental/settings.py` (the production pipeline
+  `run_analysis_ekf.py` uses the AWETrim copy).
+- A/B on the slice (`_tune_s5d` dist 0 vs `_tune_dist115` dist 11.5, all
+  else identical): wing CD total 0.088→0.094 flight median, bridle/KCU CD
+  restored to paper-era values, dips <0.05 9.5→6.6 %, wind + pattern metrics
+  + NIS UNCHANGED, k_phi_us unchanged (only k_cd_us −16 %). The stages and
+  lidar conclusions survive; only drag attribution was corrupted.
+- Reconciliation: paper 0.123 − calibration − tether-resolution ≈ 0.095;
+  fixed run gives total 0.094. The books balance; ~0.094 total (CD0 state
+  ~0.079) is the defensible current number.
+- PENDING: both production h5s must be RE-SOLVED by the user (interactive
+  run_analysis_ekf) to pick up the fix; until then base-h5 configs feed
+  tune runs distance 0 (override with --set kcu.distance_kcu_kite=10.3).
+  All reference tune h5s except `_tune_dist115` carry the bug.
+
 ### Fixed background decisions (do not relitigate)
 
 - vw 0.02 is the sweet spot (0.05 wanders with the loop, 0.01 suppresses real
