@@ -180,6 +180,8 @@ below 0 for ~0.3 % (2.6 % in the old loose production tuning). Diagnosed:
   RECOMMENDED: model_stdv.CD = 0.0005 for production (balanced); 0.0001 if
   a hard floor matters more than the 2019 w_z/TI stiffness signs. A
   positivity reparameterization (softplus floor) is now likely unnecessary.
+  ADOPTED 2026-08-25: CD = 0.0005 is in data/LEI-V3-KITE/ekf_config.yaml in
+  BOTH repos (EKF-AWE committed, AWETrim committed separately).
 
 ### Fixed background decisions (do not relitigate)
 

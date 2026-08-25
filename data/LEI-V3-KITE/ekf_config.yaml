@@ -55,7 +55,7 @@ tuning_parameters:
     vw: 0.02   # per-step random walk; 0.05 let the wind wander ~7 % pp in phase with the loop, 0.01 over-tightens (suppresses real turbulence, biases the level +0.4 m/s). Residual TI 8.8 %
     vwz: 0.005
     CL: 0.005  # residual walks: the loop-locked steering response is carried by the steering_dependent_* terms, so the walks only hold what the actuation cannot explain. Tightening below these was not tried; loosening back to 0.01/0.003/0.01 costs wind-speed pattern (0.457 vs 0.401 pp). Freeing to 0.05 breaks wind observability outright
-    CD: 0.002
+    CD: 0.0005 # with the stages carrying the loop-locked and depower response, the CD state is a near-constant parasitic CD0 — a loose walk let lift/drag axis-misattribution noise dip the wing CD below 0.05 for 12% of samples (0.002) vs 9.5% here; lidar agreement on 2025-10-09 is unchanged by the tightening. 0.0001 kills the dips entirely (1.6%) but suppresses TI 8.8->6.6% and degrades w_z pattern on 2019 (tuned 2026-08-25)
     CS: 0.003
     tether_elevation: 0.0873 # 5 degrees in radians
     tether_azimuth: 0.0873 # 5 degrees in radians
