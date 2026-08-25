@@ -163,10 +163,23 @@ below 0 for ~0.3 % (2.6 % in the old loose production tuning). Diagnosed:
   (12.3 -> 12.1 % below 0.05). Runs: `_tune_s4` (first form), `_tune_s4b`
   (depower path removed), `_tune_s4c` (CD walk 0.001 — dips 11.2 %, best
   of the three, still no fix).
-- Remaining honest fix for the dips: POSITIVITY REPARAMETERIZATION of the
-  CD state (CD0 = floor + softplus(x), floor ~0.04; near-linear away from
-  the floor so the Q interpretation survives). Not implemented — the axis
-  noise then redistributes, watch the wind channels when trying it.
+- RESOLUTION (user's insight): with the stages carrying the deterministic
+  physics, the CD state is a PARASITIC near-constant and should barely
+  move — tightening model_stdv.CD is the fix, no polar needed (at tight CD
+  the polar-vs-no-polar runs are identical; keep drag_polar OFF).
+  2019 slice, s3b flags, by CD walk (total wing CD):
+    0.002: 12.3 % below 0.05, p1 +0.014 (the complaint)
+    0.0005 (`_tune_s5d`): 9.5 %, p1 +0.025, wind-dir pattern 2.19->1.70
+    0.0001 (`_tune_s5e`): 1.6 %, p1 +0.043, dir 1.63 — but w_z pattern
+      0.123->0.152 and TI 8.8->6.6 % (stiffness warnings on 2019)
+  The remaining <0 rate (0.2 %) is only the first-seconds transient.
+  LIDAR REFEREE (2025, `_tune_s4d25/_tune_s4e25` vs `_tune_s3b25`):
+  agreement unchanged at every tightness (speed bias +0.10/+0.09/+0.10,
+  RMS 0.47/0.47/0.48, dir RMS 9.9/10.4/10.5, w_z bias +0.07/+0.07/+0.05) —
+  the 2019 wind-speed-pattern rise is not a real accuracy loss.
+  RECOMMENDED: model_stdv.CD = 0.0005 for production (balanced); 0.0001 if
+  a hard floor matters more than the 2019 w_z/TI stiffness signs. A
+  positivity reparameterization (softplus floor) is now likely unnecessary.
 
 ### Fixed background decisions (do not relitigate)
 
