@@ -209,6 +209,15 @@ def internal_metrics(ekf, fd, cfg):
         "leak_cd_aus": abs(_corr(cd_d, aus_d) or np.nan),
         "leak_dir_us": abs(_corr(ed_d, us_d) or np.nan),
         "leak_speed_aus": abs(_corr(eu_d, aus_d) or np.nan),
+        # AMPLITUDE forms (|corr| x channel std): correlations are scale-
+        # invariant, so they measure the loop-locked FRACTION and cannot
+        # rank tunings whose total noise level differs (e.g. the vw grid,
+        # where loop leak and residual grow together at loose vw). The
+        # amplitude is the loop-locked wobble in the channel's own units.
+        "leak_dir_amp_deg": abs(_corr(ed_d, us_d) or np.nan)
+        * float(np.rad2deg(np.nanstd(ed_d))) if ed_d.size else np.nan,
+        "leak_speed_amp": abs(_corr(eu_d, aus_d) or np.nan)
+        * float(np.nanstd(eu_d)) if eu_d.size else np.nan,
         "leak_wz_us": abs(_corr(wz_d, us_d) or np.nan),
         # blind pitot criterion: signed wind-va loop correlation
         "ro_corr": _corr(eu_d, va_d),

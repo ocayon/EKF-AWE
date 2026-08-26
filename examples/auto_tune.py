@@ -223,29 +223,40 @@ class Ladder:
         self.log = []
         self.solved = {}
 
-    def h5_path(self, name):
+    def _job_h5(self, name, cfg):
+        """h5 path for a candidate; the name carries a hash of its config so
+        --reuse can never pick up a run from a different decision path."""
+        import hashlib
+
+        h = hashlib.md5(
+            json.dumps(cfg, sort_keys=True, default=str).encode()
+        ).hexdigest()[:6]
         prefix = f"{self.tag}_" if self.tag else ""
-        return (
+        stem = f"{prefix}{name}_{h}"
+        return stem, (
             PROJECT_DIR / "results" / self.model
-            / f"{self.model}_{self.date}_auto_{prefix}{name}.h5"
+            / f"{self.model}_{self.date}_auto_{stem}.h5"
         )
 
     def solve_many(self, jobs):
         """jobs: list of (name, config_dict). Runs missing ones in parallel."""
         pending = []
+        self._expected = getattr(self, "_expected", {})
         for name, cfg in jobs:
             if name in self.solved:
                 continue
-            if self.h5_path(name).exists() and self.args.reuse:
-                self.solved[name] = self.h5_path(name)
+            stem, path = self._job_h5(name, cfg)
+            self._expected[name] = path
+            if path.exists() and self.args.reuse:
+                self.solved[name] = path
                 continue
-            jf = self.out_dir / f"job_{name}.json"
+            jf = self.out_dir / f"job_{stem}.json"
             jf.write_text(json.dumps({
                 "project_dir": str(PROJECT_DIR),
                 "config": cfg,
                 "start_min": self.args.start_min,
                 "end_min": self.args.end_min,
-                "addition": f"_auto_{(self.tag + '_') if self.tag else ''}{name}",
+                "addition": f"_auto_{stem}",
             }, default=str))
             pending.append((name, jf))
         procs = {}
@@ -275,8 +286,8 @@ class Ladder:
             if p.poll() is not None:
                 logf.close()
                 del procs[name]
-                if p.returncode == 0 and self.h5_path(name).exists():
-                    self.solved[name] = self.h5_path(name)
+                if p.returncode == 0 and self._expected[name].exists():
+                    self.solved[name] = self._expected[name]
                     print(f"  {name} done", flush=True)
                 else:
                     print(f"  {name} FAILED (exit {p.returncode})", flush=True)
@@ -334,12 +345,12 @@ class Ladder:
         )
         self.decide("P0-sniff", flight, "flight capabilities", {})
 
-        # ---- P0 audit + P1 vw grid (audit doubles as the vw=0.1 point)
-        vw_grid = [0.1, 0.05] + ([0.02] if flight["has_va"] else [])
-        jobs = [(f"vw{v}", self.cfg(vw=v)) for v in vw_grid]
-        self.solve_many(jobs)
-        scores = {v: self.score(f"vw{v}") for v in vw_grid}
+        # ---- P0 audit + P1 wind walk
         if flight["lidar"]:
+            # grid decided by the va-scale-insensitive lidar criterion
+            vw_grid = [0.1, 0.05] + ([0.02] if flight["has_va"] else [])
+            self.solve_many([(f"vw{v}", self.cfg(vw=v)) for v in vw_grid])
+            scores = {v: self.score(f"vw{v}") for v in vw_grid}
             tab = {v: {"dir_rms": s["lidar"]["dir_rms_deg"],
                        "nis": s["internal"]["nis_median"]}
                    for v, s in scores.items()}
@@ -348,15 +359,20 @@ class Ladder:
             vw = min(ok, key=lambda v: tab[v]["dir_rms"])
             reason = "min lidar direction RMS (va-scale-insensitive), NIS in band"
         else:
-            ti0 = scores[0.1]["internal"]["ti_proxy"]
-            tab = {v: {"leak_dir": s["internal"]["leak_dir_us"],
-                       "ti": s["internal"]["ti_proxy"],
-                       "nis": s["internal"]["nis_median"]}
-                   for v, s in scores.items()}
-            ok = [v for v in vw_grid if tab[v]["ti"] >= 0.65 * ti0
-                  and NIS_BAND[0] < tab[v]["nis"] < NIS_BAND[1]] or vw_grid
-            vw = min(ok, key=lambda v: tab[v]["leak_dir"])
-            reason = "min blind direction leak with turbulence + NIS guards"
+            # BLIND: vw is a methodological prior, not per-flight tunable.
+            # Internal criteria are weakly identified for it: the loose-vw
+            # wind error is mostly NOT loop-locked (low-frequency wander),
+            # and the turbulence reference is itself inflated by the leak.
+            # 0.02 (va measured) / 0.05 (no va) were lidar-validated on the
+            # V3 (2019+2025) and V9 (2023+2024) at two sites.
+            vw = 0.02 if flight["has_va"] else 0.05
+            self.solve_many([(f"vw{vw}", self.cfg(vw=vw))])
+            s = self.score(f"vw{vw}")["internal"]
+            tab = {"nis": s["nis_median"], "ti": s["ti_proxy"]}
+            reason = ("TRANSFERRED PRIOR (lidar-validated V3+V9); blind "
+                      "internal criteria cannot identify vw")
+            if not (NIS_BAND[0] < s["nis_median"] < NIS_BAND[1]):
+                reason += f" -- WARNING: NIS {s['nis_median']:.2f} out of band"
         self.decide("P1-vw", vw, reason, tab)
         best = f"vw{vw}"
         base_kw = {"vw": vw}
@@ -461,7 +477,8 @@ class Ladder:
                             and abs(L["speed_bias"]) <= abs(L0["speed_bias"]) + 0.15)
                 i0, i = s0["internal"], s["internal"]
                 return (i["wind_hp_std"] <= 1.10 * i0["wind_hp_std"]
-                        and i["leak_dir_us"] <= i0["leak_dir_us"] + 0.10)
+                        and i["leak_dir_amp_deg"] <= 1.10 * i0["leak_dir_amp_deg"]
+                        + 0.1)
 
             ok = [l for l in cands if guarded(l)]
             max_red = max(red[l] for l in ok)
