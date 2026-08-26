@@ -59,6 +59,26 @@ Input CSV spec and diagrams: `.claude/`.
   lands in the h5 (runs from before this change — everything up to
   `_tune_t4` — do NOT record it; the ladder used --pitot 0.864,0 on the
   CLI).
+- AUTO-TUNER (`examples/auto_tune.py` + `autotune_metrics.py`, commits
+  518e15b/d8a6344): the tuning ladder as a driver — audit → vw (lidar
+  dir-RMS grid, or blind = TRANSFERRED PRIOR 0.02/0.05 with a NIS
+  warning; blind internal criteria provably cannot identify vw) → pitot k
+  (lidar secant, or blind ro-corr zero flagged UNANCHORED) → stages gated
+  on split-half drift <30 % → lag elbow (≥70 % of max guarded CS-leak
+  reduction) → CD tightness → final + pitot re-verify. Emits
+  results/<model>/autotune_<date>[_tag]/ekf_config_autotuned.yaml +
+  decisions.json; candidate h5s carry config hashes (--reuse safe;
+  --tag namespaces). ACCEPTANCE on V9 2023-11-27 from generic-loose
+  defaults: lidar branch re-derives the hand answer (vw 0.02, k 0.876 vs
+  0.864, stages+asym, lag 1.0, CD 0.002; RMS 0.48 / dir 1.9° — identical
+  to `_tune_lag10`); blind branch (lidar hidden) makes identical
+  STRUCTURAL choices, blind k 0.8327 (ro-corr zero; scan predicted
+  0.834), final vs lidar bias +0.46 / dir 2.0° — the characterized
+  unanchored-level penalty, declared in the output. Lesson: structure
+  identifies blind (leak collapse + split-half); LEVELS (pitot k, vw)
+  need a lidar or a validated prior — the k-scan (`_tune_kscan*` +
+  s2af) showed ALL self-referential criteria cluster at k 0.80–0.83 vs
+  lidar 0.864.
 - Provenance of the (1.0638463, −0.4149) speed-linear va coeffs: present in
   process_KP_data.py AND process_v3_KP.py (both gitignored, no history);
   among ALL processed CSVs in use they were applied ONLY to the V11
