@@ -13,6 +13,59 @@ Input CSV spec and diagrams: `.claude/`.
 
 ---
 
+## Handoff (2026-08-26 — V9 tuned, both paper flights re-solved)
+
+- Task: tune the LEI V9 (Kitepower ProtoLogger data, local-only per the
+  ignore rules) and compare the paper's two flights, 2023-11-27 (86 min,
+  WITH airspeed sensor) and 2024-06-05 (242 min, NO airspeed; the paper ran
+  it with `dynamic_depower: true` — kept). BOTH processed CSVs carry
+  profiling-lidar columns (40–250 m, h5-sanitized names like
+  `100m_Wind_Speed_m_s`) → every candidate was scored against the lidar
+  (60-s blocks at kite height); that, not the pattern metrics, was the
+  primary referee.
+- `data/LEI-V9-KITE/` (gitignored) now holds the TUNED `ekf_config.yaml`,
+  the fixed `system.yaml` (tether diameter placeholder 0.001 → 0.014 m),
+  and the session tooling: `tune_v9.py` (non-interactive runner; config
+  from a results h5 + `--set` overrides + `--pitot K,B` freeze; results to
+  `results/v9/v9_<date>_tune_<name>.h5`), `lidar_compare.py`,
+  `compare_flights.py` (paper-style two-flight comparison + figures).
+- COMMITTED+PUSHED `2bda3d2`: `load_config` crashed on the V9 yaml (wing
+  `center_of_mass` is empty → `None[2]`); `_distance_kcu_kite` now falls
+  back to `control_system.structure.distance_kcu_kite` (15.45 m for V9).
+- V9 pitot: the preprocessor (`process_KP_data.py`) already applies a
+  linear va calibration; the in-EKF pre-run then OVERFITS on top of it
+  (fitted k=0.818 ≡ va×1.106 → wind +0.66 m/s vs lidar), while raw va sits
+  ~7 % low (wind −1.3 m/s). LIDAR-ANCHORED residual scale k=0.864
+  (va×1.076, `--pitot 0.864,0`, `calibrate_apparent_windspeed: false`)
+  zeroes the 60-s-block wind-speed bias. Don't re-enable the pre-run for
+  the V9 without a lidar check.
+- Steering stages transfer to the V9. Lag swept 0/0.5/1.0/1.5 s (V3 was
+  0.3): on 2023 the CS pattern-lock falls 0.049/0.036/0.026/0.020 with the
+  lidar flat; on 2024 (no va) lag 1.0 costs +0.2 m/s bias and +0.13 RMS
+  while 0.3≈0.5 tie. CONFIG default 0.5 s (robust across sensor sets); use
+  1.0 for aero-focused work on va-instrumented flights. CD walk 0.0005 and
+  vw 0.02 both push the no-va wind level down (−0.55 m/s at vw 0.02, run
+  `_tune_t1`) — the no-va flight wants vw 0.05, CD 0.002.
+- FINAL runs: `_tune_lag05` (2023) and `_tune_t4` (2024); full ladder kept
+  (paper/base/basenoc/s2/s3b/s2f/s2af/lag05/lag10/lag15, t1–t4). Vs lidar,
+  final (paper cfg): 2023 bias +0.02 (+0.27), RMS 0.48 (0.51), corr 0.88
+  (0.90), dir RMS 1.9° (2.7°); 2024 bias +0.15 (+0.58), RMS 1.07 (1.30),
+  corr 0.74 (0.68), dir RMS 6.1° (7.4°). Direction-total pattern on 2023:
+  1.8° vs paper 7.7°. w_z bias −0.3-−0.4 both flights (lidar ≈ +0.1).
+- Cross-flight physics: at MATCHED lag 1.0 k_phi_us = −0.150 vs −0.154 per
+  % steering (3 %; at lag 0.5 the no-va flight converges it more slowly —
+  −0.143 vs −0.119). Reel-out medians CL 0.87/0.89, CD 0.147/0.147 —
+  season-repeatable. `k_cl_us_odd` FLIPS SIGN between campaigns (+0.040 vs
+  −0.079 per %): rigging-trim asymmetry, don't average it across flights.
+  2024 constants other than k_phi_us have 20–40 % half-drift (4-h no-va
+  flight) — treat as indicative.
+- diagnose_ekf.py works on V9 h5s (fpi 1=reel-out, 3=reel-in) but 2023 has
+  only ~4 usable reel-out minutes (V9 pump cycles ~66 s < MIN_SEGMENT_S
+  windows); 2024 gives 18 min. NIS median ≈ 1.0 (2023) / 0.6 (2024).
+- The old paper-era h5s (`v9_<date>.h5` etc.) are untouched; the 2024
+  paper config reproduces its lidar stats exactly under current code, the
+  2023 one shifts (va-handling code changed since).
+
 ## Handoff (2026-08-24, evening — steering-dependent aero stages DONE)
 
 ### State of the repo
