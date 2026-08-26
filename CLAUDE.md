@@ -32,13 +32,25 @@ Input CSV spec and diagrams: `.claude/`.
 - COMMITTED+PUSHED `2bda3d2`: `load_config` crashed on the V9 yaml (wing
   `center_of_mass` is empty → `None[2]`); `_distance_kcu_kite` now falls
   back to `control_system.structure.distance_kcu_kite` (15.45 m for V9).
-- V9 pitot: the preprocessor (`process_KP_data.py`) already applies a
-  linear va calibration; the in-EKF pre-run then OVERFITS on top of it
-  (fitted k=0.818 ≡ va×1.106 → wind +0.66 m/s vs lidar), while raw va sits
-  ~7 % low (wind −1.3 m/s). LIDAR-ANCHORED residual scale k=0.864
-  (va×1.076, `--pitot 0.864,0`, `calibrate_apparent_windspeed: false`)
-  zeroes the 60-s-block wind-speed bias. Don't re-enable the pre-run for
-  the V9 without a lidar check.
+- V9 pitot (CHECKED PROPERLY, user prompt): the processed V9 CSVs carry
+  the RAW sensor (processed = 1.000000·raw − 0.000000 verified on
+  2023-11-27) — the hardcoded speed-linear coeffs in `process_KP_data.py`
+  are the V11's fit (V11 2025-10-09 CSV = exactly a·raw+b), added AFTER
+  the V9 CSVs were made; they are now GATED to v11 so a V9 regeneration
+  cannot double-calibrate (preprocessor is gitignored — local edit). The
+  LIDAR-ANCHORED calibration is a PURE dynamic-pressure scale k=0.864 on
+  raw, b=0 — the form is validated (60-s-block wind bias flat across va
+  levels: −0.02 @ va 18–24 vs +0.04 @ ≥24), apples-to-apples with the
+  V3's 0.8224/0.8308: both pitots under-read q by 14–18 % (installation/
+  induced-flow effect, k worth quoting as 0.86–0.88; reel-out-only blocks
+  give ~0.876). The in-EKF pre-run fits k=0.818 (va×1.106 → wind
+  +0.66 m/s vs lidar) because it calibrates against the filter's own wind
+  — self-referential, input-scale-invariant, so no b tweak fixes it; keep
+  it off for the V9. Sample-level caveat: reel-in wind reads −1.1 m/s vs
+  lidar (paper config −2.0) at every calibration — a retraction-phase
+  model artifact, not pitot form; the within-reel-out bias-vs-va slope is
+  the residual loop leak (va varies 20→30 within each figure-eight), also
+  not pitot form.
 - Steering stages transfer to the V9. Lag swept 0/0.5/1.0/1.5 s (V3 was
   0.3): on 2023 the CS pattern-lock falls 0.049/0.036/0.026/0.020 with the
   lidar flat; on 2024 (no va) lag 1.0 costs +0.2 m/s bias and +0.13 RMS
