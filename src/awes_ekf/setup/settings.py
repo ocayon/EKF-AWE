@@ -36,6 +36,21 @@ def get_tether(system_config):
     return components.get("tether", {})
 
 
+def _distance_kcu_kite(wing_struct, control_sys_struct):
+    """KCU-to-wing distance [m]: the wing CG height above the bridle point.
+
+    bridle_point_node is the body-frame ORIGIN in awesIO (always [0,0,0]), so
+    the distance is the wing CG z. Reading the node itself gave 0 and collapsed
+    the bridle segment in the tether model (bridle drag lost, KCU drag split
+    corrupted). A system yaml without a wing CG (e.g. the LEI V9) may instead
+    carry the measured distance explicitly on the control_system structure.
+    """
+    wing_cg = wing_struct.get("center_of_mass")
+    if wing_cg is not None and wing_cg[2]:
+        return wing_cg[2]
+    return control_sys_struct.get("distance_kcu_kite") or 0.0
+
+
 def _prompt_path(message):
     try:
         from prompt_toolkit import prompt
@@ -143,11 +158,7 @@ def load_config(config_folder=None):
         "length": control_sys_struct.get("length", 1.0),
         "diameter": control_sys_struct.get("diameter", 0.48),
         "mass": control_sys_struct.get("mass", 0.0),
-        # bridle_point_node is the body-frame ORIGIN in awesIO (always [0,0,0]),
-        # so the KCU-to-wing distance is the wing CG height above it. Reading
-        # the node itself gave 0 and collapsed the bridle segment in the tether
-        # model (bridle drag lost, KCU drag split corrupted).
-        "distance_kcu_kite": wing_struct.get("center_of_mass", [0.0, 0.0, 0.0])[2],
+        "distance_kcu_kite": _distance_kcu_kite(wing_struct, control_sys_struct),
         "total_length_bridle_lines": bridle_struct.get(
             "total_nominal_line_length", 0.0
         ),
