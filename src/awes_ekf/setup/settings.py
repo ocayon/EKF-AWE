@@ -223,6 +223,17 @@ class SimulationConfig:
         self.pitot_calibration_fit_zero = kwargs.get(
             "pitot_calibration_fit_zero", False
         )
+        # FROZEN pitot calibration (va_meas^2 = k va_ref^2 + b), applied to
+        # the measured apparent wind speed in create_input_from_csv. Use for
+        # an externally validated calibration (e.g. the LEI V9's
+        # lidar-anchored k = 0.864 on the raw sensor); setting k disables
+        # the in-loop pre-run fit for the apparent wind speed, which would
+        # otherwise re-fit against the filter's own wind and absorb model
+        # bias into the sensor coefficient.
+        self.pitot_calibration_k = kwargs.get("pitot_calibration_k", None)
+        self.pitot_calibration_b = kwargs.get("pitot_calibration_b", 0.0)
+        if self.pitot_calibration_k:
+            self.calibrate_sensor["kite_apparent_windspeed"] = False
         # Window the sensor calibrations are fitted on, in minutes of flight.
         # It starts after the filter transient, lasts as long as asked for, and
         # always stops short of the end of the flight, where the data is often

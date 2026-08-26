@@ -51,6 +51,21 @@ Input CSV spec and diagrams: `.claude/`.
   model artifact, not pitot form; the within-reel-out bias-vs-va slope is
   the residual loop leak (va varies 20→30 within each figure-eight), also
   not pitot form.
+- Frozen pitot calibration is now FIRST-CLASS CONFIG: simulation_parameters
+  `pitot_calibration_k`/`_b` (SimulationConfig reads them,
+  create_input_from_csv applies va_ref = sqrt((va²−b)/k), and setting k
+  disables the va pre-run). `data/LEI-V9-KITE/ekf_config.yaml` carries
+  k=0.864; tune_v9.py --pitot now routes through the config so the pair
+  lands in the h5 (runs from before this change — everything up to
+  `_tune_t4` — do NOT record it; the ladder used --pitot 0.864,0 on the
+  CLI).
+- Provenance of the (1.0638463, −0.4149) speed-linear va coeffs: present in
+  process_KP_data.py AND process_v3_KP.py (both gitignored, no history);
+  among ALL processed CSVs in use they were applied ONLY to the V11
+  2025-10-09 one (V9 2023-11-27, V3 2019 and V3 2025 CSVs verified exactly
+  raw). process_KP_data now gates them to v11; the V11 should eventually
+  migrate to a lidar-anchored dynamic-pressure k like the V9 (it has lidar
+  flights), retiring the speed-linear form entirely.
 - Steering stages transfer to the V9. Lag swept 0/0.5/1.0/1.5 s (V3 was
   0.3): on 2023 the CS pattern-lock falls 0.049/0.036/0.026/0.020 with the
   lidar flat; on 2024 (no va) lag 1.0 costs +0.2 m/s bias and +0.13 RMS

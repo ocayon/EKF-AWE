@@ -112,6 +112,21 @@ def create_input_from_csv(
             )
         kite_apparent_windspeed = np.zeros(n_intervals)
 
+    # Frozen pitot calibration from the config: va_meas^2 = k va_ref^2 + b,
+    # solved for the reference speed. Recorded in ekf_config.yaml (e.g. the
+    # LEI V9's lidar-anchored k = 0.864) so a plain run applies it without
+    # command-line flags; the in-loop pre-run is disabled when it is set.
+    if getattr(simConfig, "pitot_calibration_k", None):
+        k_cal = float(simConfig.pitot_calibration_k)
+        b_cal = float(getattr(simConfig, "pitot_calibration_b", 0.0) or 0.0)
+        kite_apparent_windspeed = np.sqrt(
+            np.maximum((kite_apparent_windspeed**2 - b_cal) / k_cal, 0.0)
+        )
+        print(
+            f"Frozen pitot calibration from config: k = {k_cal:.4f}, "
+            f"zero = {b_cal:.4f} m2/s2"
+        )
+
     try:
         depower_input = np.array(flight_data["kcu_actual_depower"]) / max(
             abs(flight_data["kcu_actual_depower"])
